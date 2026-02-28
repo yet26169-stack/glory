@@ -1,0 +1,70 @@
+{
+    "id": "fire_mage_flame_pillar",
+    "displayName": "Flame Pillar",
+    "slot": "W",
+    "targeting": "POINT",
+    "resourceType": "MANA",
+    "costPerLevel": [
+        70,
+        80,
+        90,
+        100,
+        110
+    ],
+    "cooldownPerLevel": [
+        12.0,
+        11.0,
+        10.0,
+        9.0,
+        8.0
+    ],
+    "castTime": 0.5,
+    "channelDuration": 0.0,
+    "canMoveWhileCasting": false,
+    "canBeInterrupted": true,
+    "castRange": 900.0,
+    "areaShape": "CIRCLE",
+    "areaRadius": 250.0,
+    "onHitEffects": [
+        {
+            "type": "DAMAGE",
+            "damageType": "MAGICAL",
+            "scaling": {
+                "basePerLevel": [
+                    90,
+                    145,
+                    200,
+                    255,
+                    310
+                ],
+                "apRatio": 0.85
+            }
+        },
+        {
+            "type": "DOT",
+            "damageType": "MAGICAL",
+            "scaling": {
+                "basePerLevel": [
+                    30,
+                    50,
+                    70,
+                    90,
+                    110
+                ],
+                "apRatio": 0.2
+            },
+            "duration": 3.0,
+            "tickRate": 1.0
+        }
+    ],
+    "castVFX": "vfx_flame_pillar_cast",
+    "impactVFX": "vfx_flame_pillar_eruption",
+    "castSFX": "sfx_flame_pillar_cast",
+    "impactSFX": "sfx_flame_pillar_eruption",
+    "tags": [
+        "damage",
+        "aoe",
+        "magical",
+        "dot"
+    ]
+}

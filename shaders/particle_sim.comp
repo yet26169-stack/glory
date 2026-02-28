@@ -1,0 +1,71 @@
+#version 450
+
+// GPU particle simulation compute shader
+// Updates particle physics (velocity, position, lifetime, alpha fade)
+// Writes alive particles to output vertex buffer via atomic counter
+
+struct Particle {
+    vec4 posAndLifetime;   // xyz = position, w = lifetime
+    vec4 velAndMaxLife;    // xyz = velocity, w = maxLifetime
+    vec4 color;            // rgba
+};
+
+struct ParticleVertex {
+    vec4 posAndPad;   // xyz = position, w = padding (matches C++ vec3 + padding to vec4 alignment)
+    vec4 color;
+};
+
+layout(std430, binding = 0) buffer ParticleSSBO {
+    Particle particles[];
+};
+
+layout(std430, binding = 1) buffer VertexSSBO {
+    ParticleVertex vertices[];
+};
+
+layout(std430, binding = 2) buffer CounterSSBO {
+    uint aliveCount;
+};
+
+layout(push_constant) uniform PushConstants {
+    float deltaTime;
+    float gravity;
+    uint  maxParticles;
+};
+
+layout(local_size_x = 64) in;
+
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+    if (idx >= maxParticles) return;
+
+    Particle p = particles[idx];
+
+    // Skip dead particles
+    if (p.posAndLifetime.w <= 0.0) return;
+
+    // Decrement lifetime
+    p.posAndLifetime.w -= deltaTime;
+    if (p.posAndLifetime.w <= 0.0) {
+        particles[idx].posAndLifetime.w = 0.0;
+        return;
+    }
+
+    // Apply gravity to velocity
+    p.velAndMaxLife.y += gravity * deltaTime;
+
+    // Integrate position
+    p.posAndLifetime.xyz += p.velAndMaxLife.xyz * deltaTime;
+
+    // Quadratic alpha fade over lifetime
+    float t = p.posAndLifetime.w / p.velAndMaxLife.w;
+    p.color.a = t * t;
+
+    // Write back to particle buffer
+    particles[idx] = p;
+
+    // Append to output vertex buffer (atomic compaction)
+    uint slot = atomicAdd(aliveCount, 1);
+    vertices[slot].posAndPad = vec4(p.posAndLifetime.xyz, 0.0);
+    vertices[slot].color     = p.color;
+}

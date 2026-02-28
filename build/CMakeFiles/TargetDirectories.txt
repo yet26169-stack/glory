@@ -1,0 +1,12 @@
+/Users/donkey/Development/1/Glory/build/CMakeFiles/Shaders.dir
+/Users/donkey/Development/1/Glory/build/CMakeFiles/Glory.dir
+/Users/donkey/Development/1/Glory/build/CMakeFiles/mesh_cook.dir
+/Users/donkey/Development/1/Glory/build/CMakeFiles/Assets.dir
+/Users/donkey/Development/1/Glory/build/CMakeFiles/test_mirror.dir
+/Users/donkey/Development/1/Glory/build/CMakeFiles/test_maploader.dir
+/Users/donkey/Development/1/Glory/build/CMakeFiles/test_terrain.dir
+/Users/donkey/Development/1/Glory/build/CMakeFiles/test_nav.dir
+/Users/donkey/Development/1/Glory/build/CMakeFiles/test_fog.dir
+/Users/donkey/Development/1/Glory/build/CMakeFiles/test_ability.dir
+/Users/donkey/Development/1/Glory/build/CMakeFiles/edit_cache.dir
+/Users/donkey/Development/1/Glory/build/CMakeFiles/rebuild_cache.dir
