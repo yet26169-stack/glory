@@ -1259,6 +1259,93 @@ CMakeFiles/Glory.dir/src/renderer/GLBLoader.cpp.o: \
   /opt/homebrew/include/glm/detail/func_integer.inl \
   /Users/donkey/Development/1/Glory/src/renderer/Device.h \
   /Users/donkey/Development/1/Glory/src/renderer/Model.h \
+  /Users/donkey/Development/1/Glory/src/animation/AnimationClip.h \
+  /opt/homebrew/include/glm/gtc/quaternion.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/constants.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../ext/scalar_constants.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../ext/../detail/setup.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../ext/scalar_constants.inl \
+  /opt/homebrew/include/glm/gtc/../gtc/constants.inl \
+  /opt/homebrew/include/glm/gtc/../gtc/matrix_transform.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../mat4x4.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../vec2.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../vec3.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../vec4.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../ext/matrix_projection.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../ext/../gtc/constants.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../ext/../geometric.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../ext/../trigonometric.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../ext/../matrix.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../ext/matrix_projection.inl \
+  /opt/homebrew/include/glm/gtc/../gtc/../ext/matrix_clip_space.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../ext/../ext/scalar_constants.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../ext/matrix_clip_space.inl \
+  /opt/homebrew/include/glm/gtc/../gtc/../ext/matrix_transform.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../ext/matrix_transform.inl \
+  /opt/homebrew/include/glm/gtc/../gtc/matrix_transform.inl \
+  /opt/homebrew/include/glm/gtc/../gtc/../geometric.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../trigonometric.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../matrix.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/vector_relational.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/qualifier.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/vector_relational.inl \
+  /opt/homebrew/include/glm/gtc/../ext/../vector_relational.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../common.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/type_float.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/setup.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/quaternion_common.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../ext/scalar_constants.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../ext/quaternion_geometric.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../ext/../geometric.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../ext/../exponential.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../ext/../ext/vector_relational.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../ext/quaternion_geometric.inl \
+  /opt/homebrew/include/glm/gtc/../ext/../trigonometric.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../exponential.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/quaternion_common.inl \
+  /opt/homebrew/include/glm/gtc/../ext/quaternion_float.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/type_quat.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/../detail/type_mat3x3.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/../detail/type_mat4x4.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/../detail/type_vec3.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/../detail/type_vec4.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/../ext/vector_relational.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/../ext/quaternion_relational.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/../ext/../vector_relational.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/../ext/quaternion_relational.inl \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/../gtc/constants.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/../gtc/matrix_transform.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/type_quat.inl \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/../trigonometric.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/../exponential.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/../ext/quaternion_common.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/../ext/quaternion_geometric.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/quaternion_float_precision.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/quaternion_double.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/quaternion_double_precision.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/quaternion_relational.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/quaternion_geometric.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/quaternion_trigonometric.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/scalar_constants.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/quaternion_trigonometric.inl \
+  /opt/homebrew/include/glm/gtc/../ext/quaternion_transform.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../geometric.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/quaternion_transform.inl \
+  /opt/homebrew/include/glm/gtc/../detail/type_mat3x3.hpp \
+  /opt/homebrew/include/glm/gtc/../detail/type_mat4x4.hpp \
+  /opt/homebrew/include/glm/gtc/../detail/type_vec3.hpp \
+  /opt/homebrew/include/glm/gtc/../detail/type_vec4.hpp \
+  /opt/homebrew/include/glm/gtc/quaternion.inl \
+  /opt/homebrew/include/glm/gtc/../trigonometric.hpp \
+  /opt/homebrew/include/glm/gtc/../geometric.hpp \
+  /opt/homebrew/include/glm/gtc/../exponential.hpp \
+  /opt/homebrew/include/glm/gtc/epsilon.hpp \
+  /opt/homebrew/include/glm/gtc/../detail/setup.hpp \
+  /opt/homebrew/include/glm/gtc/../detail/qualifier.hpp \
+  /opt/homebrew/include/glm/gtc/epsilon.inl \
+  /opt/homebrew/include/glm/gtc/../vector_relational.hpp \
+  /opt/homebrew/include/glm/gtc/../common.hpp \
+  /Users/donkey/Development/1/Glory/src/animation/Skeleton.h \
   /Users/donkey/Development/1/Glory/src/renderer/Mesh.h \
   /Users/donkey/Development/1/Glory/src/renderer/Texture.h \
   /Users/donkey/Development/1/Glory/src/renderer/Image.h \
@@ -1316,4 +1403,5 @@ CMakeFiles/Glory.dir/src/renderer/GLBLoader.cpp.o: \
   /opt/homebrew/include/spdlog/details/circular_q.h \
   /opt/homebrew/include/spdlog/details/log_msg_buffer.h \
   /opt/homebrew/include/spdlog/details/log_msg.h \
-  /opt/homebrew/include/spdlog/version.h
+  /opt/homebrew/include/spdlog/version.h \
+  /Users/donkey/Development/1/Glory/extern/meshoptimizer/src/meshoptimizer.h

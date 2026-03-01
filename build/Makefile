@@ -130,6 +130,19 @@ Shaders/fast:
 .PHONY : Shaders/fast
 
 #=============================================================================
+# Target rules for targets named meshoptimizer
+
+# Build rule for target.
+meshoptimizer: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 meshoptimizer
+.PHONY : meshoptimizer
+
+# fast build rule for target.
+meshoptimizer/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/build
+.PHONY : meshoptimizer/fast
+
+#=============================================================================
 # Target rules for targets named Glory
 
 # Build rule for target.
@@ -414,6 +427,438 @@ extern/imgui/imgui_widgets.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/extern/imgui/imgui_widgets.cpp.s
 .PHONY : extern/imgui/imgui_widgets.cpp.s
 
+extern/meshoptimizer/src/allocator.o: extern/meshoptimizer/src/allocator.cpp.o
+.PHONY : extern/meshoptimizer/src/allocator.o
+
+# target to build an object file
+extern/meshoptimizer/src/allocator.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/allocator.cpp.o
+.PHONY : extern/meshoptimizer/src/allocator.cpp.o
+
+extern/meshoptimizer/src/allocator.i: extern/meshoptimizer/src/allocator.cpp.i
+.PHONY : extern/meshoptimizer/src/allocator.i
+
+# target to preprocess a source file
+extern/meshoptimizer/src/allocator.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/allocator.cpp.i
+.PHONY : extern/meshoptimizer/src/allocator.cpp.i
+
+extern/meshoptimizer/src/allocator.s: extern/meshoptimizer/src/allocator.cpp.s
+.PHONY : extern/meshoptimizer/src/allocator.s
+
+# target to generate assembly for a file
+extern/meshoptimizer/src/allocator.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/allocator.cpp.s
+.PHONY : extern/meshoptimizer/src/allocator.cpp.s
+
+extern/meshoptimizer/src/clusterizer.o: extern/meshoptimizer/src/clusterizer.cpp.o
+.PHONY : extern/meshoptimizer/src/clusterizer.o
+
+# target to build an object file
+extern/meshoptimizer/src/clusterizer.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/clusterizer.cpp.o
+.PHONY : extern/meshoptimizer/src/clusterizer.cpp.o
+
+extern/meshoptimizer/src/clusterizer.i: extern/meshoptimizer/src/clusterizer.cpp.i
+.PHONY : extern/meshoptimizer/src/clusterizer.i
+
+# target to preprocess a source file
+extern/meshoptimizer/src/clusterizer.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/clusterizer.cpp.i
+.PHONY : extern/meshoptimizer/src/clusterizer.cpp.i
+
+extern/meshoptimizer/src/clusterizer.s: extern/meshoptimizer/src/clusterizer.cpp.s
+.PHONY : extern/meshoptimizer/src/clusterizer.s
+
+# target to generate assembly for a file
+extern/meshoptimizer/src/clusterizer.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/clusterizer.cpp.s
+.PHONY : extern/meshoptimizer/src/clusterizer.cpp.s
+
+extern/meshoptimizer/src/indexanalyzer.o: extern/meshoptimizer/src/indexanalyzer.cpp.o
+.PHONY : extern/meshoptimizer/src/indexanalyzer.o
+
+# target to build an object file
+extern/meshoptimizer/src/indexanalyzer.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/indexanalyzer.cpp.o
+.PHONY : extern/meshoptimizer/src/indexanalyzer.cpp.o
+
+extern/meshoptimizer/src/indexanalyzer.i: extern/meshoptimizer/src/indexanalyzer.cpp.i
+.PHONY : extern/meshoptimizer/src/indexanalyzer.i
+
+# target to preprocess a source file
+extern/meshoptimizer/src/indexanalyzer.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/indexanalyzer.cpp.i
+.PHONY : extern/meshoptimizer/src/indexanalyzer.cpp.i
+
+extern/meshoptimizer/src/indexanalyzer.s: extern/meshoptimizer/src/indexanalyzer.cpp.s
+.PHONY : extern/meshoptimizer/src/indexanalyzer.s
+
+# target to generate assembly for a file
+extern/meshoptimizer/src/indexanalyzer.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/indexanalyzer.cpp.s
+.PHONY : extern/meshoptimizer/src/indexanalyzer.cpp.s
+
+extern/meshoptimizer/src/indexcodec.o: extern/meshoptimizer/src/indexcodec.cpp.o
+.PHONY : extern/meshoptimizer/src/indexcodec.o
+
+# target to build an object file
+extern/meshoptimizer/src/indexcodec.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/indexcodec.cpp.o
+.PHONY : extern/meshoptimizer/src/indexcodec.cpp.o
+
+extern/meshoptimizer/src/indexcodec.i: extern/meshoptimizer/src/indexcodec.cpp.i
+.PHONY : extern/meshoptimizer/src/indexcodec.i
+
+# target to preprocess a source file
+extern/meshoptimizer/src/indexcodec.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/indexcodec.cpp.i
+.PHONY : extern/meshoptimizer/src/indexcodec.cpp.i
+
+extern/meshoptimizer/src/indexcodec.s: extern/meshoptimizer/src/indexcodec.cpp.s
+.PHONY : extern/meshoptimizer/src/indexcodec.s
+
+# target to generate assembly for a file
+extern/meshoptimizer/src/indexcodec.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/indexcodec.cpp.s
+.PHONY : extern/meshoptimizer/src/indexcodec.cpp.s
+
+extern/meshoptimizer/src/indexgenerator.o: extern/meshoptimizer/src/indexgenerator.cpp.o
+.PHONY : extern/meshoptimizer/src/indexgenerator.o
+
+# target to build an object file
+extern/meshoptimizer/src/indexgenerator.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/indexgenerator.cpp.o
+.PHONY : extern/meshoptimizer/src/indexgenerator.cpp.o
+
+extern/meshoptimizer/src/indexgenerator.i: extern/meshoptimizer/src/indexgenerator.cpp.i
+.PHONY : extern/meshoptimizer/src/indexgenerator.i
+
+# target to preprocess a source file
+extern/meshoptimizer/src/indexgenerator.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/indexgenerator.cpp.i
+.PHONY : extern/meshoptimizer/src/indexgenerator.cpp.i
+
+extern/meshoptimizer/src/indexgenerator.s: extern/meshoptimizer/src/indexgenerator.cpp.s
+.PHONY : extern/meshoptimizer/src/indexgenerator.s
+
+# target to generate assembly for a file
+extern/meshoptimizer/src/indexgenerator.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/indexgenerator.cpp.s
+.PHONY : extern/meshoptimizer/src/indexgenerator.cpp.s
+
+extern/meshoptimizer/src/meshletcodec.o: extern/meshoptimizer/src/meshletcodec.cpp.o
+.PHONY : extern/meshoptimizer/src/meshletcodec.o
+
+# target to build an object file
+extern/meshoptimizer/src/meshletcodec.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/meshletcodec.cpp.o
+.PHONY : extern/meshoptimizer/src/meshletcodec.cpp.o
+
+extern/meshoptimizer/src/meshletcodec.i: extern/meshoptimizer/src/meshletcodec.cpp.i
+.PHONY : extern/meshoptimizer/src/meshletcodec.i
+
+# target to preprocess a source file
+extern/meshoptimizer/src/meshletcodec.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/meshletcodec.cpp.i
+.PHONY : extern/meshoptimizer/src/meshletcodec.cpp.i
+
+extern/meshoptimizer/src/meshletcodec.s: extern/meshoptimizer/src/meshletcodec.cpp.s
+.PHONY : extern/meshoptimizer/src/meshletcodec.s
+
+# target to generate assembly for a file
+extern/meshoptimizer/src/meshletcodec.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/meshletcodec.cpp.s
+.PHONY : extern/meshoptimizer/src/meshletcodec.cpp.s
+
+extern/meshoptimizer/src/meshletutils.o: extern/meshoptimizer/src/meshletutils.cpp.o
+.PHONY : extern/meshoptimizer/src/meshletutils.o
+
+# target to build an object file
+extern/meshoptimizer/src/meshletutils.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/meshletutils.cpp.o
+.PHONY : extern/meshoptimizer/src/meshletutils.cpp.o
+
+extern/meshoptimizer/src/meshletutils.i: extern/meshoptimizer/src/meshletutils.cpp.i
+.PHONY : extern/meshoptimizer/src/meshletutils.i
+
+# target to preprocess a source file
+extern/meshoptimizer/src/meshletutils.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/meshletutils.cpp.i
+.PHONY : extern/meshoptimizer/src/meshletutils.cpp.i
+
+extern/meshoptimizer/src/meshletutils.s: extern/meshoptimizer/src/meshletutils.cpp.s
+.PHONY : extern/meshoptimizer/src/meshletutils.s
+
+# target to generate assembly for a file
+extern/meshoptimizer/src/meshletutils.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/meshletutils.cpp.s
+.PHONY : extern/meshoptimizer/src/meshletutils.cpp.s
+
+extern/meshoptimizer/src/overdrawoptimizer.o: extern/meshoptimizer/src/overdrawoptimizer.cpp.o
+.PHONY : extern/meshoptimizer/src/overdrawoptimizer.o
+
+# target to build an object file
+extern/meshoptimizer/src/overdrawoptimizer.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/overdrawoptimizer.cpp.o
+.PHONY : extern/meshoptimizer/src/overdrawoptimizer.cpp.o
+
+extern/meshoptimizer/src/overdrawoptimizer.i: extern/meshoptimizer/src/overdrawoptimizer.cpp.i
+.PHONY : extern/meshoptimizer/src/overdrawoptimizer.i
+
+# target to preprocess a source file
+extern/meshoptimizer/src/overdrawoptimizer.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/overdrawoptimizer.cpp.i
+.PHONY : extern/meshoptimizer/src/overdrawoptimizer.cpp.i
+
+extern/meshoptimizer/src/overdrawoptimizer.s: extern/meshoptimizer/src/overdrawoptimizer.cpp.s
+.PHONY : extern/meshoptimizer/src/overdrawoptimizer.s
+
+# target to generate assembly for a file
+extern/meshoptimizer/src/overdrawoptimizer.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/overdrawoptimizer.cpp.s
+.PHONY : extern/meshoptimizer/src/overdrawoptimizer.cpp.s
+
+extern/meshoptimizer/src/partition.o: extern/meshoptimizer/src/partition.cpp.o
+.PHONY : extern/meshoptimizer/src/partition.o
+
+# target to build an object file
+extern/meshoptimizer/src/partition.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/partition.cpp.o
+.PHONY : extern/meshoptimizer/src/partition.cpp.o
+
+extern/meshoptimizer/src/partition.i: extern/meshoptimizer/src/partition.cpp.i
+.PHONY : extern/meshoptimizer/src/partition.i
+
+# target to preprocess a source file
+extern/meshoptimizer/src/partition.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/partition.cpp.i
+.PHONY : extern/meshoptimizer/src/partition.cpp.i
+
+extern/meshoptimizer/src/partition.s: extern/meshoptimizer/src/partition.cpp.s
+.PHONY : extern/meshoptimizer/src/partition.s
+
+# target to generate assembly for a file
+extern/meshoptimizer/src/partition.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/partition.cpp.s
+.PHONY : extern/meshoptimizer/src/partition.cpp.s
+
+extern/meshoptimizer/src/quantization.o: extern/meshoptimizer/src/quantization.cpp.o
+.PHONY : extern/meshoptimizer/src/quantization.o
+
+# target to build an object file
+extern/meshoptimizer/src/quantization.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/quantization.cpp.o
+.PHONY : extern/meshoptimizer/src/quantization.cpp.o
+
+extern/meshoptimizer/src/quantization.i: extern/meshoptimizer/src/quantization.cpp.i
+.PHONY : extern/meshoptimizer/src/quantization.i
+
+# target to preprocess a source file
+extern/meshoptimizer/src/quantization.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/quantization.cpp.i
+.PHONY : extern/meshoptimizer/src/quantization.cpp.i
+
+extern/meshoptimizer/src/quantization.s: extern/meshoptimizer/src/quantization.cpp.s
+.PHONY : extern/meshoptimizer/src/quantization.s
+
+# target to generate assembly for a file
+extern/meshoptimizer/src/quantization.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/quantization.cpp.s
+.PHONY : extern/meshoptimizer/src/quantization.cpp.s
+
+extern/meshoptimizer/src/rasterizer.o: extern/meshoptimizer/src/rasterizer.cpp.o
+.PHONY : extern/meshoptimizer/src/rasterizer.o
+
+# target to build an object file
+extern/meshoptimizer/src/rasterizer.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/rasterizer.cpp.o
+.PHONY : extern/meshoptimizer/src/rasterizer.cpp.o
+
+extern/meshoptimizer/src/rasterizer.i: extern/meshoptimizer/src/rasterizer.cpp.i
+.PHONY : extern/meshoptimizer/src/rasterizer.i
+
+# target to preprocess a source file
+extern/meshoptimizer/src/rasterizer.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/rasterizer.cpp.i
+.PHONY : extern/meshoptimizer/src/rasterizer.cpp.i
+
+extern/meshoptimizer/src/rasterizer.s: extern/meshoptimizer/src/rasterizer.cpp.s
+.PHONY : extern/meshoptimizer/src/rasterizer.s
+
+# target to generate assembly for a file
+extern/meshoptimizer/src/rasterizer.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/rasterizer.cpp.s
+.PHONY : extern/meshoptimizer/src/rasterizer.cpp.s
+
+extern/meshoptimizer/src/simplifier.o: extern/meshoptimizer/src/simplifier.cpp.o
+.PHONY : extern/meshoptimizer/src/simplifier.o
+
+# target to build an object file
+extern/meshoptimizer/src/simplifier.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/simplifier.cpp.o
+.PHONY : extern/meshoptimizer/src/simplifier.cpp.o
+
+extern/meshoptimizer/src/simplifier.i: extern/meshoptimizer/src/simplifier.cpp.i
+.PHONY : extern/meshoptimizer/src/simplifier.i
+
+# target to preprocess a source file
+extern/meshoptimizer/src/simplifier.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/simplifier.cpp.i
+.PHONY : extern/meshoptimizer/src/simplifier.cpp.i
+
+extern/meshoptimizer/src/simplifier.s: extern/meshoptimizer/src/simplifier.cpp.s
+.PHONY : extern/meshoptimizer/src/simplifier.s
+
+# target to generate assembly for a file
+extern/meshoptimizer/src/simplifier.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/simplifier.cpp.s
+.PHONY : extern/meshoptimizer/src/simplifier.cpp.s
+
+extern/meshoptimizer/src/spatialorder.o: extern/meshoptimizer/src/spatialorder.cpp.o
+.PHONY : extern/meshoptimizer/src/spatialorder.o
+
+# target to build an object file
+extern/meshoptimizer/src/spatialorder.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/spatialorder.cpp.o
+.PHONY : extern/meshoptimizer/src/spatialorder.cpp.o
+
+extern/meshoptimizer/src/spatialorder.i: extern/meshoptimizer/src/spatialorder.cpp.i
+.PHONY : extern/meshoptimizer/src/spatialorder.i
+
+# target to preprocess a source file
+extern/meshoptimizer/src/spatialorder.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/spatialorder.cpp.i
+.PHONY : extern/meshoptimizer/src/spatialorder.cpp.i
+
+extern/meshoptimizer/src/spatialorder.s: extern/meshoptimizer/src/spatialorder.cpp.s
+.PHONY : extern/meshoptimizer/src/spatialorder.s
+
+# target to generate assembly for a file
+extern/meshoptimizer/src/spatialorder.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/spatialorder.cpp.s
+.PHONY : extern/meshoptimizer/src/spatialorder.cpp.s
+
+extern/meshoptimizer/src/stripifier.o: extern/meshoptimizer/src/stripifier.cpp.o
+.PHONY : extern/meshoptimizer/src/stripifier.o
+
+# target to build an object file
+extern/meshoptimizer/src/stripifier.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/stripifier.cpp.o
+.PHONY : extern/meshoptimizer/src/stripifier.cpp.o
+
+extern/meshoptimizer/src/stripifier.i: extern/meshoptimizer/src/stripifier.cpp.i
+.PHONY : extern/meshoptimizer/src/stripifier.i
+
+# target to preprocess a source file
+extern/meshoptimizer/src/stripifier.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/stripifier.cpp.i
+.PHONY : extern/meshoptimizer/src/stripifier.cpp.i
+
+extern/meshoptimizer/src/stripifier.s: extern/meshoptimizer/src/stripifier.cpp.s
+.PHONY : extern/meshoptimizer/src/stripifier.s
+
+# target to generate assembly for a file
+extern/meshoptimizer/src/stripifier.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/stripifier.cpp.s
+.PHONY : extern/meshoptimizer/src/stripifier.cpp.s
+
+extern/meshoptimizer/src/vcacheoptimizer.o: extern/meshoptimizer/src/vcacheoptimizer.cpp.o
+.PHONY : extern/meshoptimizer/src/vcacheoptimizer.o
+
+# target to build an object file
+extern/meshoptimizer/src/vcacheoptimizer.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/vcacheoptimizer.cpp.o
+.PHONY : extern/meshoptimizer/src/vcacheoptimizer.cpp.o
+
+extern/meshoptimizer/src/vcacheoptimizer.i: extern/meshoptimizer/src/vcacheoptimizer.cpp.i
+.PHONY : extern/meshoptimizer/src/vcacheoptimizer.i
+
+# target to preprocess a source file
+extern/meshoptimizer/src/vcacheoptimizer.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/vcacheoptimizer.cpp.i
+.PHONY : extern/meshoptimizer/src/vcacheoptimizer.cpp.i
+
+extern/meshoptimizer/src/vcacheoptimizer.s: extern/meshoptimizer/src/vcacheoptimizer.cpp.s
+.PHONY : extern/meshoptimizer/src/vcacheoptimizer.s
+
+# target to generate assembly for a file
+extern/meshoptimizer/src/vcacheoptimizer.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/vcacheoptimizer.cpp.s
+.PHONY : extern/meshoptimizer/src/vcacheoptimizer.cpp.s
+
+extern/meshoptimizer/src/vertexcodec.o: extern/meshoptimizer/src/vertexcodec.cpp.o
+.PHONY : extern/meshoptimizer/src/vertexcodec.o
+
+# target to build an object file
+extern/meshoptimizer/src/vertexcodec.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/vertexcodec.cpp.o
+.PHONY : extern/meshoptimizer/src/vertexcodec.cpp.o
+
+extern/meshoptimizer/src/vertexcodec.i: extern/meshoptimizer/src/vertexcodec.cpp.i
+.PHONY : extern/meshoptimizer/src/vertexcodec.i
+
+# target to preprocess a source file
+extern/meshoptimizer/src/vertexcodec.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/vertexcodec.cpp.i
+.PHONY : extern/meshoptimizer/src/vertexcodec.cpp.i
+
+extern/meshoptimizer/src/vertexcodec.s: extern/meshoptimizer/src/vertexcodec.cpp.s
+.PHONY : extern/meshoptimizer/src/vertexcodec.s
+
+# target to generate assembly for a file
+extern/meshoptimizer/src/vertexcodec.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/vertexcodec.cpp.s
+.PHONY : extern/meshoptimizer/src/vertexcodec.cpp.s
+
+extern/meshoptimizer/src/vertexfilter.o: extern/meshoptimizer/src/vertexfilter.cpp.o
+.PHONY : extern/meshoptimizer/src/vertexfilter.o
+
+# target to build an object file
+extern/meshoptimizer/src/vertexfilter.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/vertexfilter.cpp.o
+.PHONY : extern/meshoptimizer/src/vertexfilter.cpp.o
+
+extern/meshoptimizer/src/vertexfilter.i: extern/meshoptimizer/src/vertexfilter.cpp.i
+.PHONY : extern/meshoptimizer/src/vertexfilter.i
+
+# target to preprocess a source file
+extern/meshoptimizer/src/vertexfilter.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/vertexfilter.cpp.i
+.PHONY : extern/meshoptimizer/src/vertexfilter.cpp.i
+
+extern/meshoptimizer/src/vertexfilter.s: extern/meshoptimizer/src/vertexfilter.cpp.s
+.PHONY : extern/meshoptimizer/src/vertexfilter.s
+
+# target to generate assembly for a file
+extern/meshoptimizer/src/vertexfilter.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/vertexfilter.cpp.s
+.PHONY : extern/meshoptimizer/src/vertexfilter.cpp.s
+
+extern/meshoptimizer/src/vfetchoptimizer.o: extern/meshoptimizer/src/vfetchoptimizer.cpp.o
+.PHONY : extern/meshoptimizer/src/vfetchoptimizer.o
+
+# target to build an object file
+extern/meshoptimizer/src/vfetchoptimizer.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/vfetchoptimizer.cpp.o
+.PHONY : extern/meshoptimizer/src/vfetchoptimizer.cpp.o
+
+extern/meshoptimizer/src/vfetchoptimizer.i: extern/meshoptimizer/src/vfetchoptimizer.cpp.i
+.PHONY : extern/meshoptimizer/src/vfetchoptimizer.i
+
+# target to preprocess a source file
+extern/meshoptimizer/src/vfetchoptimizer.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/vfetchoptimizer.cpp.i
+.PHONY : extern/meshoptimizer/src/vfetchoptimizer.cpp.i
+
+extern/meshoptimizer/src/vfetchoptimizer.s: extern/meshoptimizer/src/vfetchoptimizer.cpp.s
+.PHONY : extern/meshoptimizer/src/vfetchoptimizer.s
+
+# target to generate assembly for a file
+extern/meshoptimizer/src/vfetchoptimizer.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/extern/meshoptimizer/src/vfetchoptimizer.cpp.s
+.PHONY : extern/meshoptimizer/src/vfetchoptimizer.cpp.s
+
 extern/vma/vma_impl.o: extern/vma/vma_impl.cpp.o
 .PHONY : extern/vma/vma_impl.o
 
@@ -599,6 +1044,54 @@ src/ability/StatusEffectSystem.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/ability/StatusEffectSystem.cpp.s
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_ability.dir/build.make CMakeFiles/test_ability.dir/src/ability/StatusEffectSystem.cpp.s
 .PHONY : src/ability/StatusEffectSystem.cpp.s
+
+src/animation/AnimationPlayer.o: src/animation/AnimationPlayer.cpp.o
+.PHONY : src/animation/AnimationPlayer.o
+
+# target to build an object file
+src/animation/AnimationPlayer.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/animation/AnimationPlayer.cpp.o
+.PHONY : src/animation/AnimationPlayer.cpp.o
+
+src/animation/AnimationPlayer.i: src/animation/AnimationPlayer.cpp.i
+.PHONY : src/animation/AnimationPlayer.i
+
+# target to preprocess a source file
+src/animation/AnimationPlayer.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/animation/AnimationPlayer.cpp.i
+.PHONY : src/animation/AnimationPlayer.cpp.i
+
+src/animation/AnimationPlayer.s: src/animation/AnimationPlayer.cpp.s
+.PHONY : src/animation/AnimationPlayer.s
+
+# target to generate assembly for a file
+src/animation/AnimationPlayer.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/animation/AnimationPlayer.cpp.s
+.PHONY : src/animation/AnimationPlayer.cpp.s
+
+src/animation/CPUSkinning.o: src/animation/CPUSkinning.cpp.o
+.PHONY : src/animation/CPUSkinning.o
+
+# target to build an object file
+src/animation/CPUSkinning.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/animation/CPUSkinning.cpp.o
+.PHONY : src/animation/CPUSkinning.cpp.o
+
+src/animation/CPUSkinning.i: src/animation/CPUSkinning.cpp.i
+.PHONY : src/animation/CPUSkinning.i
+
+# target to preprocess a source file
+src/animation/CPUSkinning.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/animation/CPUSkinning.cpp.i
+.PHONY : src/animation/CPUSkinning.cpp.i
+
+src/animation/CPUSkinning.s: src/animation/CPUSkinning.cpp.s
+.PHONY : src/animation/CPUSkinning.s
+
+# target to generate assembly for a file
+src/animation/CPUSkinning.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/animation/CPUSkinning.cpp.s
+.PHONY : src/animation/CPUSkinning.cpp.s
 
 src/audio/AudioEngine.o: src/audio/AudioEngine.cpp.o
 .PHONY : src/audio/AudioEngine.o
@@ -945,6 +1438,54 @@ src/renderer/Buffer.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/Buffer.cpp.s
 .PHONY : src/renderer/Buffer.cpp.s
 
+src/renderer/CascadeShadow.o: src/renderer/CascadeShadow.cpp.o
+.PHONY : src/renderer/CascadeShadow.o
+
+# target to build an object file
+src/renderer/CascadeShadow.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/CascadeShadow.cpp.o
+.PHONY : src/renderer/CascadeShadow.cpp.o
+
+src/renderer/CascadeShadow.i: src/renderer/CascadeShadow.cpp.i
+.PHONY : src/renderer/CascadeShadow.i
+
+# target to preprocess a source file
+src/renderer/CascadeShadow.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/CascadeShadow.cpp.i
+.PHONY : src/renderer/CascadeShadow.cpp.i
+
+src/renderer/CascadeShadow.s: src/renderer/CascadeShadow.cpp.s
+.PHONY : src/renderer/CascadeShadow.s
+
+# target to generate assembly for a file
+src/renderer/CascadeShadow.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/CascadeShadow.cpp.s
+.PHONY : src/renderer/CascadeShadow.cpp.s
+
+src/renderer/ComputeSkinner.o: src/renderer/ComputeSkinner.cpp.o
+.PHONY : src/renderer/ComputeSkinner.o
+
+# target to build an object file
+src/renderer/ComputeSkinner.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/ComputeSkinner.cpp.o
+.PHONY : src/renderer/ComputeSkinner.cpp.o
+
+src/renderer/ComputeSkinner.i: src/renderer/ComputeSkinner.cpp.i
+.PHONY : src/renderer/ComputeSkinner.i
+
+# target to preprocess a source file
+src/renderer/ComputeSkinner.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/ComputeSkinner.cpp.i
+.PHONY : src/renderer/ComputeSkinner.cpp.i
+
+src/renderer/ComputeSkinner.s: src/renderer/ComputeSkinner.cpp.s
+.PHONY : src/renderer/ComputeSkinner.s
+
+# target to generate assembly for a file
+src/renderer/ComputeSkinner.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/ComputeSkinner.cpp.s
+.PHONY : src/renderer/ComputeSkinner.cpp.s
+
 src/renderer/Context.o: src/renderer/Context.cpp.o
 .PHONY : src/renderer/Context.o
 
@@ -1017,6 +1558,30 @@ src/renderer/Device.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/Device.cpp.s
 .PHONY : src/renderer/Device.cpp.s
 
+src/renderer/DynamicMesh.o: src/renderer/DynamicMesh.cpp.o
+.PHONY : src/renderer/DynamicMesh.o
+
+# target to build an object file
+src/renderer/DynamicMesh.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/DynamicMesh.cpp.o
+.PHONY : src/renderer/DynamicMesh.cpp.o
+
+src/renderer/DynamicMesh.i: src/renderer/DynamicMesh.cpp.i
+.PHONY : src/renderer/DynamicMesh.i
+
+# target to preprocess a source file
+src/renderer/DynamicMesh.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/DynamicMesh.cpp.i
+.PHONY : src/renderer/DynamicMesh.cpp.i
+
+src/renderer/DynamicMesh.s: src/renderer/DynamicMesh.cpp.s
+.PHONY : src/renderer/DynamicMesh.s
+
+# target to generate assembly for a file
+src/renderer/DynamicMesh.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/DynamicMesh.cpp.s
+.PHONY : src/renderer/DynamicMesh.cpp.s
+
 src/renderer/GBuffer.o: src/renderer/GBuffer.cpp.o
 .PHONY : src/renderer/GBuffer.o
 
@@ -1064,6 +1629,54 @@ src/renderer/GLBLoader.s: src/renderer/GLBLoader.cpp.s
 src/renderer/GLBLoader.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/GLBLoader.cpp.s
 .PHONY : src/renderer/GLBLoader.cpp.s
+
+src/renderer/GpuCuller.o: src/renderer/GpuCuller.cpp.o
+.PHONY : src/renderer/GpuCuller.o
+
+# target to build an object file
+src/renderer/GpuCuller.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/GpuCuller.cpp.o
+.PHONY : src/renderer/GpuCuller.cpp.o
+
+src/renderer/GpuCuller.i: src/renderer/GpuCuller.cpp.i
+.PHONY : src/renderer/GpuCuller.i
+
+# target to preprocess a source file
+src/renderer/GpuCuller.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/GpuCuller.cpp.i
+.PHONY : src/renderer/GpuCuller.cpp.i
+
+src/renderer/GpuCuller.s: src/renderer/GpuCuller.cpp.s
+.PHONY : src/renderer/GpuCuller.s
+
+# target to generate assembly for a file
+src/renderer/GpuCuller.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/GpuCuller.cpp.s
+.PHONY : src/renderer/GpuCuller.cpp.s
+
+src/renderer/GpuProfiler.o: src/renderer/GpuProfiler.cpp.o
+.PHONY : src/renderer/GpuProfiler.o
+
+# target to build an object file
+src/renderer/GpuProfiler.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/GpuProfiler.cpp.o
+.PHONY : src/renderer/GpuProfiler.cpp.o
+
+src/renderer/GpuProfiler.i: src/renderer/GpuProfiler.cpp.i
+.PHONY : src/renderer/GpuProfiler.i
+
+# target to preprocess a source file
+src/renderer/GpuProfiler.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/GpuProfiler.cpp.i
+.PHONY : src/renderer/GpuProfiler.cpp.i
+
+src/renderer/GpuProfiler.s: src/renderer/GpuProfiler.cpp.s
+.PHONY : src/renderer/GpuProfiler.s
+
+# target to generate assembly for a file
+src/renderer/GpuProfiler.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/GpuProfiler.cpp.s
+.PHONY : src/renderer/GpuProfiler.cpp.s
 
 src/renderer/Image.o: src/renderer/Image.cpp.o
 .PHONY : src/renderer/Image.o
@@ -1305,6 +1918,30 @@ src/renderer/ShadowMap.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/ShadowMap.cpp.s
 .PHONY : src/renderer/ShadowMap.cpp.s
 
+src/renderer/StaticSkinnedMesh.o: src/renderer/StaticSkinnedMesh.cpp.o
+.PHONY : src/renderer/StaticSkinnedMesh.o
+
+# target to build an object file
+src/renderer/StaticSkinnedMesh.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/StaticSkinnedMesh.cpp.o
+.PHONY : src/renderer/StaticSkinnedMesh.cpp.o
+
+src/renderer/StaticSkinnedMesh.i: src/renderer/StaticSkinnedMesh.cpp.i
+.PHONY : src/renderer/StaticSkinnedMesh.i
+
+# target to preprocess a source file
+src/renderer/StaticSkinnedMesh.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/StaticSkinnedMesh.cpp.i
+.PHONY : src/renderer/StaticSkinnedMesh.cpp.i
+
+src/renderer/StaticSkinnedMesh.s: src/renderer/StaticSkinnedMesh.cpp.s
+.PHONY : src/renderer/StaticSkinnedMesh.s
+
+# target to generate assembly for a file
+src/renderer/StaticSkinnedMesh.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/StaticSkinnedMesh.cpp.s
+.PHONY : src/renderer/StaticSkinnedMesh.cpp.s
+
 src/renderer/Swapchain.o: src/renderer/Swapchain.cpp.o
 .PHONY : src/renderer/Swapchain.o
 
@@ -1376,6 +2013,30 @@ src/renderer/Texture.s: src/renderer/Texture.cpp.s
 src/renderer/Texture.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/Texture.cpp.s
 .PHONY : src/renderer/Texture.cpp.s
+
+src/renderer/TextureStreamer.o: src/renderer/TextureStreamer.cpp.o
+.PHONY : src/renderer/TextureStreamer.o
+
+# target to build an object file
+src/renderer/TextureStreamer.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/TextureStreamer.cpp.o
+.PHONY : src/renderer/TextureStreamer.cpp.o
+
+src/renderer/TextureStreamer.i: src/renderer/TextureStreamer.cpp.i
+.PHONY : src/renderer/TextureStreamer.i
+
+# target to preprocess a source file
+src/renderer/TextureStreamer.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/TextureStreamer.cpp.i
+.PHONY : src/renderer/TextureStreamer.cpp.i
+
+src/renderer/TextureStreamer.s: src/renderer/TextureStreamer.cpp.s
+.PHONY : src/renderer/TextureStreamer.s
+
+# target to generate assembly for a file
+src/renderer/TextureStreamer.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/TextureStreamer.cpp.s
+.PHONY : src/renderer/TextureStreamer.cpp.s
 
 src/scene/Scene.o: src/scene/Scene.cpp.o
 .PHONY : src/scene/Scene.o
@@ -1680,6 +2341,7 @@ help:
 	@echo "... Shaders"
 	@echo "... Glory"
 	@echo "... mesh_cook"
+	@echo "... meshoptimizer"
 	@echo "... test_ability"
 	@echo "... test_fog"
 	@echo "... test_maploader"
@@ -1707,6 +2369,60 @@ help:
 	@echo "... extern/imgui/imgui_widgets.o"
 	@echo "... extern/imgui/imgui_widgets.i"
 	@echo "... extern/imgui/imgui_widgets.s"
+	@echo "... extern/meshoptimizer/src/allocator.o"
+	@echo "... extern/meshoptimizer/src/allocator.i"
+	@echo "... extern/meshoptimizer/src/allocator.s"
+	@echo "... extern/meshoptimizer/src/clusterizer.o"
+	@echo "... extern/meshoptimizer/src/clusterizer.i"
+	@echo "... extern/meshoptimizer/src/clusterizer.s"
+	@echo "... extern/meshoptimizer/src/indexanalyzer.o"
+	@echo "... extern/meshoptimizer/src/indexanalyzer.i"
+	@echo "... extern/meshoptimizer/src/indexanalyzer.s"
+	@echo "... extern/meshoptimizer/src/indexcodec.o"
+	@echo "... extern/meshoptimizer/src/indexcodec.i"
+	@echo "... extern/meshoptimizer/src/indexcodec.s"
+	@echo "... extern/meshoptimizer/src/indexgenerator.o"
+	@echo "... extern/meshoptimizer/src/indexgenerator.i"
+	@echo "... extern/meshoptimizer/src/indexgenerator.s"
+	@echo "... extern/meshoptimizer/src/meshletcodec.o"
+	@echo "... extern/meshoptimizer/src/meshletcodec.i"
+	@echo "... extern/meshoptimizer/src/meshletcodec.s"
+	@echo "... extern/meshoptimizer/src/meshletutils.o"
+	@echo "... extern/meshoptimizer/src/meshletutils.i"
+	@echo "... extern/meshoptimizer/src/meshletutils.s"
+	@echo "... extern/meshoptimizer/src/overdrawoptimizer.o"
+	@echo "... extern/meshoptimizer/src/overdrawoptimizer.i"
+	@echo "... extern/meshoptimizer/src/overdrawoptimizer.s"
+	@echo "... extern/meshoptimizer/src/partition.o"
+	@echo "... extern/meshoptimizer/src/partition.i"
+	@echo "... extern/meshoptimizer/src/partition.s"
+	@echo "... extern/meshoptimizer/src/quantization.o"
+	@echo "... extern/meshoptimizer/src/quantization.i"
+	@echo "... extern/meshoptimizer/src/quantization.s"
+	@echo "... extern/meshoptimizer/src/rasterizer.o"
+	@echo "... extern/meshoptimizer/src/rasterizer.i"
+	@echo "... extern/meshoptimizer/src/rasterizer.s"
+	@echo "... extern/meshoptimizer/src/simplifier.o"
+	@echo "... extern/meshoptimizer/src/simplifier.i"
+	@echo "... extern/meshoptimizer/src/simplifier.s"
+	@echo "... extern/meshoptimizer/src/spatialorder.o"
+	@echo "... extern/meshoptimizer/src/spatialorder.i"
+	@echo "... extern/meshoptimizer/src/spatialorder.s"
+	@echo "... extern/meshoptimizer/src/stripifier.o"
+	@echo "... extern/meshoptimizer/src/stripifier.i"
+	@echo "... extern/meshoptimizer/src/stripifier.s"
+	@echo "... extern/meshoptimizer/src/vcacheoptimizer.o"
+	@echo "... extern/meshoptimizer/src/vcacheoptimizer.i"
+	@echo "... extern/meshoptimizer/src/vcacheoptimizer.s"
+	@echo "... extern/meshoptimizer/src/vertexcodec.o"
+	@echo "... extern/meshoptimizer/src/vertexcodec.i"
+	@echo "... extern/meshoptimizer/src/vertexcodec.s"
+	@echo "... extern/meshoptimizer/src/vertexfilter.o"
+	@echo "... extern/meshoptimizer/src/vertexfilter.i"
+	@echo "... extern/meshoptimizer/src/vertexfilter.s"
+	@echo "... extern/meshoptimizer/src/vfetchoptimizer.o"
+	@echo "... extern/meshoptimizer/src/vfetchoptimizer.i"
+	@echo "... extern/meshoptimizer/src/vfetchoptimizer.s"
 	@echo "... extern/vma/vma_impl.o"
 	@echo "... extern/vma/vma_impl.i"
 	@echo "... extern/vma/vma_impl.s"
@@ -1728,6 +2444,12 @@ help:
 	@echo "... src/ability/StatusEffectSystem.o"
 	@echo "... src/ability/StatusEffectSystem.i"
 	@echo "... src/ability/StatusEffectSystem.s"
+	@echo "... src/animation/AnimationPlayer.o"
+	@echo "... src/animation/AnimationPlayer.i"
+	@echo "... src/animation/AnimationPlayer.s"
+	@echo "... src/animation/CPUSkinning.o"
+	@echo "... src/animation/CPUSkinning.i"
+	@echo "... src/animation/CPUSkinning.s"
 	@echo "... src/audio/AudioEngine.o"
 	@echo "... src/audio/AudioEngine.i"
 	@echo "... src/audio/AudioEngine.s"
@@ -1770,6 +2492,12 @@ help:
 	@echo "... src/renderer/Buffer.o"
 	@echo "... src/renderer/Buffer.i"
 	@echo "... src/renderer/Buffer.s"
+	@echo "... src/renderer/CascadeShadow.o"
+	@echo "... src/renderer/CascadeShadow.i"
+	@echo "... src/renderer/CascadeShadow.s"
+	@echo "... src/renderer/ComputeSkinner.o"
+	@echo "... src/renderer/ComputeSkinner.i"
+	@echo "... src/renderer/ComputeSkinner.s"
 	@echo "... src/renderer/Context.o"
 	@echo "... src/renderer/Context.i"
 	@echo "... src/renderer/Context.s"
@@ -1779,12 +2507,21 @@ help:
 	@echo "... src/renderer/Device.o"
 	@echo "... src/renderer/Device.i"
 	@echo "... src/renderer/Device.s"
+	@echo "... src/renderer/DynamicMesh.o"
+	@echo "... src/renderer/DynamicMesh.i"
+	@echo "... src/renderer/DynamicMesh.s"
 	@echo "... src/renderer/GBuffer.o"
 	@echo "... src/renderer/GBuffer.i"
 	@echo "... src/renderer/GBuffer.s"
 	@echo "... src/renderer/GLBLoader.o"
 	@echo "... src/renderer/GLBLoader.i"
 	@echo "... src/renderer/GLBLoader.s"
+	@echo "... src/renderer/GpuCuller.o"
+	@echo "... src/renderer/GpuCuller.i"
+	@echo "... src/renderer/GpuCuller.s"
+	@echo "... src/renderer/GpuProfiler.o"
+	@echo "... src/renderer/GpuProfiler.i"
+	@echo "... src/renderer/GpuProfiler.s"
 	@echo "... src/renderer/Image.o"
 	@echo "... src/renderer/Image.i"
 	@echo "... src/renderer/Image.s"
@@ -1815,6 +2552,9 @@ help:
 	@echo "... src/renderer/ShadowMap.o"
 	@echo "... src/renderer/ShadowMap.i"
 	@echo "... src/renderer/ShadowMap.s"
+	@echo "... src/renderer/StaticSkinnedMesh.o"
+	@echo "... src/renderer/StaticSkinnedMesh.i"
+	@echo "... src/renderer/StaticSkinnedMesh.s"
 	@echo "... src/renderer/Swapchain.o"
 	@echo "... src/renderer/Swapchain.i"
 	@echo "... src/renderer/Swapchain.s"
@@ -1824,6 +2564,9 @@ help:
 	@echo "... src/renderer/Texture.o"
 	@echo "... src/renderer/Texture.i"
 	@echo "... src/renderer/Texture.s"
+	@echo "... src/renderer/TextureStreamer.o"
+	@echo "... src/renderer/TextureStreamer.i"
+	@echo "... src/renderer/TextureStreamer.s"
 	@echo "... src/scene/Scene.o"
 	@echo "... src/scene/Scene.i"
 	@echo "... src/scene/Scene.s"

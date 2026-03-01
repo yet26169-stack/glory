@@ -2,7 +2,7 @@ CMakeFiles/Glory.dir/src/scene/Scene.cpp.o: \
   /Users/donkey/Development/1/Glory/src/scene/Scene.cpp \
   /Users/donkey/Development/1/Glory/src/scene/Scene.h \
   /Users/donkey/Development/1/Glory/src/scene/Components.h \
-  /Users/donkey/Development/1/Glory/src/renderer/Frustum.h \
+  /Users/donkey/Development/1/Glory/src/animation/AnimationClip.h \
   /opt/homebrew/include/glm/glm.hpp \
   /opt/homebrew/include/glm/detail/_fixes.hpp \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/cmath \
@@ -1102,6 +1102,111 @@ CMakeFiles/Glory.dir/src/scene/Scene.cpp.o: \
   /opt/homebrew/include/glm/vector_relational.hpp \
   /opt/homebrew/include/glm/integer.hpp \
   /opt/homebrew/include/glm/detail/func_integer.inl \
+  /opt/homebrew/include/glm/gtc/quaternion.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/constants.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../ext/scalar_constants.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../ext/../detail/setup.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../ext/scalar_constants.inl \
+  /opt/homebrew/include/glm/gtc/../gtc/constants.inl \
+  /opt/homebrew/include/glm/gtc/../gtc/matrix_transform.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../mat4x4.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../vec2.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../vec3.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../vec4.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../ext/matrix_projection.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../ext/../gtc/constants.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../ext/../geometric.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../ext/../trigonometric.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../ext/../matrix.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../ext/matrix_projection.inl \
+  /opt/homebrew/include/glm/gtc/../gtc/../ext/matrix_clip_space.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../ext/../ext/scalar_constants.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../ext/matrix_clip_space.inl \
+  /opt/homebrew/include/glm/gtc/../gtc/../ext/matrix_transform.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../ext/matrix_transform.inl \
+  /opt/homebrew/include/glm/gtc/../gtc/matrix_transform.inl \
+  /opt/homebrew/include/glm/gtc/../gtc/../geometric.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../trigonometric.hpp \
+  /opt/homebrew/include/glm/gtc/../gtc/../matrix.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/vector_relational.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/qualifier.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/vector_relational.inl \
+  /opt/homebrew/include/glm/gtc/../ext/../vector_relational.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../common.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/type_float.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/setup.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/quaternion_common.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../ext/scalar_constants.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../ext/quaternion_geometric.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../ext/../geometric.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../ext/../exponential.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../ext/../ext/vector_relational.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../ext/quaternion_geometric.inl \
+  /opt/homebrew/include/glm/gtc/../ext/../trigonometric.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../exponential.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/quaternion_common.inl \
+  /opt/homebrew/include/glm/gtc/../ext/quaternion_float.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/type_quat.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/../detail/type_mat3x3.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/../detail/type_mat4x4.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/../detail/type_vec3.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/../detail/type_vec4.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/../ext/vector_relational.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/../ext/quaternion_relational.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/../ext/../vector_relational.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/../ext/quaternion_relational.inl \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/../gtc/constants.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/../gtc/matrix_transform.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/type_quat.inl \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/../trigonometric.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/../exponential.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/../ext/quaternion_common.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../detail/../ext/quaternion_geometric.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/quaternion_float_precision.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/quaternion_double.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/quaternion_double_precision.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/quaternion_relational.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/quaternion_geometric.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/quaternion_trigonometric.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/scalar_constants.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/quaternion_trigonometric.inl \
+  /opt/homebrew/include/glm/gtc/../ext/quaternion_transform.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/../geometric.hpp \
+  /opt/homebrew/include/glm/gtc/../ext/quaternion_transform.inl \
+  /opt/homebrew/include/glm/gtc/../detail/type_mat3x3.hpp \
+  /opt/homebrew/include/glm/gtc/../detail/type_mat4x4.hpp \
+  /opt/homebrew/include/glm/gtc/../detail/type_vec3.hpp \
+  /opt/homebrew/include/glm/gtc/../detail/type_vec4.hpp \
+  /opt/homebrew/include/glm/gtc/quaternion.inl \
+  /opt/homebrew/include/glm/gtc/../trigonometric.hpp \
+  /opt/homebrew/include/glm/gtc/../geometric.hpp \
+  /opt/homebrew/include/glm/gtc/../exponential.hpp \
+  /opt/homebrew/include/glm/gtc/epsilon.hpp \
+  /opt/homebrew/include/glm/gtc/../detail/setup.hpp \
+  /opt/homebrew/include/glm/gtc/../detail/qualifier.hpp \
+  /opt/homebrew/include/glm/gtc/epsilon.inl \
+  /opt/homebrew/include/glm/gtc/../vector_relational.hpp \
+  /opt/homebrew/include/glm/gtc/../common.hpp \
+  /Users/donkey/Development/1/Glory/src/animation/AnimationPlayer.h \
+  /Users/donkey/Development/1/Glory/src/animation/Skeleton.h \
+  /Users/donkey/Development/1/Glory/src/renderer/Buffer.h \
+  /opt/homebrew/include/vulkan/vulkan.h \
+  /opt/homebrew/include/vulkan/vk_platform.h \
+  /opt/homebrew/include/vulkan/vulkan_core.h \
+  /opt/homebrew/include/vk_video/vulkan_video_codec_h264std.h \
+  /opt/homebrew/include/vk_video/vulkan_video_codecs_common.h \
+  /opt/homebrew/include/vk_video/vulkan_video_codec_h264std_encode.h \
+  /opt/homebrew/include/vk_video/vulkan_video_codec_h265std.h \
+  /opt/homebrew/include/vk_video/vulkan_video_codec_h265std_encode.h \
+  /opt/homebrew/include/vk_video/vulkan_video_codec_h264std_decode.h \
+  /opt/homebrew/include/vk_video/vulkan_video_codec_h265std_decode.h \
+  /opt/homebrew/include/vk_video/vulkan_video_codec_av1std.h \
+  /opt/homebrew/include/vk_video/vulkan_video_codec_av1std_decode.h \
+  /opt/homebrew/include/vk_video/vulkan_video_codec_av1std_encode.h \
+  /opt/homebrew/include/vk_video/vulkan_video_codec_vp9std.h \
+  /opt/homebrew/include/vk_video/vulkan_video_codec_vp9std_decode.h \
+  /Users/donkey/Development/1/Glory/extern/vma/vk_mem_alloc.h \
+  /Users/donkey/Development/1/Glory/src/renderer/Frustum.h \
   /Users/donkey/Development/1/Glory/extern/entt/entt.hpp \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/ostream \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__ostream/basic_ostream.h \
@@ -1166,108 +1271,15 @@ CMakeFiles/Glory.dir/src/scene/Scene.cpp.o: \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/set \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/unordered_set \
   /opt/homebrew/include/glm/gtc/matrix_transform.hpp \
-  /opt/homebrew/include/glm/gtc/../mat4x4.hpp \
-  /opt/homebrew/include/glm/gtc/../vec2.hpp \
-  /opt/homebrew/include/glm/gtc/../vec3.hpp \
-  /opt/homebrew/include/glm/gtc/../vec4.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/matrix_projection.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../gtc/constants.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../gtc/../ext/scalar_constants.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../gtc/../ext/../detail/setup.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../gtc/../ext/scalar_constants.inl \
-  /opt/homebrew/include/glm/gtc/../ext/../gtc/constants.inl \
-  /opt/homebrew/include/glm/gtc/../ext/../geometric.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../trigonometric.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../matrix.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/matrix_projection.inl \
-  /opt/homebrew/include/glm/gtc/../ext/matrix_clip_space.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../ext/scalar_constants.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/matrix_clip_space.inl \
-  /opt/homebrew/include/glm/gtc/../ext/matrix_transform.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/matrix_transform.inl \
-  /opt/homebrew/include/glm/gtc/matrix_transform.inl \
-  /opt/homebrew/include/glm/gtc/../geometric.hpp \
-  /opt/homebrew/include/glm/gtc/../trigonometric.hpp \
-  /opt/homebrew/include/glm/gtc/../matrix.hpp \
-  /opt/homebrew/include/glm/gtc/quaternion.hpp \
-  /opt/homebrew/include/glm/gtc/../gtc/constants.hpp \
-  /opt/homebrew/include/glm/gtc/../gtc/matrix_transform.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/vector_relational.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../detail/qualifier.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/vector_relational.inl \
-  /opt/homebrew/include/glm/gtc/../ext/../vector_relational.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../common.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../detail/type_float.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../detail/setup.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/quaternion_common.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../ext/quaternion_geometric.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../ext/../geometric.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../ext/../exponential.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../ext/../ext/vector_relational.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../ext/quaternion_geometric.inl \
-  /opt/homebrew/include/glm/gtc/../ext/../exponential.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/quaternion_common.inl \
-  /opt/homebrew/include/glm/gtc/../ext/quaternion_float.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../detail/type_quat.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../detail/../detail/type_mat3x3.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../detail/../detail/type_mat4x4.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../detail/../detail/type_vec3.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../detail/../detail/type_vec4.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../detail/../ext/vector_relational.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../detail/../ext/quaternion_relational.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../detail/../ext/../vector_relational.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../detail/../ext/quaternion_relational.inl \
-  /opt/homebrew/include/glm/gtc/../ext/../detail/../gtc/constants.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../detail/../gtc/matrix_transform.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../detail/type_quat.inl \
-  /opt/homebrew/include/glm/gtc/../ext/../detail/../trigonometric.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../detail/../exponential.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../detail/../ext/quaternion_common.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/../detail/../ext/quaternion_geometric.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/quaternion_float_precision.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/quaternion_double.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/quaternion_double_precision.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/quaternion_relational.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/quaternion_geometric.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/quaternion_trigonometric.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/scalar_constants.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/quaternion_trigonometric.inl \
-  /opt/homebrew/include/glm/gtc/../ext/quaternion_transform.hpp \
-  /opt/homebrew/include/glm/gtc/../ext/quaternion_transform.inl \
-  /opt/homebrew/include/glm/gtc/../detail/type_mat3x3.hpp \
-  /opt/homebrew/include/glm/gtc/../detail/type_mat4x4.hpp \
-  /opt/homebrew/include/glm/gtc/../detail/type_vec3.hpp \
-  /opt/homebrew/include/glm/gtc/../detail/type_vec4.hpp \
-  /opt/homebrew/include/glm/gtc/quaternion.inl \
-  /opt/homebrew/include/glm/gtc/../exponential.hpp \
-  /opt/homebrew/include/glm/gtc/epsilon.hpp \
-  /opt/homebrew/include/glm/gtc/../detail/setup.hpp \
-  /opt/homebrew/include/glm/gtc/../detail/qualifier.hpp \
-  /opt/homebrew/include/glm/gtc/epsilon.inl \
-  /opt/homebrew/include/glm/gtc/../vector_relational.hpp \
-  /opt/homebrew/include/glm/gtc/../common.hpp \
+  /Users/donkey/Development/1/Glory/src/renderer/DynamicMesh.h \
+  /Users/donkey/Development/1/Glory/src/renderer/Sync.h \
   /Users/donkey/Development/1/Glory/src/renderer/Model.h \
   /Users/donkey/Development/1/Glory/src/renderer/Mesh.h \
-  /Users/donkey/Development/1/Glory/src/renderer/Buffer.h \
-  /opt/homebrew/include/vulkan/vulkan.h \
-  /opt/homebrew/include/vulkan/vk_platform.h \
-  /opt/homebrew/include/vulkan/vulkan_core.h \
-  /opt/homebrew/include/vk_video/vulkan_video_codec_h264std.h \
-  /opt/homebrew/include/vk_video/vulkan_video_codecs_common.h \
-  /opt/homebrew/include/vk_video/vulkan_video_codec_h264std_encode.h \
-  /opt/homebrew/include/vk_video/vulkan_video_codec_h265std.h \
-  /opt/homebrew/include/vk_video/vulkan_video_codec_h265std_encode.h \
-  /opt/homebrew/include/vk_video/vulkan_video_codec_h264std_decode.h \
-  /opt/homebrew/include/vk_video/vulkan_video_codec_h265std_decode.h \
-  /opt/homebrew/include/vk_video/vulkan_video_codec_av1std.h \
-  /opt/homebrew/include/vk_video/vulkan_video_codec_av1std_decode.h \
-  /opt/homebrew/include/vk_video/vulkan_video_codec_av1std_encode.h \
-  /opt/homebrew/include/vk_video/vulkan_video_codec_vp9std.h \
-  /opt/homebrew/include/vk_video/vulkan_video_codec_vp9std_decode.h \
-  /Users/donkey/Development/1/Glory/extern/vma/vk_mem_alloc.h \
   /Users/donkey/Development/1/Glory/src/renderer/Texture.h \
   /Users/donkey/Development/1/Glory/src/renderer/Image.h \
+  /Users/donkey/Development/1/Glory/src/renderer/StaticSkinnedMesh.h \
   /Users/donkey/Development/1/Glory/src/renderer/Material.h \
+  /Users/donkey/Development/1/Glory/src/animation/CPUSkinning.h \
   /Users/donkey/Development/1/Glory/src/terrain/TerrainSystem.h \
   /Users/donkey/Development/1/Glory/src/terrain/TerrainTextures.h \
   /Users/donkey/Development/1/Glory/src/terrain/TerrainVertex.h \

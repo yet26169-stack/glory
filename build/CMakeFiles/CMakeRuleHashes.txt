@@ -2,6 +2,7 @@
 aad0335f7572bf9d3cc3069053c58cdd CMakeFiles/Shaders
 51cc38bfbc8ced5d8a2c6bf6d90fbdd4 shaders/bloom_blur.frag.spv
 6c37da05868d52439fc83a4a1b5d7fa5 shaders/bloom_extract.frag.spv
+eb93d44770918a3815e1443c2149ba40 shaders/cull.comp.spv
 6e7b9ef6567249faf83ed83988e284f1 shaders/debug.frag.spv
 c7e5420024ffb7cfb3f9932c2e58a2a4 shaders/debug.vert.spv
 02cb4d35552702922a8d8aba8a24a399 shaders/deferred.frag.spv
@@ -19,6 +20,9 @@ bf6d63355cf9bca26fee0792cef70b65 shaders/particle.frag.spv
 f3382de1a767a24ff22c0078a2d9aed2 shaders/postprocess.vert.spv
 7c5aeeba1192dad54008bf84ff7bbddc shaders/shadow.frag.spv
 d746b305a8078fbc5e692259273b6f51 shaders/shadow.vert.spv
+3e58f5055013233446edb767e00617b1 shaders/shadow_skinned.vert.spv
+0cc52a1dd7feed52cb5282cea2ed9635 shaders/skinned.vert.spv
+c722921563ffb1d4baacabeab2d1b55c shaders/skinning.comp.spv
 021b3446c711ecb22dd1a5732f1fbad3 shaders/sky.frag.spv
 db005e3b4af536f8c1e4f9f46df348a9 shaders/ssao.frag.spv
 1e522e04d55642c78bb32b1999106349 shaders/ssao_blur.frag.spv

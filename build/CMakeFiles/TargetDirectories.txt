@@ -1,4 +1,5 @@
 /Users/donkey/Development/1/Glory/build/CMakeFiles/Shaders.dir
+/Users/donkey/Development/1/Glory/build/CMakeFiles/meshoptimizer.dir
 /Users/donkey/Development/1/Glory/build/CMakeFiles/Glory.dir
 /Users/donkey/Development/1/Glory/build/CMakeFiles/mesh_cook.dir
 /Users/donkey/Development/1/Glory/build/CMakeFiles/Assets.dir

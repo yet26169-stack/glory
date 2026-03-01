@@ -73,6 +73,7 @@ set(CMAKE_MAKEFILE_PRODUCTS
 # Dependency information for all targets:
 set(CMAKE_DEPEND_INFO_FILES
   "CMakeFiles/Shaders.dir/DependInfo.cmake"
+  "CMakeFiles/meshoptimizer.dir/DependInfo.cmake"
   "CMakeFiles/Glory.dir/DependInfo.cmake"
   "CMakeFiles/mesh_cook.dir/DependInfo.cmake"
   "CMakeFiles/Assets.dir/DependInfo.cmake"
