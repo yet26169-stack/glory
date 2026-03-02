@@ -1289,12 +1289,18 @@ CMakeFiles/Glory.dir/src/core/Application.cpp.o: \
   /Users/donkey/Development/1/Glory/src/renderer/StaticSkinnedMesh.h \
   /Users/donkey/Development/1/Glory/src/renderer/Material.h \
   /Users/donkey/Development/1/Glory/src/camera/Camera.h \
+  /Users/donkey/Development/1/Glory/src/hud/HUD.h \
   /Users/donkey/Development/1/Glory/src/editor/DebugOverlay.h \
   /Users/donkey/Development/1/Glory/src/fog/FogSystem.h \
   /Users/donkey/Development/1/Glory/src/input/InputManager.h \
   /Users/donkey/Development/1/Glory/src/ability/AbilityTypes.h \
   /Users/donkey/Development/1/Glory/src/map/MapLoader.h \
   /Users/donkey/Development/1/Glory/src/map/MapTypes.h \
+  /Users/donkey/Development/1/Glory/src/minion/MinionSystem.h \
+  /Users/donkey/Development/1/Glory/src/minion/MinionComponents.h \
+  /Users/donkey/Development/1/Glory/src/minion/MinionTypes.h \
+  /Users/donkey/Development/1/Glory/src/minion/MinionConfig.h \
+  /Users/donkey/Development/1/Glory/src/minion/SpatialHash.h \
   /Users/donkey/Development/1/Glory/src/nav/DebugRenderer.h \
   /Users/donkey/Development/1/Glory/src/renderer/Bloom.h \
   /Users/donkey/Development/1/Glory/src/renderer/ComputeSkinner.h \

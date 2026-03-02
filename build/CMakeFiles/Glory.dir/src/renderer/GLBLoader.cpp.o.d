@@ -1404,4 +1404,28 @@ CMakeFiles/Glory.dir/src/renderer/GLBLoader.cpp.o: \
   /opt/homebrew/include/spdlog/details/log_msg_buffer.h \
   /opt/homebrew/include/spdlog/details/log_msg.h \
   /opt/homebrew/include/spdlog/version.h \
+  /opt/homebrew/include/glm/gtc/matrix_transform.hpp \
+  /opt/homebrew/include/glm/gtx/quaternion.hpp \
+  /opt/homebrew/include/glm/gtx/../glm.hpp \
+  /opt/homebrew/include/glm/gtx/../gtc/constants.hpp \
+  /opt/homebrew/include/glm/gtx/../gtc/quaternion.hpp \
+  /opt/homebrew/include/glm/gtx/../ext/quaternion_exponential.hpp \
+  /opt/homebrew/include/glm/gtx/../ext/../common.hpp \
+  /opt/homebrew/include/glm/gtx/../ext/../trigonometric.hpp \
+  /opt/homebrew/include/glm/gtx/../ext/../geometric.hpp \
+  /opt/homebrew/include/glm/gtx/../ext/../ext/scalar_constants.hpp \
+  /opt/homebrew/include/glm/gtx/../ext/quaternion_exponential.inl \
+  /opt/homebrew/include/glm/gtx/../ext/scalar_constants.hpp \
+  /opt/homebrew/include/glm/gtx/../gtx/norm.hpp \
+  /opt/homebrew/include/glm/gtx/../gtx/../geometric.hpp \
+  /opt/homebrew/include/glm/gtx/../gtx/../gtx/component_wise.hpp \
+  /opt/homebrew/include/glm/gtx/../gtx/../gtx/../detail/setup.hpp \
+  /opt/homebrew/include/glm/gtx/../gtx/../gtx/../detail/qualifier.hpp \
+  /opt/homebrew/include/glm/gtx/../gtx/../gtx/component_wise.inl \
+  /opt/homebrew/include/glm/gtx/../gtx/../gtx/../ext/scalar_common.hpp \
+  /opt/homebrew/include/glm/gtx/../gtx/../gtx/../ext/../common.hpp \
+  /opt/homebrew/include/glm/gtx/../gtx/../gtx/../ext/scalar_common.inl \
+  /opt/homebrew/include/glm/gtx/../gtx/norm.inl \
+  /opt/homebrew/include/glm/gtx/../gtx/../detail/qualifier.hpp \
+  /opt/homebrew/include/glm/gtx/quaternion.inl \
   /Users/donkey/Development/1/Glory/extern/meshoptimizer/src/meshoptimizer.h

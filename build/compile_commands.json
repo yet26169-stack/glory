@@ -325,6 +325,12 @@
 },
 {
   "directory": "/Users/donkey/Development/1/Glory/build",
+  "command": "/usr/bin/c++ -DABILITY_DATA_DIR=\\\"/Users/donkey/Development/1/Glory/assets/abilities/\\\" -DASSET_DIR=\\\"/Users/donkey/Development/1/Glory/build/assets/\\\" -DFMT_SHARED -DGLFW_INCLUDE_VULKAN -DGLM_FORCE_DEPTH_ZERO_TO_ONE -DGLM_FORCE_RADIANS -DMAP_DATA_DIR=\\\"/Users/donkey/Development/1/Glory/assets/maps/\\\" -DMODEL_DIR=\\\"/Users/donkey/Development/1/Glory/\\\" -DSHADER_DIR=\\\"/Users/donkey/Development/1/Glory/build/shaders/\\\" -DSPDLOG_COMPILED_LIB -DSPDLOG_FMT_EXTERNAL -DSPDLOG_SHARED_LIB -I/Users/donkey/Development/1/Glory/src -I/Users/donkey/Development/1/Glory/extern/vma -I/Users/donkey/Development/1/Glory/extern/stb -I/Users/donkey/Development/1/Glory/extern/tinyobj -I/Users/donkey/Development/1/Glory/extern/entt -I/Users/donkey/Development/1/Glory/extern/imgui -I/Users/donkey/Development/1/Glory/extern/tinygltf -I/Users/donkey/Development/1/Glory/extern -I/Users/donkey/Development/1/Glory/extern/meshoptimizer/src -isystem /opt/homebrew/include -g -std=gnu++20 -arch arm64 -o CMakeFiles/Glory.dir/src/hud/HUD.cpp.o -c /Users/donkey/Development/1/Glory/src/hud/HUD.cpp",
+  "file": "/Users/donkey/Development/1/Glory/src/hud/HUD.cpp",
+  "output": "CMakeFiles/Glory.dir/src/hud/HUD.cpp.o"
+},
+{
+  "directory": "/Users/donkey/Development/1/Glory/build",
   "command": "/usr/bin/c++ -DABILITY_DATA_DIR=\\\"/Users/donkey/Development/1/Glory/assets/abilities/\\\" -DASSET_DIR=\\\"/Users/donkey/Development/1/Glory/build/assets/\\\" -DFMT_SHARED -DGLFW_INCLUDE_VULKAN -DGLM_FORCE_DEPTH_ZERO_TO_ONE -DGLM_FORCE_RADIANS -DMAP_DATA_DIR=\\\"/Users/donkey/Development/1/Glory/assets/maps/\\\" -DMODEL_DIR=\\\"/Users/donkey/Development/1/Glory/\\\" -DSHADER_DIR=\\\"/Users/donkey/Development/1/Glory/build/shaders/\\\" -DSPDLOG_COMPILED_LIB -DSPDLOG_FMT_EXTERNAL -DSPDLOG_SHARED_LIB -I/Users/donkey/Development/1/Glory/src -I/Users/donkey/Development/1/Glory/extern/vma -I/Users/donkey/Development/1/Glory/extern/stb -I/Users/donkey/Development/1/Glory/extern/tinyobj -I/Users/donkey/Development/1/Glory/extern/entt -I/Users/donkey/Development/1/Glory/extern/imgui -I/Users/donkey/Development/1/Glory/extern/tinygltf -I/Users/donkey/Development/1/Glory/extern -I/Users/donkey/Development/1/Glory/extern/meshoptimizer/src -isystem /opt/homebrew/include -g -std=gnu++20 -arch arm64 -o CMakeFiles/Glory.dir/src/ability/AbilityDef.cpp.o -c /Users/donkey/Development/1/Glory/src/ability/AbilityDef.cpp",
   "file": "/Users/donkey/Development/1/Glory/src/ability/AbilityDef.cpp",
   "output": "CMakeFiles/Glory.dir/src/ability/AbilityDef.cpp.o"
@@ -418,6 +424,18 @@
   "command": "/usr/bin/c++ -DABILITY_DATA_DIR=\\\"/Users/donkey/Development/1/Glory/assets/abilities/\\\" -DASSET_DIR=\\\"/Users/donkey/Development/1/Glory/build/assets/\\\" -DFMT_SHARED -DGLFW_INCLUDE_VULKAN -DGLM_FORCE_DEPTH_ZERO_TO_ONE -DGLM_FORCE_RADIANS -DMAP_DATA_DIR=\\\"/Users/donkey/Development/1/Glory/assets/maps/\\\" -DMODEL_DIR=\\\"/Users/donkey/Development/1/Glory/\\\" -DSHADER_DIR=\\\"/Users/donkey/Development/1/Glory/build/shaders/\\\" -DSPDLOG_COMPILED_LIB -DSPDLOG_FMT_EXTERNAL -DSPDLOG_SHARED_LIB -I/Users/donkey/Development/1/Glory/src -I/Users/donkey/Development/1/Glory/extern/vma -I/Users/donkey/Development/1/Glory/extern/stb -I/Users/donkey/Development/1/Glory/extern/tinyobj -I/Users/donkey/Development/1/Glory/extern/entt -I/Users/donkey/Development/1/Glory/extern/imgui -I/Users/donkey/Development/1/Glory/extern/tinygltf -I/Users/donkey/Development/1/Glory/extern -I/Users/donkey/Development/1/Glory/extern/meshoptimizer/src -isystem /opt/homebrew/include -g -std=gnu++20 -arch arm64 -o CMakeFiles/Glory.dir/src/animation/CPUSkinning.cpp.o -c /Users/donkey/Development/1/Glory/src/animation/CPUSkinning.cpp",
   "file": "/Users/donkey/Development/1/Glory/src/animation/CPUSkinning.cpp",
   "output": "CMakeFiles/Glory.dir/src/animation/CPUSkinning.cpp.o"
+},
+{
+  "directory": "/Users/donkey/Development/1/Glory/build",
+  "command": "/usr/bin/c++ -DABILITY_DATA_DIR=\\\"/Users/donkey/Development/1/Glory/assets/abilities/\\\" -DASSET_DIR=\\\"/Users/donkey/Development/1/Glory/build/assets/\\\" -DFMT_SHARED -DGLFW_INCLUDE_VULKAN -DGLM_FORCE_DEPTH_ZERO_TO_ONE -DGLM_FORCE_RADIANS -DMAP_DATA_DIR=\\\"/Users/donkey/Development/1/Glory/assets/maps/\\\" -DMODEL_DIR=\\\"/Users/donkey/Development/1/Glory/\\\" -DSHADER_DIR=\\\"/Users/donkey/Development/1/Glory/build/shaders/\\\" -DSPDLOG_COMPILED_LIB -DSPDLOG_FMT_EXTERNAL -DSPDLOG_SHARED_LIB -I/Users/donkey/Development/1/Glory/src -I/Users/donkey/Development/1/Glory/extern/vma -I/Users/donkey/Development/1/Glory/extern/stb -I/Users/donkey/Development/1/Glory/extern/tinyobj -I/Users/donkey/Development/1/Glory/extern/entt -I/Users/donkey/Development/1/Glory/extern/imgui -I/Users/donkey/Development/1/Glory/extern/tinygltf -I/Users/donkey/Development/1/Glory/extern -I/Users/donkey/Development/1/Glory/extern/meshoptimizer/src -isystem /opt/homebrew/include -g -std=gnu++20 -arch arm64 -o CMakeFiles/Glory.dir/src/minion/MinionConfig.cpp.o -c /Users/donkey/Development/1/Glory/src/minion/MinionConfig.cpp",
+  "file": "/Users/donkey/Development/1/Glory/src/minion/MinionConfig.cpp",
+  "output": "CMakeFiles/Glory.dir/src/minion/MinionConfig.cpp.o"
+},
+{
+  "directory": "/Users/donkey/Development/1/Glory/build",
+  "command": "/usr/bin/c++ -DABILITY_DATA_DIR=\\\"/Users/donkey/Development/1/Glory/assets/abilities/\\\" -DASSET_DIR=\\\"/Users/donkey/Development/1/Glory/build/assets/\\\" -DFMT_SHARED -DGLFW_INCLUDE_VULKAN -DGLM_FORCE_DEPTH_ZERO_TO_ONE -DGLM_FORCE_RADIANS -DMAP_DATA_DIR=\\\"/Users/donkey/Development/1/Glory/assets/maps/\\\" -DMODEL_DIR=\\\"/Users/donkey/Development/1/Glory/\\\" -DSHADER_DIR=\\\"/Users/donkey/Development/1/Glory/build/shaders/\\\" -DSPDLOG_COMPILED_LIB -DSPDLOG_FMT_EXTERNAL -DSPDLOG_SHARED_LIB -I/Users/donkey/Development/1/Glory/src -I/Users/donkey/Development/1/Glory/extern/vma -I/Users/donkey/Development/1/Glory/extern/stb -I/Users/donkey/Development/1/Glory/extern/tinyobj -I/Users/donkey/Development/1/Glory/extern/entt -I/Users/donkey/Development/1/Glory/extern/imgui -I/Users/donkey/Development/1/Glory/extern/tinygltf -I/Users/donkey/Development/1/Glory/extern -I/Users/donkey/Development/1/Glory/extern/meshoptimizer/src -isystem /opt/homebrew/include -g -std=gnu++20 -arch arm64 -o CMakeFiles/Glory.dir/src/minion/MinionSystem.cpp.o -c /Users/donkey/Development/1/Glory/src/minion/MinionSystem.cpp",
+  "file": "/Users/donkey/Development/1/Glory/src/minion/MinionSystem.cpp",
+  "output": "CMakeFiles/Glory.dir/src/minion/MinionSystem.cpp.o"
 },
 {
   "directory": "/Users/donkey/Development/1/Glory/build",
@@ -568,5 +586,29 @@
   "command": "/usr/bin/c++ -DABILITY_DATA_DIR=\\\"/Users/donkey/Development/1/Glory/assets/abilities/\\\" -DFMT_SHARED -DGLM_FORCE_DEPTH_ZERO_TO_ONE -DGLM_FORCE_RADIANS -DSPDLOG_COMPILED_LIB -DSPDLOG_FMT_EXTERNAL -DSPDLOG_SHARED_LIB -I/Users/donkey/Development/1/Glory/src -I/Users/donkey/Development/1/Glory/extern -I/Users/donkey/Development/1/Glory/extern/entt -isystem /opt/homebrew/include -g -std=gnu++20 -arch arm64 -o CMakeFiles/test_ability.dir/src/ability/StatusEffectSystem.cpp.o -c /Users/donkey/Development/1/Glory/src/ability/StatusEffectSystem.cpp",
   "file": "/Users/donkey/Development/1/Glory/src/ability/StatusEffectSystem.cpp",
   "output": "CMakeFiles/test_ability.dir/src/ability/StatusEffectSystem.cpp.o"
+},
+{
+  "directory": "/Users/donkey/Development/1/Glory/build",
+  "command": "/usr/bin/c++ -DCONFIG_DIR=\\\"/Users/donkey/Development/1/Glory/assets/config/\\\" -DFMT_SHARED -DGLM_FORCE_DEPTH_ZERO_TO_ONE -DGLM_FORCE_RADIANS -DMAP_DATA_DIR=\\\"/Users/donkey/Development/1/Glory/assets/maps/\\\" -DSPDLOG_COMPILED_LIB -DSPDLOG_FMT_EXTERNAL -DSPDLOG_SHARED_LIB -I/Users/donkey/Development/1/Glory/src -I/Users/donkey/Development/1/Glory/extern -I/Users/donkey/Development/1/Glory/extern/entt -I/Users/donkey/Development/1/Glory/extern/vma -I/Users/donkey/Development/1/Glory/extern/tinygltf -isystem /opt/homebrew/include -g -std=gnu++20 -arch arm64 -o CMakeFiles/test_minion.dir/tests/test_minion.cpp.o -c /Users/donkey/Development/1/Glory/tests/test_minion.cpp",
+  "file": "/Users/donkey/Development/1/Glory/tests/test_minion.cpp",
+  "output": "CMakeFiles/test_minion.dir/tests/test_minion.cpp.o"
+},
+{
+  "directory": "/Users/donkey/Development/1/Glory/build",
+  "command": "/usr/bin/c++ -DCONFIG_DIR=\\\"/Users/donkey/Development/1/Glory/assets/config/\\\" -DFMT_SHARED -DGLM_FORCE_DEPTH_ZERO_TO_ONE -DGLM_FORCE_RADIANS -DMAP_DATA_DIR=\\\"/Users/donkey/Development/1/Glory/assets/maps/\\\" -DSPDLOG_COMPILED_LIB -DSPDLOG_FMT_EXTERNAL -DSPDLOG_SHARED_LIB -I/Users/donkey/Development/1/Glory/src -I/Users/donkey/Development/1/Glory/extern -I/Users/donkey/Development/1/Glory/extern/entt -I/Users/donkey/Development/1/Glory/extern/vma -I/Users/donkey/Development/1/Glory/extern/tinygltf -isystem /opt/homebrew/include -g -std=gnu++20 -arch arm64 -o CMakeFiles/test_minion.dir/src/minion/MinionSystem.cpp.o -c /Users/donkey/Development/1/Glory/src/minion/MinionSystem.cpp",
+  "file": "/Users/donkey/Development/1/Glory/src/minion/MinionSystem.cpp",
+  "output": "CMakeFiles/test_minion.dir/src/minion/MinionSystem.cpp.o"
+},
+{
+  "directory": "/Users/donkey/Development/1/Glory/build",
+  "command": "/usr/bin/c++ -DCONFIG_DIR=\\\"/Users/donkey/Development/1/Glory/assets/config/\\\" -DFMT_SHARED -DGLM_FORCE_DEPTH_ZERO_TO_ONE -DGLM_FORCE_RADIANS -DMAP_DATA_DIR=\\\"/Users/donkey/Development/1/Glory/assets/maps/\\\" -DSPDLOG_COMPILED_LIB -DSPDLOG_FMT_EXTERNAL -DSPDLOG_SHARED_LIB -I/Users/donkey/Development/1/Glory/src -I/Users/donkey/Development/1/Glory/extern -I/Users/donkey/Development/1/Glory/extern/entt -I/Users/donkey/Development/1/Glory/extern/vma -I/Users/donkey/Development/1/Glory/extern/tinygltf -isystem /opt/homebrew/include -g -std=gnu++20 -arch arm64 -o CMakeFiles/test_minion.dir/src/minion/MinionConfig.cpp.o -c /Users/donkey/Development/1/Glory/src/minion/MinionConfig.cpp",
+  "file": "/Users/donkey/Development/1/Glory/src/minion/MinionConfig.cpp",
+  "output": "CMakeFiles/test_minion.dir/src/minion/MinionConfig.cpp.o"
+},
+{
+  "directory": "/Users/donkey/Development/1/Glory/build",
+  "command": "/usr/bin/c++ -DCONFIG_DIR=\\\"/Users/donkey/Development/1/Glory/assets/config/\\\" -DFMT_SHARED -DGLM_FORCE_DEPTH_ZERO_TO_ONE -DGLM_FORCE_RADIANS -DMAP_DATA_DIR=\\\"/Users/donkey/Development/1/Glory/assets/maps/\\\" -DSPDLOG_COMPILED_LIB -DSPDLOG_FMT_EXTERNAL -DSPDLOG_SHARED_LIB -I/Users/donkey/Development/1/Glory/src -I/Users/donkey/Development/1/Glory/extern -I/Users/donkey/Development/1/Glory/extern/entt -I/Users/donkey/Development/1/Glory/extern/vma -I/Users/donkey/Development/1/Glory/extern/tinygltf -isystem /opt/homebrew/include -g -std=gnu++20 -arch arm64 -o CMakeFiles/test_minion.dir/src/map/MapLoader.cpp.o -c /Users/donkey/Development/1/Glory/src/map/MapLoader.cpp",
+  "file": "/Users/donkey/Development/1/Glory/src/map/MapLoader.cpp",
+  "output": "CMakeFiles/test_minion.dir/src/map/MapLoader.cpp.o"
 }
 ]

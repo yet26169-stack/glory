@@ -259,6 +259,19 @@ test_ability/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_ability.dir/build.make CMakeFiles/test_ability.dir/build
 .PHONY : test_ability/fast
 
+#=============================================================================
+# Target rules for targets named test_minion
+
+# Build rule for target.
+test_minion: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_minion
+.PHONY : test_minion
+
+# fast build rule for target.
+test_minion/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_minion.dir/build.make CMakeFiles/test_minion.dir/build
+.PHONY : test_minion/fast
+
 extern/imgui/imgui.o: extern/imgui/imgui.cpp.o
 .PHONY : extern/imgui/imgui.o
 
@@ -1264,6 +1277,30 @@ src/fog/FogSystem.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fog.dir/build.make CMakeFiles/test_fog.dir/src/fog/FogSystem.cpp.s
 .PHONY : src/fog/FogSystem.cpp.s
 
+src/hud/HUD.o: src/hud/HUD.cpp.o
+.PHONY : src/hud/HUD.o
+
+# target to build an object file
+src/hud/HUD.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/hud/HUD.cpp.o
+.PHONY : src/hud/HUD.cpp.o
+
+src/hud/HUD.i: src/hud/HUD.cpp.i
+.PHONY : src/hud/HUD.i
+
+# target to preprocess a source file
+src/hud/HUD.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/hud/HUD.cpp.i
+.PHONY : src/hud/HUD.cpp.i
+
+src/hud/HUD.s: src/hud/HUD.cpp.s
+.PHONY : src/hud/HUD.s
+
+# target to generate assembly for a file
+src/hud/HUD.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/hud/HUD.cpp.s
+.PHONY : src/hud/HUD.cpp.s
+
 src/input/InputManager.o: src/input/InputManager.cpp.o
 .PHONY : src/input/InputManager.o
 
@@ -1320,6 +1357,7 @@ src/map/MapLoader.cpp.o:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/map/MapLoader.cpp.o
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_maploader.dir/build.make CMakeFiles/test_maploader.dir/src/map/MapLoader.cpp.o
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_nav.dir/build.make CMakeFiles/test_nav.dir/src/map/MapLoader.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_minion.dir/build.make CMakeFiles/test_minion.dir/src/map/MapLoader.cpp.o
 .PHONY : src/map/MapLoader.cpp.o
 
 src/map/MapLoader.i: src/map/MapLoader.cpp.i
@@ -1330,6 +1368,7 @@ src/map/MapLoader.cpp.i:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/map/MapLoader.cpp.i
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_maploader.dir/build.make CMakeFiles/test_maploader.dir/src/map/MapLoader.cpp.i
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_nav.dir/build.make CMakeFiles/test_nav.dir/src/map/MapLoader.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_minion.dir/build.make CMakeFiles/test_minion.dir/src/map/MapLoader.cpp.i
 .PHONY : src/map/MapLoader.cpp.i
 
 src/map/MapLoader.s: src/map/MapLoader.cpp.s
@@ -1340,7 +1379,62 @@ src/map/MapLoader.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/map/MapLoader.cpp.s
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_maploader.dir/build.make CMakeFiles/test_maploader.dir/src/map/MapLoader.cpp.s
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_nav.dir/build.make CMakeFiles/test_nav.dir/src/map/MapLoader.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_minion.dir/build.make CMakeFiles/test_minion.dir/src/map/MapLoader.cpp.s
 .PHONY : src/map/MapLoader.cpp.s
+
+src/minion/MinionConfig.o: src/minion/MinionConfig.cpp.o
+.PHONY : src/minion/MinionConfig.o
+
+# target to build an object file
+src/minion/MinionConfig.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/minion/MinionConfig.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_minion.dir/build.make CMakeFiles/test_minion.dir/src/minion/MinionConfig.cpp.o
+.PHONY : src/minion/MinionConfig.cpp.o
+
+src/minion/MinionConfig.i: src/minion/MinionConfig.cpp.i
+.PHONY : src/minion/MinionConfig.i
+
+# target to preprocess a source file
+src/minion/MinionConfig.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/minion/MinionConfig.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_minion.dir/build.make CMakeFiles/test_minion.dir/src/minion/MinionConfig.cpp.i
+.PHONY : src/minion/MinionConfig.cpp.i
+
+src/minion/MinionConfig.s: src/minion/MinionConfig.cpp.s
+.PHONY : src/minion/MinionConfig.s
+
+# target to generate assembly for a file
+src/minion/MinionConfig.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/minion/MinionConfig.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_minion.dir/build.make CMakeFiles/test_minion.dir/src/minion/MinionConfig.cpp.s
+.PHONY : src/minion/MinionConfig.cpp.s
+
+src/minion/MinionSystem.o: src/minion/MinionSystem.cpp.o
+.PHONY : src/minion/MinionSystem.o
+
+# target to build an object file
+src/minion/MinionSystem.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/minion/MinionSystem.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_minion.dir/build.make CMakeFiles/test_minion.dir/src/minion/MinionSystem.cpp.o
+.PHONY : src/minion/MinionSystem.cpp.o
+
+src/minion/MinionSystem.i: src/minion/MinionSystem.cpp.i
+.PHONY : src/minion/MinionSystem.i
+
+# target to preprocess a source file
+src/minion/MinionSystem.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/minion/MinionSystem.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_minion.dir/build.make CMakeFiles/test_minion.dir/src/minion/MinionSystem.cpp.i
+.PHONY : src/minion/MinionSystem.cpp.i
+
+src/minion/MinionSystem.s: src/minion/MinionSystem.cpp.s
+.PHONY : src/minion/MinionSystem.s
+
+# target to generate assembly for a file
+src/minion/MinionSystem.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/minion/MinionSystem.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_minion.dir/build.make CMakeFiles/test_minion.dir/src/minion/MinionSystem.cpp.s
+.PHONY : src/minion/MinionSystem.cpp.s
 
 src/nav/DebugRenderer.o: src/nav/DebugRenderer.cpp.o
 .PHONY : src/nav/DebugRenderer.o
@@ -2233,6 +2327,30 @@ tests/test_maploader.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_maploader.dir/build.make CMakeFiles/test_maploader.dir/tests/test_maploader.cpp.s
 .PHONY : tests/test_maploader.cpp.s
 
+tests/test_minion.o: tests/test_minion.cpp.o
+.PHONY : tests/test_minion.o
+
+# target to build an object file
+tests/test_minion.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_minion.dir/build.make CMakeFiles/test_minion.dir/tests/test_minion.cpp.o
+.PHONY : tests/test_minion.cpp.o
+
+tests/test_minion.i: tests/test_minion.cpp.i
+.PHONY : tests/test_minion.i
+
+# target to preprocess a source file
+tests/test_minion.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_minion.dir/build.make CMakeFiles/test_minion.dir/tests/test_minion.cpp.i
+.PHONY : tests/test_minion.cpp.i
+
+tests/test_minion.s: tests/test_minion.cpp.s
+.PHONY : tests/test_minion.s
+
+# target to generate assembly for a file
+tests/test_minion.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_minion.dir/build.make CMakeFiles/test_minion.dir/tests/test_minion.cpp.s
+.PHONY : tests/test_minion.cpp.s
+
 tests/test_mirror.o: tests/test_mirror.cpp.o
 .PHONY : tests/test_mirror.o
 
@@ -2345,6 +2463,7 @@ help:
 	@echo "... test_ability"
 	@echo "... test_fog"
 	@echo "... test_maploader"
+	@echo "... test_minion"
 	@echo "... test_mirror"
 	@echo "... test_nav"
 	@echo "... test_terrain"
@@ -2471,6 +2590,9 @@ help:
 	@echo "... src/fog/FogSystem.o"
 	@echo "... src/fog/FogSystem.i"
 	@echo "... src/fog/FogSystem.s"
+	@echo "... src/hud/HUD.o"
+	@echo "... src/hud/HUD.i"
+	@echo "... src/hud/HUD.s"
 	@echo "... src/input/InputManager.o"
 	@echo "... src/input/InputManager.i"
 	@echo "... src/input/InputManager.s"
@@ -2480,6 +2602,12 @@ help:
 	@echo "... src/map/MapLoader.o"
 	@echo "... src/map/MapLoader.i"
 	@echo "... src/map/MapLoader.s"
+	@echo "... src/minion/MinionConfig.o"
+	@echo "... src/minion/MinionConfig.i"
+	@echo "... src/minion/MinionConfig.s"
+	@echo "... src/minion/MinionSystem.o"
+	@echo "... src/minion/MinionSystem.i"
+	@echo "... src/minion/MinionSystem.s"
 	@echo "... src/nav/DebugRenderer.o"
 	@echo "... src/nav/DebugRenderer.i"
 	@echo "... src/nav/DebugRenderer.s"
@@ -2591,6 +2719,9 @@ help:
 	@echo "... tests/test_maploader.o"
 	@echo "... tests/test_maploader.i"
 	@echo "... tests/test_maploader.s"
+	@echo "... tests/test_minion.o"
+	@echo "... tests/test_minion.i"
+	@echo "... tests/test_minion.s"
 	@echo "... tests/test_mirror.o"
 	@echo "... tests/test_mirror.i"
 	@echo "... tests/test_mirror.s"

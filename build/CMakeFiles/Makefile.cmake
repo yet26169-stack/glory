@@ -83,4 +83,5 @@ set(CMAKE_DEPEND_INFO_FILES
   "CMakeFiles/test_nav.dir/DependInfo.cmake"
   "CMakeFiles/test_fog.dir/DependInfo.cmake"
   "CMakeFiles/test_ability.dir/DependInfo.cmake"
+  "CMakeFiles/test_minion.dir/DependInfo.cmake"
   )
