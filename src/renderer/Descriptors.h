@@ -5,6 +5,7 @@
 #include <glm/glm.hpp>
 
 #include <vector>
+#include "renderer/Buffer.h"
 
 namespace glory {
 
@@ -52,12 +53,25 @@ public:
 
     void updateUniformBuffer(uint32_t frameIndex, const UniformBufferObject& ubo);
     void updateLightBuffer(uint32_t frameIndex, const LightUBO& light);
+    // Legacy: writes all matrices to slot 0 (single-character shortcut)
+    void updateBoneBuffer(uint32_t frameIndex, const std::vector<glm::mat4>& matrices);
+    // Ring-buffer API: write bone matrices for a specific character slot (0..MAX_SKINNED_CHARS-1).
+    // Returns the bone SSBO byte offset to pass to the vertex shader.
+    uint32_t writeBoneSlot(uint32_t frameIndex, uint32_t slotIndex,
+                           const std::vector<glm::mat4>& matrices);
     void writeBindlessTexture(uint32_t arrayIndex, VkImageView imageView, VkSampler sampler);
     void updateShadowMap(VkImageView depthView, VkSampler shadowSampler);
 
     VkDescriptorSetLayout getLayout() const { return m_layout; }
     VkDescriptorPool      getPool()   const { return m_pool; }
     VkDescriptorSet       getSet(uint32_t frameIndex) const { return m_sets[frameIndex]; }
+    // Returns the bone ring-buffer SSBO for a given frame (used by compute skinning)
+    VkBuffer              getBoneBuffer(uint32_t frameIndex) const {
+        return m_boneBuffers[frameIndex].getBuffer();
+    }
+
+    static constexpr uint32_t MAX_BONES = 256;
+    static constexpr uint32_t MAX_SKINNED_CHARS = 128;
 
 private:
     const Device& m_device;
@@ -67,15 +81,12 @@ private:
     VkDescriptorPool             m_pool   = VK_NULL_HANDLE;
     std::vector<VkDescriptorSet> m_sets;
 
-    // Per-frame uniform buffers (host-visible, persistently mapped)
-    std::vector<VkBuffer>      m_uniformBuffers;
-    std::vector<VmaAllocation> m_uniformAllocations;
-    std::vector<void*>         m_uniformMapped;
+    // Per-frame uniform buffers (host-visible, persistently mapped via Buffer class)
+    std::vector<Buffer> m_uniformBuffers;
+    std::vector<Buffer> m_lightBuffers;
 
-    // Per-frame light UBOs
-    std::vector<VkBuffer>      m_lightBuffers;
-    std::vector<VmaAllocation> m_lightAllocations;
-    std::vector<void*>         m_lightMapped;
+    // Per-frame bone matrix SSBOs (binding 4, GPU skinning)
+    std::vector<Buffer> m_boneBuffers;
 
     bool m_cleaned = false;
 

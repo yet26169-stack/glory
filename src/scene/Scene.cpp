@@ -1,5 +1,8 @@
 #include "scene/Scene.h"
+#include "animation/CPUSkinning.h"
 #include "terrain/TerrainSystem.h"
+#include "minion/MinionComponents.h"
+#include "minion/MinionTypes.h"
 
 #include "ability/AbilitySystem.h"
 #include "ability/CooldownSystem.h"
@@ -39,7 +42,19 @@ uint32_t Scene::addMaterial(Material material) {
   return idx;
 }
 
-void Scene::update(float deltaTime) {
+uint32_t Scene::addDynamicMesh(DynamicMesh mesh) {
+  uint32_t idx = static_cast<uint32_t>(m_dynamicMeshes.size());
+  m_dynamicMeshes.push_back(std::move(mesh));
+  return idx;
+}
+
+uint32_t Scene::addStaticSkinnedMesh(StaticSkinnedMesh mesh) {
+  uint32_t idx = static_cast<uint32_t>(m_staticSkinnedMeshes.size());
+  m_staticSkinnedMeshes.push_back(std::move(mesh));
+  return idx;
+}
+
+void Scene::update(float deltaTime, uint32_t currentFrame) {
   // Update ability systems
   glory::StatusEffectSystem().update(m_registry, deltaTime);
   glory::CooldownSystem().update(m_registry, deltaTime);
@@ -72,6 +87,13 @@ void Scene::update(float deltaTime) {
   for (auto entity : charView) {
     auto &transform = charView.get<TransformComponent>(entity);
     auto &character = charView.get<CharacterComponent>(entity);
+
+    // Always snap to terrain height (even when idle)
+    if (m_terrain) {
+      transform.position.y =
+          m_terrain->GetHeightAt(transform.position.x, transform.position.z) +
+          character.heightOffset;
+    }
 
     if (!character.hasTarget)
       continue;
@@ -106,12 +128,107 @@ void Scene::update(float deltaTime) {
     if (lerpSpeed > 1.0f)
       lerpSpeed = 1.0f;
     transform.rotation.y = currentYaw + diff * lerpSpeed;
+  }
 
-    // Snap to terrain height
-    if (m_terrain) {
-      transform.position.y =
-          m_terrain->GetHeightAt(transform.position.x, transform.position.z);
+  // ── Animation update: state transitions + skinning ──────────────────────
+  auto animView =
+      m_registry
+          .view<SkeletonComponent, AnimationComponent, DynamicMeshComponent>();
+  for (auto entity : animView) {
+    auto &skelComp = animView.get<SkeletonComponent>(entity);
+    auto &animComp = animView.get<AnimationComponent>(entity);
+    auto &dynComp = animView.get<DynamicMeshComponent>(entity);
+
+    // State transition for minions: 0=walk, 1=attack
+    auto *minionState = m_registry.try_get<MinionStateComponent>(entity);
+    if (minionState && !animComp.clips.empty()) {
+      int desiredClip = 0;
+      if (animComp.clips.size() >= 2 &&
+          minionState->state == MinionState::Attacking) {
+        desiredClip = 1;
+      }
+      if (desiredClip != animComp.activeClipIndex) {
+        animComp.activeClipIndex = desiredClip;
+        animComp.player.setClip(&animComp.clips[desiredClip]);
+      }
     }
+
+    // State transition: pick clip — 0=idle, 1=walk, 2=auto-attack
+    auto *charComp = m_registry.try_get<CharacterComponent>(entity);
+    if (charComp && !animComp.clips.empty()) {
+      int desiredClip = 0; // default idle
+      auto *atkComp = m_registry.try_get<AutoAttackComponent>(entity);
+
+      if (animComp.clips.size() >= 3 && atkComp && atkComp->isAttacking) {
+        desiredClip = 2; // auto-attack
+      } else if (animComp.clips.size() >= 2 && charComp->hasTarget) {
+        desiredClip = 1; // walk
+      }
+
+      if (desiredClip != animComp.activeClipIndex) {
+        animComp.activeClipIndex = desiredClip;
+        animComp.player.setClip(&animComp.clips[desiredClip]);
+      }
+    }
+
+    animComp.player.update(deltaTime);
+
+    // CPU skinning for each sub-mesh (typically just 1)
+    if (dynComp.dynamicMeshIndex < m_dynamicMeshes.size()) {
+      auto &dynMesh = m_dynamicMeshes[dynComp.dynamicMeshIndex];
+      const auto &skinningMats = animComp.player.getSkinningMatrices();
+
+      // Skin mesh 0 (most characters have a single mesh)
+      if (!skelComp.bindPoseVertices.empty() &&
+          !skelComp.skinVertices.empty()) {
+        applyCPUSkinning(skelComp.bindPoseVertices[0], skelComp.skinVertices[0],
+                         skinningMats, animComp.skinnedVertices);
+        dynMesh.updateVertices(currentFrame, animComp.skinnedVertices);
+      }
+    }
+  }
+
+  // ── GPU-skinned animation update: advance animation only, no CPU skinning ──
+  // Bone matrices are uploaded to the SSBO by the Renderer each frame.
+  auto gpuAnimView =
+      m_registry
+          .view<SkeletonComponent, AnimationComponent, GPUSkinnedMeshComponent>();
+  for (auto entity : gpuAnimView) {
+    auto &animComp = gpuAnimView.get<AnimationComponent>(entity);
+
+    // State transition for minions: 0=walk, 1=attack
+    auto *minionState = m_registry.try_get<MinionStateComponent>(entity);
+    if (minionState && !animComp.clips.empty()) {
+      int desiredClip = 0;
+      if (animComp.clips.size() >= 2 &&
+          minionState->state == MinionState::Attacking) {
+        desiredClip = 1;
+      }
+      if (desiredClip != animComp.activeClipIndex) {
+        animComp.activeClipIndex = desiredClip;
+        animComp.player.setClip(&animComp.clips[desiredClip]);
+      }
+    }
+
+    // State transition: pick clip — 0=idle, 1=walk, 2=auto-attack
+    auto *charComp = m_registry.try_get<CharacterComponent>(entity);
+    if (charComp && !animComp.clips.empty()) {
+      int desiredClip = 0;
+      auto *atkComp = m_registry.try_get<AutoAttackComponent>(entity);
+
+      if (animComp.clips.size() >= 3 && atkComp && atkComp->isAttacking) {
+        desiredClip = 2; // auto-attack
+      } else if (animComp.clips.size() >= 2 && charComp->hasTarget) {
+        desiredClip = 1; // walk
+      }
+
+      if (desiredClip != animComp.activeClipIndex) {
+        animComp.activeClipIndex = desiredClip;
+        animComp.player.setClip(desiredClip >= 0 ? &animComp.clips[desiredClip] : nullptr);
+      }
+    }
+
+    animComp.player.update(deltaTime);
   }
 }
 
