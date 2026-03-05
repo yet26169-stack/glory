@@ -1114,4 +1114,6 @@ CMakeFiles/test_fog.dir/tests/test_fog.cpp.o: \
   /opt/homebrew/include/vk_video/vulkan_video_codec_av1std_decode.h \
   /opt/homebrew/include/vk_video/vulkan_video_codec_av1std_encode.h \
   /opt/homebrew/include/vk_video/vulkan_video_codec_vp9std.h \
-  /opt/homebrew/include/vk_video/vulkan_video_codec_vp9std_decode.h
+  /opt/homebrew/include/vk_video/vulkan_video_codec_vp9std_decode.h \
+  /Users/donkey/Development/1/Glory/extern/vma/vk_mem_alloc.h \
+  /Users/donkey/Development/1/Glory/src/renderer/Buffer.h

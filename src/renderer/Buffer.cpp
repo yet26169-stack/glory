@@ -42,6 +42,26 @@ std::array<VkVertexInputAttributeDescription, 4> Vertex::getAttributeDescription
     return attrs;
 }
 
+// ── SkinnedVertex ────────────────────────────────────────────────────────────
+VkVertexInputBindingDescription SkinnedVertex::getBindingDescription() {
+    VkVertexInputBindingDescription desc{};
+    desc.binding   = 0;
+    desc.stride    = sizeof(SkinnedVertex);
+    desc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    return desc;
+}
+
+std::array<VkVertexInputAttributeDescription, 6> SkinnedVertex::getAttributeDescriptions() {
+    std::array<VkVertexInputAttributeDescription, 6> attrs{};
+    attrs[0] = {0, 0, VK_FORMAT_R32G32B32_SFLOAT,    offsetof(SkinnedVertex, position)};
+    attrs[1] = {1, 0, VK_FORMAT_R32G32B32_SFLOAT,    offsetof(SkinnedVertex, color)};
+    attrs[2] = {2, 0, VK_FORMAT_R32G32B32_SFLOAT,    offsetof(SkinnedVertex, normal)};
+    attrs[3] = {3, 0, VK_FORMAT_R32G32_SFLOAT,        offsetof(SkinnedVertex, texCoord)};
+    attrs[4] = {4, 0, VK_FORMAT_R32G32B32A32_SINT,    offsetof(SkinnedVertex, joints)};
+    attrs[5] = {5, 0, VK_FORMAT_R32G32B32A32_SFLOAT,  offsetof(SkinnedVertex, weights)};
+    return attrs;
+}
+
 // ── InstanceData ────────────────────────────────────────────────────────────
 VkVertexInputBindingDescription InstanceData::getBindingDescription() {
     VkVertexInputBindingDescription desc{};
@@ -97,11 +117,26 @@ Buffer::Buffer(VmaAllocator allocator, VkDeviceSize size,
     bufCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
     VmaAllocationCreateInfo allocCI{};
-    allocCI.usage = memUsage;
+    allocCI.usage = VMA_MEMORY_USAGE_AUTO;
+    
+    if (memUsage == VMA_MEMORY_USAGE_CPU_ONLY || 
+        memUsage == VMA_MEMORY_USAGE_CPU_TO_GPU) 
+    {
+        allocCI.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | 
+                        VMA_ALLOCATION_CREATE_MAPPED_BIT;
+    }
+    else if (memUsage == VMA_MEMORY_USAGE_GPU_TO_CPU)
+    {
+        allocCI.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | 
+                        VMA_ALLOCATION_CREATE_MAPPED_BIT;
+    }
 
+    VmaAllocationInfo allocInfo{};
     VK_CHECK(vmaCreateBuffer(m_allocator, &bufCI, &allocCI,
-                             &m_buffer, &m_allocation, nullptr),
+                             &m_buffer, &m_allocation, &allocInfo),
              "Failed to create VMA buffer");
+             
+    m_mappedData = allocInfo.pMappedData;
 }
 
 Buffer::~Buffer() { destroy(); }
@@ -111,11 +146,15 @@ Buffer::Buffer(Buffer&& other) noexcept
     , m_buffer(other.m_buffer)
     , m_allocation(other.m_allocation)
     , m_size(other.m_size)
+    , m_mappedData(other.m_mappedData)
+    , m_manuallyMapped(other.m_manuallyMapped)
 {
     other.m_allocator  = VK_NULL_HANDLE;
     other.m_buffer     = VK_NULL_HANDLE;
     other.m_allocation = VK_NULL_HANDLE;
     other.m_size       = 0;
+    other.m_mappedData = nullptr;
+    other.m_manuallyMapped = false;
 }
 
 Buffer& Buffer::operator=(Buffer&& other) noexcept {
@@ -125,30 +164,43 @@ Buffer& Buffer::operator=(Buffer&& other) noexcept {
         m_buffer     = other.m_buffer;
         m_allocation = other.m_allocation;
         m_size       = other.m_size;
+        m_mappedData = other.m_mappedData;
+        m_manuallyMapped = other.m_manuallyMapped;
         other.m_allocator  = VK_NULL_HANDLE;
         other.m_buffer     = VK_NULL_HANDLE;
         other.m_allocation = VK_NULL_HANDLE;
         other.m_size       = 0;
+        other.m_mappedData = nullptr;
+        other.m_manuallyMapped = false;
     }
     return *this;
 }
 
 void* Buffer::map() {
-    void* data;
-    VK_CHECK(vmaMapMemory(m_allocator, m_allocation, &data),
-             "Failed to map buffer memory");
-    return data;
+    if (m_mappedData) return m_mappedData;
+    // If not persistently mapped, map it now
+    VK_CHECK(vmaMapMemory(m_allocator, m_allocation, &m_mappedData),
+             "Failed to map VMA buffer memory");
+    m_manuallyMapped = true;
+    return m_mappedData;
 }
 
 void Buffer::unmap() {
-    vmaUnmapMemory(m_allocator, m_allocation);
+    if (m_manuallyMapped && m_mappedData) {
+        vmaUnmapMemory(m_allocator, m_allocation);
+        m_mappedData = nullptr;
+        m_manuallyMapped = false;
+    }
 }
 
 void Buffer::destroy() {
     if (m_buffer != VK_NULL_HANDLE && m_allocator != VK_NULL_HANDLE) {
+        unmap();
         vmaDestroyBuffer(m_allocator, m_buffer, m_allocation);
         m_buffer     = VK_NULL_HANDLE;
         m_allocation = VK_NULL_HANDLE;
+        m_mappedData = nullptr;
+        m_manuallyMapped = false;
     }
 }
 
@@ -198,8 +250,8 @@ Buffer Buffer::createDeviceLocal(
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers    = &cmd;
 
-    vkQueueSubmit(device.getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(device.getGraphicsQueue());
+    vkQueueSubmit(device.getTransferQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(device.getTransferQueue());
 
     vkFreeCommandBuffers(device.getDevice(), device.getTransferCommandPool(), 1, &cmd);
 

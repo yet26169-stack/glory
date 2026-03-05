@@ -1,8 +1,8 @@
 #pragma once
 
+#include "renderer/Buffer.h"
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.h>
-
 #include <vector>
 
 namespace glory {
@@ -15,7 +15,6 @@ struct DebugVertex {
 };
 
 /// Immediate-mode debug line renderer.
-/// Buffer draw commands each frame, then flush in a single draw call.
 class DebugRenderer {
 public:
   DebugRenderer() = default;
@@ -52,22 +51,14 @@ private:
 
   std::vector<DebugVertex> m_vertices;
 
-  // VMA buffer (CPU_TO_GPU, dynamic)
-  VkBuffer m_vertexBuffer = VK_NULL_HANDLE;
-  void *m_vertexAlloc = nullptr;
-  void *m_vertexMapped = nullptr;
+  // Managed GPU buffer (CPU_TO_GPU, dynamic)
+  Buffer m_vertexBuffer;
   size_t m_bufferCapacity = 0;
   static constexpr size_t INITIAL_CAPACITY = 65536;
 
   // Pipeline
   VkPipeline m_pipeline = VK_NULL_HANDLE;
   VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
-  VkDescriptorSetLayout m_descLayout = VK_NULL_HANDLE;
-  VkDescriptorPool m_descPool = VK_NULL_HANDLE;
-  VkDescriptorSet m_descSet = VK_NULL_HANDLE;
-
-  // Push constant for viewProj
-  // (simpler than UBO for debug renderer)
 
   void ensureCapacity(size_t needed);
   void createPipeline(const Device &device, VkRenderPass renderPass);

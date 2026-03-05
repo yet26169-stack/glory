@@ -1,5 +1,6 @@
 #include "ability/EffectSystem.h"
 #include "ability/AbilityComponents.h"
+#include "scene/Components.h"
 
 #include <spdlog/spdlog.h>
 
@@ -197,16 +198,58 @@ void EffectSystem::apply(entt::registry &registry) {
         break;
       }
 
-      case EffectType::DASH:
-      case EffectType::BLINK:
-        // Mobility effects — stub for now (requires physics integration)
-        spdlog::debug("Mobility effect {} (stub)",
-                      static_cast<int>(effectDef.type));
+      case EffectType::DASH: {
+        if (!registry.all_of<TransformComponent>(pe.target)) break;
+        auto &targetT = registry.get<TransformComponent>(pe.target);
+        // We need a direction. For now, assume character faces the direction of the dash.
+        // If we had `pe.targetInfo.direction` we could use it, but lacking it we'll derive it from rotation.
+        // A simple approach if `pe.source` is valid and has position, dash towards/away. 
+        // For self dash without target, dash forward.
+        glm::mat4 model = targetT.getModelMatrix();
+        glm::vec3 forward = glm::normalize(glm::vec3(model[2])); // Z axis
+        // Note: Engine uses -Z or +Z for forward. Let's assume +Z is forward for now or whatever direction character faces.
+        glm::vec3 dir = forward;
+        float dashDist = effectDef.value;
+        registry.emplace_or_replace<DashComponent>(pe.target, DashComponent{
+            targetT.position,
+            targetT.position + dir * dashDist,
+            effectDef.duration,
+            0.0f,
+            false
+        });
+        spdlog::debug("Applied DASH effect for {:.1f} dist", dashDist);
         break;
+      }
+      case EffectType::BLINK: {
+        if (!registry.all_of<TransformComponent>(pe.target)) break;
+        auto &targetT = registry.get<TransformComponent>(pe.target);
+        glm::mat4 model = targetT.getModelMatrix();
+        glm::vec3 forward = glm::normalize(glm::vec3(model[2]));
+        targetT.position += forward * effectDef.value;
+        spdlog::debug("Applied BLINK effect for {:.1f} dist", effectDef.value);
+        break;
+      }
       }
     }
 
     queue.clear();
+  }
+}
+
+void EffectSystem::update(entt::registry &registry, float dt) {
+  auto view = registry.view<DashComponent, TransformComponent>();
+  for (auto entity : view) {
+    auto &dash = view.get<DashComponent>(entity);
+    auto &t = view.get<TransformComponent>(entity);
+    
+    dash.elapsed += dt;
+    if (dash.elapsed >= dash.duration || dash.duration <= 0.0f) {
+      t.position = dash.endPos;
+      registry.remove<DashComponent>(entity);
+    } else {
+      float tParam = dash.elapsed / dash.duration;
+      t.position = glm::mix(dash.startPos, dash.endPos, tParam);
+    }
   }
 }
 

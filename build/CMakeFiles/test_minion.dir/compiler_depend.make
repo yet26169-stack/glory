@@ -3559,6 +3559,7 @@ CMakeFiles/test_minion.dir/src/minion/MinionSystem.cpp.o: /Users/donkey/Developm
   /Users/donkey/Development/1/Glory/src/animation/AnimationPlayer.h \
   /Users/donkey/Development/1/Glory/src/animation/Skeleton.h \
   /Users/donkey/Development/1/Glory/src/map/MapTypes.h \
+  /Users/donkey/Development/1/Glory/src/math/FixedPoint.h \
   /Users/donkey/Development/1/Glory/src/minion/MinionComponents.h \
   /Users/donkey/Development/1/Glory/src/minion/MinionConfig.h \
   /Users/donkey/Development/1/Glory/src/minion/MinionSystem.h \
@@ -4853,6 +4854,7 @@ CMakeFiles/test_minion.dir/tests/test_minion.cpp.o: /Users/donkey/Development/1/
   /Users/donkey/Development/1/Glory/src/animation/AnimationPlayer.h \
   /Users/donkey/Development/1/Glory/src/animation/Skeleton.h \
   /Users/donkey/Development/1/Glory/src/map/MapTypes.h \
+  /Users/donkey/Development/1/Glory/src/math/FixedPoint.h \
   /Users/donkey/Development/1/Glory/src/minion/MinionComponents.h \
   /Users/donkey/Development/1/Glory/src/minion/MinionConfig.h \
   /Users/donkey/Development/1/Glory/src/minion/MinionSystem.h \
@@ -5212,6 +5214,8 @@ CMakeFiles/test_minion.dir/tests/test_minion.cpp.o: /Users/donkey/Development/1/
 /Users/donkey/Development/1/Glory/src/minion/SpatialHash.h:
 
 /Users/donkey/Development/1/Glory/src/minion/MinionComponents.h:
+
+/Users/donkey/Development/1/Glory/src/math/FixedPoint.h:
 
 /Users/donkey/Development/1/Glory/src/animation/Skeleton.h:
 

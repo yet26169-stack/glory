@@ -12,6 +12,7 @@ namespace glory {
 class EffectSystem {
 public:
   void apply(entt::registry &registry);
+  void update(entt::registry &registry, float dt);
 
   // Standalone damage calculation (used by the system and exposed for tests)
   static float CalculateDamage(float rawDamage, DamageType type,

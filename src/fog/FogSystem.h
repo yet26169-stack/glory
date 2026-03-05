@@ -2,6 +2,8 @@
 
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.h>
+#include <vk_mem_alloc.h>
+#include "renderer/Buffer.h"
 
 #include <cstdint>
 #include <vector>
@@ -76,22 +78,18 @@ private:
   VkImage m_visionImage = VK_NULL_HANDLE;
   VkImageView m_visionView = VK_NULL_HANDLE;
   VkSampler m_visionSampler = VK_NULL_HANDLE;
-  void *m_visionAlloc = nullptr;
+  VmaAllocation m_visionAlloc = VK_NULL_HANDLE;
 
   VkImage m_explorationImage = VK_NULL_HANDLE;
   VkImageView m_explorationView = VK_NULL_HANDLE;
   VkSampler m_explorationSampler = VK_NULL_HANDLE;
-  void *m_explorationAlloc = nullptr;
+  VmaAllocation m_explorationAlloc = VK_NULL_HANDLE;
 
-  // Staging buffer
-  VkBuffer m_stagingBuffer = VK_NULL_HANDLE;
-  void *m_stagingAlloc = nullptr;
-  void *m_stagingMapped = nullptr;
+  // Staging buffer (persistently mapped via Buffer)
+  Buffer m_stagingBuffer;
 
-  // UBO
-  VkBuffer m_uboBuffer = VK_NULL_HANDLE;
-  void *m_uboAlloc = nullptr;
-  void *m_uboMapped = nullptr;
+  // UBO (persistently mapped via Buffer)
+  Buffer m_uboBuffer;
 
   // Pipeline
   VkPipeline m_pipeline = VK_NULL_HANDLE;

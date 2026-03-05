@@ -27,6 +27,20 @@ struct Vertex {
     static std::array<VkVertexInputAttributeDescription, 4> getAttributeDescriptions();
 };
 
+// ── Skinned vertex: Vertex fields + bone joints/weights ─────────────────────
+// Used as binding 0 in the GPU-skinned pipeline (static, never changes per frame)
+struct SkinnedVertex {
+    glm::vec3 position;   // location 0
+    glm::vec3 color;      // location 1
+    glm::vec3 normal;     // location 2
+    glm::vec2 texCoord;   // location 3
+    glm::ivec4 joints;    // location 4 — bone indices (up to 4)
+    glm::vec4  weights;   // location 5 — bone weights (sum to 1.0)
+
+    static VkVertexInputBindingDescription getBindingDescription();
+    static std::array<VkVertexInputAttributeDescription, 6> getAttributeDescriptions();
+};
+
 // ── Per-instance data for instanced rendering ───────────────────────────────
 struct InstanceData {
     glm::mat4 model;        // locations 4,5,6,7
@@ -71,7 +85,10 @@ private:
     VkBuffer      m_buffer     = VK_NULL_HANDLE;
     VmaAllocation m_allocation = VK_NULL_HANDLE;
     VkDeviceSize  m_size       = 0;
+    void*         m_mappedData = nullptr;
+    bool          m_manuallyMapped = false;
 
+public:
     void destroy();
 };
 

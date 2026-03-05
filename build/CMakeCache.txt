@@ -216,6 +216,9 @@ CMAKE_TAPI:FILEPATH=/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeD
 // Studio IDE projects all commands are done without /nologo.
 CMAKE_VERBOSE_MAKEFILE:BOOL=FALSE
 
+//Use fixed-point math for deterministic simulation
+GLORY_DETERMINISTIC:BOOL=OFF
+
 //Path to a program.
 GLSLC:FILEPATH=/opt/homebrew/bin/glslc
 

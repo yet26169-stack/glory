@@ -3,7 +3,6 @@
 #include "renderer/VkCheck.h"
 
 #include <spdlog/spdlog.h>
-
 #include <algorithm>
 #include <cstring>
 #include <fstream>
@@ -12,67 +11,33 @@ namespace glory {
 
 ParticleSystem::ParticleSystem(const Device& device, VkRenderPass renderPass,
                                uint32_t maxParticles)
-    : m_device(device)
-    , m_allocator(device.getAllocator())
-    , m_maxParticles(maxParticles)
+    : m_device(device), m_allocator(device.getAllocator()), m_maxParticles(maxParticles)
 {
-    // Create particle SSBO (host-visible for CPU emission + GPU compute read/write)
-    {
-        VkBufferCreateInfo bufCI{};
-        bufCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        bufCI.size  = maxParticles * sizeof(GPUParticle);
-        bufCI.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-
-        VmaAllocationCreateInfo allocCI{};
-        allocCI.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-        allocCI.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-
-        VmaAllocationInfo allocInfo{};
-        VK_CHECK(vmaCreateBuffer(m_allocator, &bufCI, &allocCI,
-                                 &m_particleBuffer, &m_particleAlloc, &allocInfo),
-                 "Failed to create particle SSBO");
-        m_particleMapped = allocInfo.pMappedData;
-
-        // Zero-initialize all particles (lifetime 0 = dead)
-        std::memset(m_particleMapped, 0, maxParticles * sizeof(GPUParticle));
+    // 1. Create SSBO for particle data (CPU_TO_GPU, persistently mapped)
+    m_particleBuffer = Buffer(m_allocator, sizeof(GPUParticle) * maxParticles,
+                             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                             VMA_MEMORY_USAGE_CPU_TO_GPU);
+    
+    // Initialize particles to dead
+    GPUParticle* p = static_cast<GPUParticle*>(m_particleBuffer.map());
+    for (uint32_t i = 0; i < maxParticles; ++i) {
+        p[i].posAndLifetime.w = -1.0f; // negative life = dead
     }
 
-    // Create vertex output buffer (GPU-local, written by compute, read as vertex)
-    {
-        VkBufferCreateInfo bufCI{};
-        bufCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        bufCI.size  = maxParticles * sizeof(ParticleVertex);
-        bufCI.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    // 2. Create output vertex buffer (GPU_ONLY)
+    m_vertexBuffer = Buffer(m_allocator, sizeof(ParticleVertex) * maxParticles,
+                           VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                           VMA_MEMORY_USAGE_GPU_ONLY);
 
-        VmaAllocationCreateInfo allocCI{};
-        allocCI.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-
-        VK_CHECK(vmaCreateBuffer(m_allocator, &bufCI, &allocCI,
-                                 &m_vertexBuffer, &m_vertexAlloc, nullptr),
-                 "Failed to create particle vertex buffer");
-    }
-
-    // Create atomic counter buffer (host-visible for CPU reset + GPU atomic ops)
-    {
-        VkBufferCreateInfo bufCI{};
-        bufCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        bufCI.size  = sizeof(uint32_t);
-        bufCI.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-
-        VmaAllocationCreateInfo allocCI{};
-        allocCI.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-        allocCI.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-
-        VmaAllocationInfo allocInfo{};
-        VK_CHECK(vmaCreateBuffer(m_allocator, &bufCI, &allocCI,
-                                 &m_counterBuffer, &m_counterAlloc, &allocInfo),
-                 "Failed to create particle counter buffer");
-        m_counterMapped = allocInfo.pMappedData;
-    }
+    // 3. Create atomic counter buffer (CPU_TO_GPU, persistently mapped)
+    m_counterBuffer = Buffer(m_allocator, sizeof(uint32_t),
+                            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                            VMA_MEMORY_USAGE_CPU_TO_GPU);
+    *static_cast<uint32_t*>(m_counterBuffer.map()) = 0;
 
     createComputePipeline();
     createGraphicsPipeline(renderPass);
-    spdlog::info("Particle system created (max {} particles, GPU compute)", maxParticles);
+    spdlog::info("ParticleSystem initialized (max particles: {})", maxParticles);
 }
 
 ParticleSystem::~ParticleSystem() {
@@ -81,11 +46,9 @@ ParticleSystem::~ParticleSystem() {
     if (m_computePipeLayout) vkDestroyPipelineLayout(dev, m_computePipeLayout, nullptr);
     if (m_computeDescPool)   vkDestroyDescriptorPool(dev, m_computeDescPool, nullptr);
     if (m_computeDescLayout) vkDestroyDescriptorSetLayout(dev, m_computeDescLayout, nullptr);
+
     if (m_pipeline)          vkDestroyPipeline(dev, m_pipeline, nullptr);
     if (m_pipelineLayout)    vkDestroyPipelineLayout(dev, m_pipelineLayout, nullptr);
-    if (m_particleBuffer)    vmaDestroyBuffer(m_allocator, m_particleBuffer, m_particleAlloc);
-    if (m_vertexBuffer)      vmaDestroyBuffer(m_allocator, m_vertexBuffer, m_vertexAlloc);
-    if (m_counterBuffer)     vmaDestroyBuffer(m_allocator, m_counterBuffer, m_counterAlloc);
 }
 
 void ParticleSystem::setEmitter(glm::vec3 pos, glm::vec3 baseColor, float emitRate) {
@@ -94,395 +57,281 @@ void ParticleSystem::setEmitter(glm::vec3 pos, glm::vec3 baseColor, float emitRa
     m_emitRate   = emitRate;
 }
 
-float ParticleSystem::randFloat(float lo, float hi) {
-    std::uniform_real_distribution<float> dist(lo, hi);
-    return dist(m_rng);
-}
-
-void ParticleSystem::emit(uint32_t count) {
-    auto* particles = static_cast<GPUParticle*>(m_particleMapped);
-
-    // Find dead slots and emit into them
-    uint32_t emitted = 0;
-    for (uint32_t i = 0; i < m_maxParticles && emitted < count; ++i) {
-        if (particles[i].posAndLifetime.w > 0.0f) continue; // alive, skip
-
-        float maxLife = randFloat(0.8f, 2.5f);
-        float brightness = randFloat(0.7f, 1.3f);
-
-        particles[i].posAndLifetime = glm::vec4(
-            m_emitterPos.x + randFloat(-0.15f, 0.15f),
-            m_emitterPos.y + randFloat(-0.05f, 0.05f),
-            m_emitterPos.z + randFloat(-0.15f, 0.15f),
-            maxLife  // lifetime
-        );
-        particles[i].velAndMaxLife = glm::vec4(
-            randFloat(-0.4f, 0.4f),
-            randFloat(0.8f, 2.5f),
-            randFloat(-0.4f, 0.4f),
-            maxLife  // maxLifetime
-        );
-        particles[i].color = glm::vec4(m_baseColor * brightness, 1.0f);
-        ++emitted;
+void ParticleSystem::setCameraPosition(const glm::vec3& camPos,
+                                       float fullRateDistance,
+                                       float cullDistance) {
+    float dist = glm::distance(camPos, m_emitterPos);
+    if (dist > cullDistance) {
+        m_emitRateScale = 0.0f;
+    } else if (dist <= fullRateDistance) {
+        m_emitRateScale = 1.0f;
+    } else {
+        // Linear falloff from 1 to 0
+        m_emitRateScale = 1.0f - (dist - fullRateDistance) / (cullDistance - fullRateDistance);
     }
 }
 
 void ParticleSystem::update(float dt) {
-    // Read back alive count from previous frame's compute dispatch
-    // (safe because fence wait in drawFrame ensures GPU work is complete)
-    std::memcpy(&m_aliveCount, m_counterMapped, sizeof(uint32_t));
+    // Read alive count from atomic counter (from last frame's dispatch)
+    uint32_t* counter = static_cast<uint32_t*>(m_counterBuffer.map());
+    m_aliveCount = *counter;
+    *counter = 0; // reset for next dispatch
 
-    // Emit new particles (CPU-side, writes to mapped SSBO)
-    m_emitAccum += m_emitRate * dt;
-    uint32_t toEmit = static_cast<uint32_t>(m_emitAccum);
+    // Emit new particles
+    m_emitAccum += m_emitRate * m_emitRateScale * dt;
+    uint32_t toEmit = static_cast<uint32_t>(std::floor(m_emitAccum));
     m_emitAccum -= static_cast<float>(toEmit);
-    emit(toEmit);
 
-    // Reset atomic counter to 0 before compute dispatch
-    uint32_t zero = 0;
-    std::memcpy(m_counterMapped, &zero, sizeof(uint32_t));
+    if (toEmit > 0) {
+        emit(toEmit);
+    }
+}
+
+void ParticleSystem::emit(uint32_t count) {
+    GPUParticle* particles = static_cast<GPUParticle*>(m_particleBuffer.map());
+    uint32_t emitted = 0;
+
+    for (uint32_t i = 0; i < m_maxParticles && emitted < count; ++i) {
+        if (particles[i].posAndLifetime.w < 0.0f) {
+            // Found a dead particle slot
+            particles[i].posAndLifetime = glm::vec4(m_emitterPos, 0.0f);
+            
+            float vx = randFloat(-1.0f, 1.0f);
+            float vy = randFloat(2.0f, 5.0f);
+            float vz = randFloat(-1.0f, 1.0f);
+            float life = randFloat(1.5f, 3.0f);
+            
+            particles[i].velAndMaxLife = glm::vec4(vx, vy, vz, life);
+            particles[i].color = glm::vec4(m_baseColor, 1.0f);
+            
+            emitted++;
+        }
+    }
+}
+
+float ParticleSystem::randFloat(float lo, float hi) {
+    std::uniform_real_distribution<float> d(lo, hi);
+    return d(m_rng);
 }
 
 void ParticleSystem::dispatchCompute(VkCommandBuffer cmd, float dt) {
-    // Bind compute pipeline
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_computePipeline);
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
-                            m_computePipeLayout, 0, 1, &m_computeDescSet, 0, nullptr);
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_computePipeLayout,
+                            0, 1, &m_computeDescSet, 0, nullptr);
 
-    // Push constants: deltaTime, gravity, maxParticles
-    struct ComputePC {
-        float    deltaTime;
-        float    gravity;
-        uint32_t maxParticles;
-    } pc;
-    pc.deltaTime    = dt;
-    pc.gravity      = -1.2f;
-    pc.maxParticles = m_maxParticles;
-    vkCmdPushConstants(cmd, m_computePipeLayout,
-                       VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), &pc);
+    struct {
+        float dt;
+        float gravity;
+        uint32_t max;
+    } pc = { dt, -9.81f, m_maxParticles };
 
-    // Dispatch: ceil(maxParticles / 64)
-    uint32_t groupCount = (m_maxParticles + 63) / 64;
+    vkCmdPushConstants(cmd, m_computePipeLayout, VK_SHADER_STAGE_COMPUTE_BIT,
+                       0, sizeof(pc), &pc);
+
+    uint32_t groupCount = (m_maxParticles + 63) / 64; // local_size_x = 64
     vkCmdDispatch(cmd, groupCount, 1, 1);
 
-    // Memory barrier: compute shader writes → vertex attribute reads
-    VkMemoryBarrier barrier{};
-    barrier.sType         = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    // Barrier: ensure compute writes to vertex buffer are finished before graphics reads
+    VkBufferMemoryBarrier barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
     barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+    barrier.buffer = m_vertexBuffer.getBuffer();
+    barrier.offset = 0;
+    barrier.size   = VK_WHOLE_SIZE;
 
-    vkCmdPipelineBarrier(cmd,
-                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                         VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
-                         0, 1, &barrier, 0, nullptr, 0, nullptr);
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                         VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 0, nullptr,
+                         1, &barrier, 0, nullptr);
 }
 
-void ParticleSystem::record(VkCommandBuffer cmd, const glm::mat4& viewProj,
-                            float particleSize) {
+void ParticleSystem::record(VkCommandBuffer cmd, const glm::mat4& viewProj, float particleSize) {
     if (m_aliveCount == 0) return;
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
 
-    struct PushData {
+    struct {
         glm::mat4 viewProj;
-        float     particleSize;
-    } pc;
-    pc.viewProj     = viewProj;
-    pc.particleSize = particleSize;
-    vkCmdPushConstants(cmd, m_pipelineLayout,
-                       VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pc), &pc);
+        float size;
+    } push;
+    push.viewProj = viewProj;
+    push.size     = particleSize;
 
+    vkCmdPushConstants(cmd, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
+                       0, sizeof(push), &push);
+
+    VkBuffer buf = m_vertexBuffer.getBuffer();
     VkDeviceSize offset = 0;
-    vkCmdBindVertexBuffers(cmd, 0, 1, &m_vertexBuffer, &offset);
-    vkCmdDraw(cmd, m_aliveCount, 1, 0, 0);
+    vkCmdBindVertexBuffers(cmd, 0, 1, &buf, &offset);
+    vkCmdDraw(cmd, m_maxParticles, 1, 0, 0);
 }
 
-// ── Compute pipeline ────────────────────────────────────────────────────────
 void ParticleSystem::createComputePipeline() {
     VkDevice dev = m_device.getDevice();
 
-    // Descriptor set layout: 3 SSBOs
+    // Descriptor layout: 0 = particles, 1 = vertex output, 2 = counter
     VkDescriptorSetLayoutBinding bindings[3]{};
-    // Binding 0: Particle SSBO (read/write)
-    bindings[0].binding         = 0;
-    bindings[0].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    bindings[0].descriptorCount = 1;
-    bindings[0].stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT;
-    // Binding 1: Vertex output SSBO (write)
-    bindings[1].binding         = 1;
-    bindings[1].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    bindings[1].descriptorCount = 1;
-    bindings[1].stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT;
-    // Binding 2: Atomic counter SSBO (read/write)
-    bindings[2].binding         = 2;
-    bindings[2].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    bindings[2].descriptorCount = 1;
-    bindings[2].stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT;
+    bindings[0] = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
+    bindings[1] = {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
+    bindings[2] = {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
 
-    VkDescriptorSetLayoutCreateInfo layoutCI{};
-    layoutCI.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    VkDescriptorSetLayoutCreateInfo layoutCI{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
     layoutCI.bindingCount = 3;
-    layoutCI.pBindings    = bindings;
-    VK_CHECK(vkCreateDescriptorSetLayout(dev, &layoutCI, nullptr, &m_computeDescLayout),
-             "Failed to create compute descriptor set layout");
+    layoutCI.pBindings = bindings;
+    VK_CHECK(vkCreateDescriptorSetLayout(dev, &layoutCI, nullptr, &m_computeDescLayout), "compute layout");
 
-    // Descriptor pool
-    VkDescriptorPoolSize poolSize{};
-    poolSize.type            = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    poolSize.descriptorCount = 3;
-
-    VkDescriptorPoolCreateInfo poolCI{};
-    poolCI.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolCI.maxSets       = 1;
+    VkDescriptorPoolSize poolSize = {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3};
+    VkDescriptorPoolCreateInfo poolCI{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+    poolCI.maxSets = 1;
     poolCI.poolSizeCount = 1;
-    poolCI.pPoolSizes    = &poolSize;
-    VK_CHECK(vkCreateDescriptorPool(dev, &poolCI, nullptr, &m_computeDescPool),
-             "Failed to create compute descriptor pool");
+    poolCI.pPoolSizes = &poolSize;
+    VK_CHECK(vkCreateDescriptorPool(dev, &poolCI, nullptr, &m_computeDescPool), "compute pool");
 
-    // Allocate descriptor set
-    VkDescriptorSetAllocateInfo allocInfo{};
-    allocInfo.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool     = m_computeDescPool;
-    allocInfo.descriptorSetCount = 1;
-    allocInfo.pSetLayouts        = &m_computeDescLayout;
-    VK_CHECK(vkAllocateDescriptorSets(dev, &allocInfo, &m_computeDescSet),
-             "Failed to allocate compute descriptor set");
+    VkDescriptorSetAllocateInfo setAI{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+    setAI.descriptorPool = m_computeDescPool;
+    setAI.descriptorSetCount = 1;
+    setAI.pSetLayouts = &m_computeDescLayout;
+    VK_CHECK(vkAllocateDescriptorSets(dev, &setAI, &m_computeDescSet), "compute set");
 
-    // Write descriptor set
-    VkDescriptorBufferInfo particleBufInfo{};
-    particleBufInfo.buffer = m_particleBuffer;
-    particleBufInfo.offset = 0;
-    particleBufInfo.range  = m_maxParticles * sizeof(GPUParticle);
-
-    VkDescriptorBufferInfo vertexBufInfo{};
-    vertexBufInfo.buffer = m_vertexBuffer;
-    vertexBufInfo.offset = 0;
-    vertexBufInfo.range  = m_maxParticles * sizeof(ParticleVertex);
-
-    VkDescriptorBufferInfo counterBufInfo{};
-    counterBufInfo.buffer = m_counterBuffer;
-    counterBufInfo.offset = 0;
-    counterBufInfo.range  = sizeof(uint32_t);
+    VkDescriptorBufferInfo bufInfos[3]{};
+    bufInfos[0] = {m_particleBuffer.getBuffer(), 0, VK_WHOLE_SIZE};
+    bufInfos[1] = {m_vertexBuffer.getBuffer(), 0, VK_WHOLE_SIZE};
+    bufInfos[2] = {m_counterBuffer.getBuffer(), 0, VK_WHOLE_SIZE};
 
     VkWriteDescriptorSet writes[3]{};
-    writes[0].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    writes[0].dstSet          = m_computeDescSet;
-    writes[0].dstBinding      = 0;
-    writes[0].descriptorCount = 1;
-    writes[0].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    writes[0].pBufferInfo     = &particleBufInfo;
-
-    writes[1].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    writes[1].dstSet          = m_computeDescSet;
-    writes[1].dstBinding      = 1;
-    writes[1].descriptorCount = 1;
-    writes[1].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    writes[1].pBufferInfo     = &vertexBufInfo;
-
-    writes[2].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    writes[2].dstSet          = m_computeDescSet;
-    writes[2].dstBinding      = 2;
-    writes[2].descriptorCount = 1;
-    writes[2].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    writes[2].pBufferInfo     = &counterBufInfo;
-
+    for(int i=0; i<3; ++i) {
+        writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[i].dstSet = m_computeDescSet;
+        writes[i].dstBinding = i;
+        writes[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        writes[i].descriptorCount = 1;
+        writes[i].pBufferInfo = &bufInfos[i];
+    }
     vkUpdateDescriptorSets(dev, 3, writes, 0, nullptr);
 
-    // Pipeline layout
-    VkPushConstantRange pushRange{};
-    pushRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-    pushRange.offset     = 0;
-    pushRange.size       = sizeof(float) * 2 + sizeof(uint32_t); // 12 bytes
+    VkPushConstantRange pc{};
+    pc.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    pc.size = sizeof(float) * 3; // deltaTime, gravity, maxParticles
+    VkPipelineLayoutCreateInfo plCI{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+    plCI.setLayoutCount = 1;
+    plCI.pSetLayouts = &m_computeDescLayout;
+    plCI.pushConstantRangeCount = 1;
+    plCI.pPushConstantRanges = &pc;
+    VK_CHECK(vkCreatePipelineLayout(dev, &plCI, nullptr, &m_computePipeLayout), "compute pipe layout");
 
-    VkPipelineLayoutCreateInfo pipeLayoutCI{};
-    pipeLayoutCI.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipeLayoutCI.setLayoutCount         = 1;
-    pipeLayoutCI.pSetLayouts            = &m_computeDescLayout;
-    pipeLayoutCI.pushConstantRangeCount = 1;
-    pipeLayoutCI.pPushConstantRanges    = &pushRange;
-    VK_CHECK(vkCreatePipelineLayout(dev, &pipeLayoutCI, nullptr, &m_computePipeLayout),
-             "Failed to create compute pipeline layout");
-
-    // Load compute shader
-    auto readFile = [](const std::string& path) -> std::vector<char> {
-        std::ifstream file(path, std::ios::ate | std::ios::binary);
-        if (!file.is_open()) throw std::runtime_error("Failed to open shader: " + path);
-        size_t sz = static_cast<size_t>(file.tellg());
+    auto readFile = [](const std::string& path) {
+        std::ifstream f(path, std::ios::ate | std::ios::binary);
+        size_t sz = (size_t)f.tellg();
         std::vector<char> buf(sz);
-        file.seekg(0);
-        file.read(buf.data(), static_cast<std::streamsize>(sz));
+        f.seekg(0); f.read(buf.data(), sz);
         return buf;
     };
+    auto code = readFile(std::string(SHADER_DIR) + "particle_sim.comp.spv");
+    VkShaderModuleCreateInfo smCI{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
+    smCI.codeSize = code.size();
+    smCI.pCode = (const uint32_t*)code.data();
+    VkShaderModule mod;
+    VK_CHECK(vkCreateShaderModule(dev, &smCI, nullptr, &mod), "particle sim shader");
 
-    auto compCode = readFile(std::string(SHADER_DIR) + "particle_sim.comp.spv");
-
-    VkShaderModuleCreateInfo modCI{};
-    modCI.sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    modCI.codeSize = compCode.size();
-    modCI.pCode    = reinterpret_cast<const uint32_t*>(compCode.data());
-    VkShaderModule compMod;
-    VK_CHECK(vkCreateShaderModule(dev, &modCI, nullptr, &compMod),
-             "Failed to create compute shader module");
-
-    VkComputePipelineCreateInfo pipeCI{};
-    pipeCI.sType  = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-    pipeCI.layout = m_computePipeLayout;
-    pipeCI.stage.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    pipeCI.stage.stage  = VK_SHADER_STAGE_COMPUTE_BIT;
-    pipeCI.stage.module = compMod;
-    pipeCI.stage.pName  = "main";
-
-    VK_CHECK(vkCreateComputePipelines(dev, VK_NULL_HANDLE, 1, &pipeCI, nullptr, &m_computePipeline),
-             "Failed to create compute pipeline");
-
-    vkDestroyShaderModule(dev, compMod, nullptr);
-    spdlog::info("Particle compute pipeline created");
+    VkComputePipelineCreateInfo cpCI{VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
+    cpCI.layout = m_computePipeLayout;
+    cpCI.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    cpCI.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    cpCI.stage.module = mod;
+    cpCI.stage.pName = "main";
+    VK_CHECK(vkCreateComputePipelines(dev, VK_NULL_HANDLE, 1, &cpCI, nullptr, &m_computePipeline), "particle compute pipeline");
+    vkDestroyShaderModule(dev, mod, nullptr);
 }
 
-// ── Graphics pipeline ───────────────────────────────────────────────────────
 void ParticleSystem::createGraphicsPipeline(VkRenderPass renderPass) {
     VkDevice dev = m_device.getDevice();
 
-    auto readFile = [](const std::string& path) -> std::vector<char> {
-        std::ifstream file(path, std::ios::ate | std::ios::binary);
-        if (!file.is_open()) throw std::runtime_error("Failed to open shader: " + path);
-        size_t sz = static_cast<size_t>(file.tellg());
+    VkPushConstantRange pc{};
+    pc.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    pc.size = sizeof(glm::mat4) + sizeof(float);
+    VkPipelineLayoutCreateInfo plCI{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+    plCI.pushConstantRangeCount = 1;
+    plCI.pPushConstantRanges = &pc;
+    VK_CHECK(vkCreatePipelineLayout(dev, &plCI, nullptr, &m_pipelineLayout), "particle graphics layout");
+
+    auto readFile = [](const std::string& path) {
+        std::ifstream f(path, std::ios::ate | std::ios::binary);
+        size_t sz = (size_t)f.tellg();
         std::vector<char> buf(sz);
-        file.seekg(0);
-        file.read(buf.data(), static_cast<std::streamsize>(sz));
+        f.seekg(0); f.read(buf.data(), sz);
         return buf;
     };
-
-    auto makeModule = [&](const std::vector<char>& code) {
-        VkShaderModuleCreateInfo ci{};
-        ci.sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-        ci.codeSize = code.size();
-        ci.pCode    = reinterpret_cast<const uint32_t*>(code.data());
-        VkShaderModule mod;
-        VK_CHECK(vkCreateShaderModule(dev, &ci, nullptr, &mod), "shader module");
-        return mod;
-    };
-
-    auto vertCode = readFile(std::string(SHADER_DIR) + "particle.vert.spv");
-    auto fragCode = readFile(std::string(SHADER_DIR) + "particle.frag.spv");
-    VkShaderModule vertMod = makeModule(vertCode);
-    VkShaderModule fragMod = makeModule(fragCode);
+    auto vcode = readFile(std::string(SHADER_DIR) + "particle.vert.spv");
+    auto fcode = readFile(std::string(SHADER_DIR) + "particle.frag.spv");
+    
+    VkShaderModuleCreateInfo smCI{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
+    smCI.codeSize = vcode.size();
+    smCI.pCode = (const uint32_t*)vcode.data();
+    VkShaderModule vertMod;
+    vkCreateShaderModule(dev, &smCI, nullptr, &vertMod);
+    
+    smCI.codeSize = fcode.size();
+    smCI.pCode = (const uint32_t*)fcode.data();
+    VkShaderModule fragMod;
+    vkCreateShaderModule(dev, &smCI, nullptr, &fragMod);
 
     VkPipelineShaderStageCreateInfo stages[2]{};
-    stages[0].sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    stages[0].stage  = VK_SHADER_STAGE_VERTEX_BIT;
-    stages[0].module = vertMod;
-    stages[0].pName  = "main";
-    stages[1].sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    stages[1].stage  = VK_SHADER_STAGE_FRAGMENT_BIT;
-    stages[1].module = fragMod;
-    stages[1].pName  = "main";
+    stages[0] = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, nullptr, 0, VK_SHADER_STAGE_VERTEX_BIT, vertMod, "main"};
+    stages[1] = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, nullptr, 0, VK_SHADER_STAGE_FRAGMENT_BIT, fragMod, "main"};
 
-    // Vertex input: position (vec3) + color (vec4)
-    VkVertexInputBindingDescription binding{};
-    binding.binding   = 0;
-    binding.stride    = sizeof(ParticleVertex);
-    binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
+    VkVertexInputBindingDescription binding{0, sizeof(ParticleVertex), VK_VERTEX_INPUT_RATE_VERTEX};
     VkVertexInputAttributeDescription attrs[2]{};
-    attrs[0].location = 0;
-    attrs[0].binding  = 0;
-    attrs[0].format   = VK_FORMAT_R32G32B32_SFLOAT;
-    attrs[0].offset   = offsetof(ParticleVertex, position);
-    attrs[1].location = 1;
-    attrs[1].binding  = 0;
-    attrs[1].format   = VK_FORMAT_R32G32B32A32_SFLOAT;
-    attrs[1].offset   = offsetof(ParticleVertex, color);
+    attrs[0] = {0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(ParticleVertex, position)};
+    attrs[1] = {1, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(ParticleVertex, color)};
 
-    VkPipelineVertexInputStateCreateInfo vertexInput{};
-    vertexInput.sType                           = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInput.vertexBindingDescriptionCount   = 1;
-    vertexInput.pVertexBindingDescriptions      = &binding;
-    vertexInput.vertexAttributeDescriptionCount = 2;
-    vertexInput.pVertexAttributeDescriptions    = attrs;
+    VkPipelineVertexInputStateCreateInfo vi{VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
+    vi.vertexBindingDescriptionCount = 1;
+    vi.pVertexBindingDescriptions = &binding;
+    vi.vertexAttributeDescriptionCount = 2;
+    vi.pVertexAttributeDescriptions = attrs;
 
-    VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
-    inputAssembly.sType    = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+    VkPipelineInputAssemblyStateCreateInfo ia{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
+    ia.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
 
-    VkDynamicState dynStates[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
-    VkPipelineDynamicStateCreateInfo dynState{};
-    dynState.sType             = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-    dynState.dynamicStateCount = 2;
-    dynState.pDynamicStates    = dynStates;
+    VkPipelineViewportStateCreateInfo vp{VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};
+    vp.viewportCount = 1; vp.scissorCount = 1;
 
-    VkPipelineViewportStateCreateInfo viewportState{};
-    viewportState.sType         = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    viewportState.viewportCount = 1;
-    viewportState.scissorCount  = 1;
+    VkPipelineRasterizationStateCreateInfo rs{VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};
+    rs.polygonMode = VK_POLYGON_MODE_FILL; rs.lineWidth = 1.0f; rs.cullMode = VK_CULL_MODE_NONE;
 
-    VkPipelineRasterizationStateCreateInfo rasterizer{};
-    rasterizer.sType       = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-    rasterizer.lineWidth   = 1.0f;
-    rasterizer.cullMode    = VK_CULL_MODE_NONE;
+    VkPipelineMultisampleStateCreateInfo ms{VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
+    ms.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-    VkPipelineMultisampleStateCreateInfo multisample{};
-    multisample.sType                = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    VkPipelineDepthStencilStateCreateInfo ds{VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
+    ds.depthTestEnable = VK_TRUE; ds.depthWriteEnable = VK_FALSE; ds.depthCompareOp = VK_COMPARE_OP_LESS;
 
-    VkPipelineDepthStencilStateCreateInfo depthStencil{};
-    depthStencil.sType            = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depthStencil.depthTestEnable  = VK_TRUE;
-    depthStencil.depthWriteEnable = VK_FALSE;
-    depthStencil.depthCompareOp   = VK_COMPARE_OP_LESS;
+    VkPipelineColorBlendAttachmentState cbA{};
+    cbA.blendEnable = VK_TRUE;
+    cbA.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+    cbA.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+    cbA.colorBlendOp = VK_BLEND_OP_ADD;
+    cbA.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+    cbA.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+    cbA.alphaBlendOp = VK_BLEND_OP_ADD;
+    cbA.colorWriteMask = 0xF;
 
-    VkPipelineColorBlendAttachmentState blendAttachment{};
-    blendAttachment.blendEnable         = VK_TRUE;
-    blendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-    blendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
-    blendAttachment.colorBlendOp        = VK_BLEND_OP_ADD;
-    blendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-    blendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-    blendAttachment.alphaBlendOp        = VK_BLEND_OP_ADD;
-    blendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                                     VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    VkPipelineColorBlendStateCreateInfo cb{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
+    cb.attachmentCount = 1; cb.pAttachments = &cbA;
 
-    VkPipelineColorBlendStateCreateInfo colorBlend{};
-    colorBlend.sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    colorBlend.attachmentCount = 1;
-    colorBlend.pAttachments    = &blendAttachment;
+    VkDynamicState dyns[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+    VkPipelineDynamicStateCreateInfo dy{VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
+    dy.dynamicStateCount = 2; dy.pDynamicStates = dyns;
 
-    VkPushConstantRange pushRange{};
-    pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    pushRange.offset     = 0;
-    pushRange.size       = sizeof(glm::mat4) + sizeof(float);
+    VkGraphicsPipelineCreateInfo gpCI{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
+    gpCI.stageCount = 2; gpCI.pStages = stages; gpCI.pVertexInputState = &vi;
+    gpCI.pInputAssemblyState = &ia; gpCI.pViewportState = &vp; gpCI.pRasterizationState = &rs;
+    gpCI.pMultisampleState = &ms; gpCI.pDepthStencilState = &ds; gpCI.pColorBlendState = &cb;
+    gpCI.pDynamicState = &dy; gpCI.layout = m_pipelineLayout; gpCI.renderPass = renderPass;
 
-    VkPipelineLayoutCreateInfo layoutCI{};
-    layoutCI.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    layoutCI.pushConstantRangeCount = 1;
-    layoutCI.pPushConstantRanges    = &pushRange;
-
-    VK_CHECK(vkCreatePipelineLayout(dev, &layoutCI, nullptr, &m_pipelineLayout),
-             "Failed to create particle pipeline layout");
-
-    VkGraphicsPipelineCreateInfo pipelineCI{};
-    pipelineCI.sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineCI.stageCount          = 2;
-    pipelineCI.pStages             = stages;
-    pipelineCI.pVertexInputState   = &vertexInput;
-    pipelineCI.pInputAssemblyState = &inputAssembly;
-    pipelineCI.pViewportState      = &viewportState;
-    pipelineCI.pRasterizationState = &rasterizer;
-    pipelineCI.pMultisampleState   = &multisample;
-    pipelineCI.pDepthStencilState  = &depthStencil;
-    pipelineCI.pColorBlendState    = &colorBlend;
-    pipelineCI.pDynamicState       = &dynState;
-    pipelineCI.layout              = m_pipelineLayout;
-    pipelineCI.renderPass          = renderPass;
-    pipelineCI.subpass             = 0;
-
-    VK_CHECK(vkCreateGraphicsPipelines(dev, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &m_pipeline),
-             "Failed to create particle pipeline");
+    VK_CHECK(vkCreateGraphicsPipelines(dev, VK_NULL_HANDLE, 1, &gpCI, nullptr, &m_pipeline), "particle graphics pipeline");
 
     vkDestroyShaderModule(dev, fragMod, nullptr);
     vkDestroyShaderModule(dev, vertMod, nullptr);
-    spdlog::info("Particle graphics pipeline created");
 }
 
 } // namespace glory

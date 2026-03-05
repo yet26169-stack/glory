@@ -105,7 +105,9 @@ void DebugOverlay::beginFrame() {
 
     ImGui::Text("FPS: %.1f", m_fps);
     ImGui::Text("Frame: %.2f ms", m_frameTimeMs);
-    ImGui::Separator();
+    ImGui::Text("GPU: %s", m_gpuTimingSummary);
+    ImGui::Text("CPU: %s", m_cpuTimingSummary);
+    ImGui::Separator();    ImGui::Separator();
     ImGui::Text("Entities: %u", m_entityCount);
     ImGui::Text("Draw calls: %u (indirect)", m_drawCalls);
     ImGui::Text("Indirect cmds: %u | Instances: %u", m_indirectCommands, m_totalInstances);

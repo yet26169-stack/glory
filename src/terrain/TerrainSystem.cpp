@@ -1,6 +1,7 @@
 #include "terrain/TerrainSystem.h"
 #include "renderer/Buffer.h"
 #include "renderer/Device.h"
+#include "renderer/VkCheck.h"
 
 #define STB_IMAGE_IMPLEMENTATION_GUARD
 #include <spdlog/spdlog.h>
@@ -60,7 +61,6 @@ void TerrainSystem::cleanup() {
   if (!m_initialized || !m_device)
     return;
   VkDevice vkDev = m_device->getDevice();
-  VmaAllocator allocator = m_device->getAllocator();
   vkDeviceWaitIdle(vkDev);
 
   auto destroyPipeline = [&](VkPipeline &p) {
@@ -81,13 +81,6 @@ void TerrainSystem::cleanup() {
       d = VK_NULL_HANDLE;
     }
   };
-  auto destroyBuf = [&](VkBuffer &b, void *&a) {
-    if (b) {
-      vmaDestroyBuffer(allocator, b, static_cast<VmaAllocation>(a));
-      b = VK_NULL_HANDLE;
-      a = nullptr;
-    }
-  };
 
   destroyPipeline(m_pipeline);
   destroyPipeline(m_wireframePipeline);
@@ -103,13 +96,11 @@ void TerrainSystem::cleanup() {
   destroyDSL(m_texDescLayout);
   destroyDSL(m_waterTexDescLayout);
 
-  destroyBuf(m_vbVma, m_vbAlloc);
-  destroyBuf(m_ibVma, m_ibAlloc);
-  destroyBuf(m_ubVma, m_ubAlloc);
-  destroyBuf(m_waterVbVma, m_waterVbAlloc);
-  destroyBuf(m_waterIbVma, m_waterIbAlloc);
-
-  m_initialized = false;
+  m_vb.destroy();
+  m_ib.destroy();
+  m_ub.destroy();
+  m_waterVb.destroy();
+  m_waterIb.destroy();
 }
 
 // ── Heightmap generation / loading ──────────────────────────────────────────
@@ -234,62 +225,11 @@ void TerrainSystem::buildMesh() {
   spdlog::info("Terrain mesh: {} verts, {} indices, {} chunks", m_totalVertices,
                m_totalIndices, m_chunks.size());
 
-  // Upload vertex buffer via staging
-  VmaAllocator allocator = m_device->getAllocator();
-  auto uploadBuffer = [&](const void *data, VkDeviceSize size,
-                          VkBufferUsageFlags usage, VkBuffer &outBuf,
-                          void *&outAlloc) {
-    VkBufferCreateInfo bufInfo{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-    bufInfo.size = size;
-    bufInfo.usage = usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    VmaAllocationCreateInfo allocInfo{};
-    allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-    VmaAllocation alloc;
-    vmaCreateBuffer(allocator, &bufInfo, &allocInfo, &outBuf, &alloc, nullptr);
-    outAlloc = alloc;
-
-    VkBuffer staging;
-    VmaAllocation stgAlloc;
-    VkBufferCreateInfo stgInfo{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-    stgInfo.size = size;
-    stgInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-    VmaAllocationCreateInfo stgAllocInfo{};
-    stgAllocInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
-    vmaCreateBuffer(allocator, &stgInfo, &stgAllocInfo, &staging, &stgAlloc,
-                    nullptr);
-
-    void *mapped;
-    vmaMapMemory(allocator, stgAlloc, &mapped);
-    std::memcpy(mapped, data, size);
-    vmaUnmapMemory(allocator, stgAlloc);
-
-    VkCommandBuffer cmd;
-    VkCommandBufferAllocateInfo cmdInfo{
-        VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
-    cmdInfo.commandPool = m_device->getTransferCommandPool();
-    cmdInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    cmdInfo.commandBufferCount = 1;
-    vkAllocateCommandBuffers(m_device->getDevice(), &cmdInfo, &cmd);
-    VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
-    begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    vkBeginCommandBuffer(cmd, &begin);
-    VkBufferCopy copy{0, 0, size};
-    vkCmdCopyBuffer(cmd, staging, outBuf, 1, &copy);
-    vkEndCommandBuffer(cmd);
-    VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
-    submit.commandBufferCount = 1;
-    submit.pCommandBuffers = &cmd;
-    vkQueueSubmit(m_device->getGraphicsQueue(), 1, &submit, VK_NULL_HANDLE);
-    vkQueueWaitIdle(m_device->getGraphicsQueue());
-    vkFreeCommandBuffers(m_device->getDevice(),
-                         m_device->getTransferCommandPool(), 1, &cmd);
-    vmaDestroyBuffer(allocator, staging, stgAlloc);
-  };
-
-  uploadBuffer(vertices.data(), sizeof(TerrainVertex) * m_totalVertices,
-               VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, m_vbVma, m_vbAlloc);
-  uploadBuffer(allIndices.data(), sizeof(uint32_t) * m_totalIndices,
-               VK_BUFFER_USAGE_INDEX_BUFFER_BIT, m_ibVma, m_ibAlloc);
+  // Upload buffers via staging
+  m_vb = Buffer::createDeviceLocal(*m_device, m_device->getAllocator(), vertices.data(), 
+                                  sizeof(TerrainVertex) * m_totalVertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+  m_ib = Buffer::createDeviceLocal(*m_device, m_device->getAllocator(), allIndices.data(), 
+                                  sizeof(uint32_t) * m_totalIndices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 }
 
 // ── Descriptors (set 0 = UBO, set 1 = textures) ────────────────────────────
@@ -298,21 +238,8 @@ void TerrainSystem::createDescriptors(const Device &device) {
   VkDevice vkDev = device.getDevice();
   VmaAllocator allocator = device.getAllocator();
 
-  // UBO buffer (persistently mapped)
-  {
-    VkBufferCreateInfo bufInfo{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-    bufInfo.size = sizeof(TerrainUBO);
-    bufInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-    VmaAllocationCreateInfo allocInfo{};
-    allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-    allocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-    VmaAllocationInfo mapInfo{};
-    VmaAllocation alloc;
-    vmaCreateBuffer(allocator, &bufInfo, &allocInfo, &m_ubVma, &alloc,
-                    &mapInfo);
-    m_ubAlloc = alloc;
-    m_uboMapped = mapInfo.pMappedData;
-  }
+  // UBO buffer (persistently mapped via Buffer class)
+  m_ub = Buffer(allocator, sizeof(TerrainUBO), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
   // Set 0 layout: UBO
   {
@@ -363,8 +290,7 @@ void TerrainSystem::createDescriptors(const Device &device) {
     vkCreateDescriptorSetLayout(vkDev, &ci, nullptr, &m_waterTexDescLayout);
   }
 
-  // Descriptor pool: 1 UBO + 6 terrain samplers + 2 water samplers = 9
-  // descriptors, 4 sets
+  // Descriptor pool
   VkDescriptorPoolSize poolSizes[] = {
       {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1},
       {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 8}};
@@ -390,7 +316,7 @@ void TerrainSystem::createDescriptors(const Device &device) {
   m_waterTexDescSet = sets[2];
 
   // Write UBO to set 0
-  VkDescriptorBufferInfo uboBufInfo{m_ubVma, 0, sizeof(TerrainUBO)};
+  VkDescriptorBufferInfo uboBufInfo{m_ub.getBuffer(), 0, sizeof(TerrainUBO)};
   VkWriteDescriptorSet uboWrite{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
   uboWrite.dstSet = m_uboDescSet;
   uboWrite.dstBinding = 0;
@@ -419,11 +345,10 @@ void TerrainSystem::createDescriptors(const Device &device) {
   }
   vkUpdateDescriptorSets(vkDev, 6, texWrites, 0, nullptr);
 
-  // Write water textures to water set (splat map + normal map as water normals)
+  // Write water textures to water set
   VkDescriptorImageInfo waterTexInfos[2] = {
       imgInfo(m_textures.splatMap),
-      imgInfo(
-          m_textures.normalMap) // reuse terrain normal map for water ripples
+      imgInfo(m_textures.normalMap) 
   };
   VkWriteDescriptorSet waterWrites[2]{};
   for (int i = 0; i < 2; ++i) {
@@ -468,90 +393,64 @@ void TerrainSystem::createPipeline(const Device &device,
   VkDevice vkDev = device.getDevice();
   std::string shaderDir = SHADER_DIR;
 
-  // Terrain pipeline (set 0 = UBO, set 1 = textures)
   VkShaderModule vertModule =
       createShaderModule(vkDev, shaderDir + "terrain.vert.spv");
   VkShaderModule fragModule =
       createShaderModule(vkDev, shaderDir + "terrain.frag.spv");
 
   VkPipelineShaderStageCreateInfo stages[2]{};
-  stages[0] = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-               nullptr,
-               0,
-               VK_SHADER_STAGE_VERTEX_BIT,
-               vertModule,
-               "main"};
-  stages[1] = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-               nullptr,
-               0,
-               VK_SHADER_STAGE_FRAGMENT_BIT,
-               fragModule,
-               "main"};
+  stages[0] = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, nullptr, 0, VK_SHADER_STAGE_VERTEX_BIT, vertModule, "main"};
+  stages[1] = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, nullptr, 0, VK_SHADER_STAGE_FRAGMENT_BIT, fragModule, "main"};
 
   auto bindingDesc = TerrainVertex::getBindingDescription();
   auto attrDescs = TerrainVertex::getAttributeDescriptions();
 
-  VkPipelineVertexInputStateCreateInfo vertexInput{
-      VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
+  VkPipelineVertexInputStateCreateInfo vertexInput{VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
   vertexInput.vertexBindingDescriptionCount = 1;
   vertexInput.pVertexBindingDescriptions = &bindingDesc;
-  vertexInput.vertexAttributeDescriptionCount =
-      static_cast<uint32_t>(attrDescs.size());
+  vertexInput.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrDescs.size());
   vertexInput.pVertexAttributeDescriptions = attrDescs.data();
 
-  VkPipelineInputAssemblyStateCreateInfo inputAssembly{
-      VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
+  VkPipelineInputAssemblyStateCreateInfo inputAssembly{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
   inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
-  VkDynamicState dynStates[] = {VK_DYNAMIC_STATE_VIEWPORT,
-                                VK_DYNAMIC_STATE_SCISSOR};
-  VkPipelineDynamicStateCreateInfo dynState{
-      VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
+  VkDynamicState dynStates[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+  VkPipelineDynamicStateCreateInfo dynState{VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
   dynState.dynamicStateCount = 2;
   dynState.pDynamicStates = dynStates;
 
-  VkPipelineViewportStateCreateInfo viewportState{
-      VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};
+  VkPipelineViewportStateCreateInfo viewportState{VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};
   viewportState.viewportCount = 1;
   viewportState.scissorCount = 1;
 
-  VkPipelineRasterizationStateCreateInfo rasterizer{
-      VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};
+  VkPipelineRasterizationStateCreateInfo rasterizer{VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};
   rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
   rasterizer.lineWidth = 1.0f;
   rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
   rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 
-  VkPipelineMultisampleStateCreateInfo multisampling{
-      VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
+  VkPipelineMultisampleStateCreateInfo multisampling{VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
   multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-  VkPipelineDepthStencilStateCreateInfo depthStencil{
-      VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
+  VkPipelineDepthStencilStateCreateInfo depthStencil{VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
   depthStencil.depthTestEnable = VK_TRUE;
   depthStencil.depthWriteEnable = VK_TRUE;
   depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
 
   VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-  colorBlendAttachment.colorWriteMask =
-      VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-      VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+  colorBlendAttachment.colorWriteMask = 0xF;
 
-  VkPipelineColorBlendStateCreateInfo colorBlending{
-      VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
+  VkPipelineColorBlendStateCreateInfo colorBlending{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
   colorBlending.attachmentCount = 1;
   colorBlending.pAttachments = &colorBlendAttachment;
 
-  // Pipeline layout: set 0 = UBO, set 1 = textures
   VkDescriptorSetLayout setLayouts[] = {m_uboDescLayout, m_texDescLayout};
-  VkPipelineLayoutCreateInfo layoutInfo{
-      VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+  VkPipelineLayoutCreateInfo layoutInfo{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
   layoutInfo.setLayoutCount = 2;
   layoutInfo.pSetLayouts = setLayouts;
   vkCreatePipelineLayout(vkDev, &layoutInfo, nullptr, &m_pipelineLayout);
 
-  VkGraphicsPipelineCreateInfo pipelineInfo{
-      VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
+  VkGraphicsPipelineCreateInfo pipelineInfo{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
   pipelineInfo.stageCount = 2;
   pipelineInfo.pStages = stages;
   pipelineInfo.pVertexInputState = &vertexInput;
@@ -565,17 +464,14 @@ void TerrainSystem::createPipeline(const Device &device,
   pipelineInfo.layout = m_pipelineLayout;
   pipelineInfo.renderPass = renderPass;
 
-  vkCreateGraphicsPipelines(vkDev, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr,
-                            &m_pipeline);
+  vkCreateGraphicsPipelines(vkDev, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline);
 
   rasterizer.polygonMode = VK_POLYGON_MODE_LINE;
   pipelineInfo.pRasterizationState = &rasterizer;
-  vkCreateGraphicsPipelines(vkDev, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr,
-                            &m_wireframePipeline);
+  vkCreateGraphicsPipelines(vkDev, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_wireframePipeline);
 
   vkDestroyShaderModule(vkDev, vertModule, nullptr);
   vkDestroyShaderModule(vkDev, fragModule, nullptr);
-  spdlog::info("Terrain pipeline created (fill + wireframe)");
 }
 
 // ── Water resources ─────────────────────────────────────────────────────────
@@ -585,11 +481,7 @@ void TerrainSystem::createWaterResources(const Device &device,
   VkDevice vkDev = device.getDevice();
   VmaAllocator allocator = device.getAllocator();
 
-  // Water quad: full-map plane at Y = 0.8
-  struct WaterVertex {
-    glm::vec3 pos;
-    glm::vec2 uv;
-  };
+  struct WaterVertex { glm::vec3 pos; glm::vec2 uv; };
   float y = 0.8f;
   WaterVertex waterVerts[] = {{{0.0f, y, 0.0f}, {0.0f, 0.0f}},
                               {{m_worldSize, y, 0.0f}, {1.0f, 0.0f}},
@@ -597,127 +489,49 @@ void TerrainSystem::createWaterResources(const Device &device,
                               {{0.0f, y, m_worldSize}, {0.0f, 1.0f}}};
   uint32_t waterIndices[] = {0, 2, 1, 0, 3, 2};
 
-  // Upload water vertex buffer
-  auto uploadBuf = [&](const void *data, VkDeviceSize size,
-                       VkBufferUsageFlags usage, VkBuffer &outBuf,
-                       void *&outAlloc) {
-    VkBufferCreateInfo bufInfo{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-    bufInfo.size = size;
-    bufInfo.usage = usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    VmaAllocationCreateInfo ai{};
-    ai.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-    VmaAllocation alloc;
-    vmaCreateBuffer(allocator, &bufInfo, &ai, &outBuf, &alloc, nullptr);
-    outAlloc = alloc;
+  m_waterVb = Buffer::createDeviceLocal(device, allocator, waterVerts, sizeof(waterVerts), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+  m_waterIb = Buffer::createDeviceLocal(device, allocator, waterIndices, sizeof(waterIndices), VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 
-    VkBuffer stg;
-    VmaAllocation stgA;
-    VkBufferCreateInfo si{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-    si.size = size;
-    si.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-    VmaAllocationCreateInfo sai{};
-    sai.usage = VMA_MEMORY_USAGE_CPU_ONLY;
-    vmaCreateBuffer(allocator, &si, &sai, &stg, &stgA, nullptr);
-    void *m;
-    vmaMapMemory(allocator, stgA, &m);
-    std::memcpy(m, data, size);
-    vmaUnmapMemory(allocator, stgA);
-
-    VkCommandBuffer cmd;
-    VkCommandBufferAllocateInfo ci{
-        VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
-    ci.commandPool = device.getTransferCommandPool();
-    ci.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    ci.commandBufferCount = 1;
-    vkAllocateCommandBuffers(vkDev, &ci, &cmd);
-    VkCommandBufferBeginInfo bi{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
-    bi.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    vkBeginCommandBuffer(cmd, &bi);
-    VkBufferCopy cp{0, 0, size};
-    vkCmdCopyBuffer(cmd, stg, outBuf, 1, &cp);
-    vkEndCommandBuffer(cmd);
-    VkSubmitInfo sub{VK_STRUCTURE_TYPE_SUBMIT_INFO};
-    sub.commandBufferCount = 1;
-    sub.pCommandBuffers = &cmd;
-    vkQueueSubmit(device.getGraphicsQueue(), 1, &sub, VK_NULL_HANDLE);
-    vkQueueWaitIdle(device.getGraphicsQueue());
-    vkFreeCommandBuffers(vkDev, device.getTransferCommandPool(), 1, &cmd);
-    vmaDestroyBuffer(allocator, stg, stgA);
-  };
-
-  uploadBuf(waterVerts, sizeof(waterVerts), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-            m_waterVbVma, m_waterVbAlloc);
-  uploadBuf(waterIndices, sizeof(waterIndices),
-            VK_BUFFER_USAGE_INDEX_BUFFER_BIT, m_waterIbVma, m_waterIbAlloc);
-
-  // Water pipeline
   std::string shaderDir = SHADER_DIR;
-  VkShaderModule wVert =
-      createShaderModule(vkDev, shaderDir + "water.vert.spv");
-  VkShaderModule wFrag =
-      createShaderModule(vkDev, shaderDir + "water.frag.spv");
+  VkShaderModule wVert = createShaderModule(vkDev, shaderDir + "water.vert.spv");
+  VkShaderModule wFrag = createShaderModule(vkDev, shaderDir + "water.frag.spv");
 
   VkPipelineShaderStageCreateInfo wStages[2]{};
-  wStages[0] = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                nullptr,
-                0,
-                VK_SHADER_STAGE_VERTEX_BIT,
-                wVert,
-                "main"};
-  wStages[1] = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                nullptr,
-                0,
-                VK_SHADER_STAGE_FRAGMENT_BIT,
-                wFrag,
-                "main"};
+  wStages[0] = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, nullptr, 0, VK_SHADER_STAGE_VERTEX_BIT, wVert, "main"};
+  wStages[1] = {VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, nullptr, 0, VK_SHADER_STAGE_FRAGMENT_BIT, wFrag, "main"};
 
-  // Water vertex input: pos (vec3) + uv (vec2)
-  VkVertexInputBindingDescription waterBinding{0, sizeof(WaterVertex),
-                                               VK_VERTEX_INPUT_RATE_VERTEX};
+  VkVertexInputBindingDescription waterBinding{0, sizeof(WaterVertex), VK_VERTEX_INPUT_RATE_VERTEX};
   VkVertexInputAttributeDescription waterAttrs[] = {
       {0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(WaterVertex, pos)},
       {1, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(WaterVertex, uv)}};
 
-  VkPipelineVertexInputStateCreateInfo waterVertexInput{
-      VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
+  VkPipelineVertexInputStateCreateInfo waterVertexInput{VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
   waterVertexInput.vertexBindingDescriptionCount = 1;
   waterVertexInput.pVertexBindingDescriptions = &waterBinding;
   waterVertexInput.vertexAttributeDescriptionCount = 2;
   waterVertexInput.pVertexAttributeDescriptions = waterAttrs;
 
-  VkPipelineInputAssemblyStateCreateInfo iasm{
-      VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
+  VkPipelineInputAssemblyStateCreateInfo iasm{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
   iasm.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
   VkDynamicState ds[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
-  VkPipelineDynamicStateCreateInfo dsi{
-      VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
-  dsi.dynamicStateCount = 2;
-  dsi.pDynamicStates = ds;
+  VkPipelineDynamicStateCreateInfo dsi{VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
+  dsi.dynamicStateCount = 2; dsi.pDynamicStates = ds;
 
-  VkPipelineViewportStateCreateInfo vps{
-      VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};
-  vps.viewportCount = 1;
-  vps.scissorCount = 1;
+  VkPipelineViewportStateCreateInfo vps{VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};
+  vps.viewportCount = 1; vps.scissorCount = 1;
 
-  VkPipelineRasterizationStateCreateInfo rast{
-      VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};
-  rast.polygonMode = VK_POLYGON_MODE_FILL;
-  rast.lineWidth = 1.0f;
-  rast.cullMode = VK_CULL_MODE_NONE; // visible from both sides
+  VkPipelineRasterizationStateCreateInfo rast{VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};
+  rast.polygonMode = VK_POLYGON_MODE_FILL; rast.lineWidth = 1.0f; rast.cullMode = VK_CULL_MODE_NONE;
   rast.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 
-  VkPipelineMultisampleStateCreateInfo ms{
-      VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
+  VkPipelineMultisampleStateCreateInfo ms{VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
   ms.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-  VkPipelineDepthStencilStateCreateInfo depth{
-      VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
-  depth.depthTestEnable = VK_TRUE;
-  depth.depthWriteEnable = VK_FALSE; // read-only depth for transparency
+  VkPipelineDepthStencilStateCreateInfo depth{VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
+  depth.depthTestEnable = VK_TRUE; depth.depthWriteEnable = VK_FALSE;
   depth.depthCompareOp = VK_COMPARE_OP_LESS;
 
-  // Alpha blending
   VkPipelineColorBlendAttachmentState blend{};
   blend.blendEnable = VK_TRUE;
   blend.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
@@ -726,43 +540,25 @@ void TerrainSystem::createWaterResources(const Device &device,
   blend.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
   blend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
   blend.alphaBlendOp = VK_BLEND_OP_ADD;
-  blend.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                         VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+  blend.colorWriteMask = 0xF;
 
-  VkPipelineColorBlendStateCreateInfo cb{
-      VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
-  cb.attachmentCount = 1;
-  cb.pAttachments = &blend;
+  VkPipelineColorBlendStateCreateInfo cb{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
+  cb.attachmentCount = 1; cb.pAttachments = &blend;
 
-  // Water pipeline layout: set 0 = UBO (shared), set 1 = water textures
-  VkDescriptorSetLayout waterLayouts[] = {m_uboDescLayout,
-                                          m_waterTexDescLayout};
+  VkDescriptorSetLayout waterLayouts[] = {m_uboDescLayout, m_waterTexDescLayout};
   VkPipelineLayoutCreateInfo wli{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-  wli.setLayoutCount = 2;
-  wli.pSetLayouts = waterLayouts;
+  wli.setLayoutCount = 2; wli.pSetLayouts = waterLayouts;
   vkCreatePipelineLayout(vkDev, &wli, nullptr, &m_waterPipelineLayout);
 
-  VkGraphicsPipelineCreateInfo wpi{
-      VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
-  wpi.stageCount = 2;
-  wpi.pStages = wStages;
-  wpi.pVertexInputState = &waterVertexInput;
-  wpi.pInputAssemblyState = &iasm;
-  wpi.pViewportState = &vps;
-  wpi.pRasterizationState = &rast;
-  wpi.pMultisampleState = &ms;
-  wpi.pDepthStencilState = &depth;
-  wpi.pColorBlendState = &cb;
-  wpi.pDynamicState = &dsi;
-  wpi.layout = m_waterPipelineLayout;
-  wpi.renderPass = renderPass;
-
-  vkCreateGraphicsPipelines(vkDev, VK_NULL_HANDLE, 1, &wpi, nullptr,
-                            &m_waterPipeline);
+  VkGraphicsPipelineCreateInfo wpi{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
+  wpi.stageCount = 2; wpi.pStages = wStages; wpi.pVertexInputState = &waterVertexInput;
+  wpi.pInputAssemblyState = &iasm; wpi.pViewportState = &vps; wpi.pRasterizationState = &rast;
+  wpi.pMultisampleState = &ms; wpi.pDepthStencilState = &depth; wpi.pColorBlendState = &cb;
+  wpi.pDynamicState = &dsi; wpi.layout = m_waterPipelineLayout; wpi.renderPass = renderPass;
+  vkCreateGraphicsPipelines(vkDev, VK_NULL_HANDLE, 1, &wpi, nullptr, &m_waterPipeline);
 
   vkDestroyShaderModule(vkDev, wVert, nullptr);
   vkDestroyShaderModule(vkDev, wFrag, nullptr);
-  spdlog::info("Water pipeline created (alpha-blended)");
 }
 
 // ── Initialization ──────────────────────────────────────────────────────────
@@ -776,7 +572,6 @@ void TerrainSystem::init(const Device &device, VkRenderPass renderPass,
   else
     loadHeightmap(heightmapPath);
 
-  // Generate terrain textures
   m_textures.generate(device);
 
   buildMesh();
@@ -785,9 +580,7 @@ void TerrainSystem::init(const Device &device, VkRenderPass renderPass,
   createWaterResources(device, renderPass);
 
   m_initialized = true;
-  spdlog::info("TerrainSystem initialized ({} chunks, {} indices, 6 textures, "
-               "water plane)",
-               m_chunks.size(), m_totalIndices);
+  spdlog::info("TerrainSystem initialized");
 }
 
 // ── Render ──────────────────────────────────────────────────────────────────
@@ -798,15 +591,13 @@ void TerrainSystem::render(VkCommandBuffer cmd, const glm::mat4 &view,
   if (!m_initialized)
     return;
 
-  // Update UBO
   TerrainUBO ubo{};
   ubo.view = view;
   ubo.proj = proj;
   ubo.cameraPos = glm::vec4(cameraPos, 1.0f);
   ubo.time = time;
-  std::memcpy(m_uboMapped, &ubo, sizeof(TerrainUBO));
+  std::memcpy(m_ub.map(), &ubo, sizeof(TerrainUBO));
 
-  // ── Terrain pass (opaque) ───────────────────────────────────────────────
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                     wireframe ? m_wireframePipeline : m_pipeline);
 
@@ -814,10 +605,10 @@ void TerrainSystem::render(VkCommandBuffer cmd, const glm::mat4 &view,
   vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                           m_pipelineLayout, 0, 2, terrainSets, 0, nullptr);
 
-  VkBuffer vbBuffers[] = {m_vbVma};
+  VkBuffer vbBuffers[] = {m_vb.getBuffer()};
   VkDeviceSize offsets[] = {0};
   vkCmdBindVertexBuffers(cmd, 0, 1, vbBuffers, offsets);
-  vkCmdBindIndexBuffer(cmd, m_ibVma, 0, VK_INDEX_TYPE_UINT32);
+  vkCmdBindIndexBuffer(cmd, m_ib.getBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
   m_visibleChunks = 0;
   for (const auto &chunk : m_chunks) {
@@ -827,17 +618,14 @@ void TerrainSystem::render(VkCommandBuffer cmd, const glm::mat4 &view,
     ++m_visibleChunks;
   }
 
-  // ── Water pass (transparent, after terrain) ─────────────────────────────
   if (!wireframe) {
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_waterPipeline);
-
     VkDescriptorSet waterSets[] = {m_uboDescSet, m_waterTexDescSet};
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                             m_waterPipelineLayout, 0, 2, waterSets, 0, nullptr);
-
-    VkBuffer waterVb[] = {m_waterVbVma};
+    VkBuffer waterVb[] = {m_waterVb.getBuffer()};
     vkCmdBindVertexBuffers(cmd, 0, 1, waterVb, offsets);
-    vkCmdBindIndexBuffer(cmd, m_waterIbVma, 0, VK_INDEX_TYPE_UINT32);
+    vkCmdBindIndexBuffer(cmd, m_waterIb.getBuffer(), 0, VK_INDEX_TYPE_UINT32);
     vkCmdDrawIndexed(cmd, 6, 1, 0, 0, 0);
   }
 }

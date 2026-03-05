@@ -8,6 +8,8 @@
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
+#include <utility>
+
 namespace glory {
 
 class Camera;
@@ -28,11 +30,28 @@ public:
   bool wasYPressed();
   bool wasRightClicked();
   glm::vec2 getLastClickPos() const { return m_rightClickPos; }
+  bool wasLeftClicked();
+  glm::vec2 getLastLeftClickPos() const { return m_leftClickPos; }
   glm::vec2 getMousePos() const {
     double x, y;
     glfwGetCursorPos(m_window, &x, &y);
     return glm::vec2(static_cast<float>(x), static_cast<float>(y));
   }
+
+  // Consume accumulated scroll delta since last call (positive = scroll up/zoom in)
+  float consumeScrollDelta() {
+    float delta = m_scrollDelta;
+    m_scrollDelta = 0.0f;
+    return delta;
+  }
+
+  // Marquee drag selection
+  bool isLeftDragging() const { return m_leftDragging; }
+  glm::vec2 getLeftDragStart() const { return m_leftDragStart; }
+  glm::vec2 getLeftDragCurrent() const { return getMousePos(); }
+  bool wasLeftDragReleased();
+  // Returns (min, max) corners of the drag rectangle
+  std::pair<glm::vec2, glm::vec2> getLeftDragRect() const;
 
   // Ability keys (MOBA mode)
   bool wasAbilityPressed(AbilitySlot slot);
@@ -57,6 +76,18 @@ private:
   bool m_yPressed = false;
   bool m_rightClicked = false;
   glm::vec2 m_rightClickPos{0.0f};
+  bool m_leftClicked = false;
+  glm::vec2 m_leftClickPos{0.0f};
+
+  // Marquee drag state
+  bool m_leftButtonDown = false;
+  bool m_leftDragging = false;
+  bool m_leftDragReleased = false;
+  glm::vec2 m_leftDragStart{0.0f};
+  glm::vec2 m_leftDragEnd{0.0f};
+  static constexpr float DRAG_DEAD_ZONE = 5.0f;
+
+  float m_scrollDelta = 0.0f; // accumulated scroll since last consumeScrollDelta()
 
   // Ability key states (MOBA mode)
   bool m_qPressed = false;

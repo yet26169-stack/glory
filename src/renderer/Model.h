@@ -1,9 +1,11 @@
 #pragma once
 
+#include "animation/AnimationClip.h"
+#include "animation/Skeleton.h"
 #include "renderer/Mesh.h"
 #include "renderer/Texture.h"
 
-#include <memory>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -37,6 +39,21 @@ public:
   // Extract embedded base-color textures from a GLB file
   static std::vector<Texture> loadGLBTextures(const Device &device,
                                               const std::string &filepath);
+
+  // Axis-aligned bounding box
+  struct AABB {
+    glm::vec3 min{std::numeric_limits<float>::max()};
+    glm::vec3 max{std::numeric_limits<float>::lowest()};
+  };
+  // Compute overall AABB across all meshes in a GLB file
+  static AABB getGLBBounds(const std::string &filepath);
+
+  // Extract raw vertex positions + indices from a GLB (CPU-side, no GPU)
+  struct RawMeshData {
+    std::vector<glm::vec3> positions;
+    std::vector<uint32_t>  indices;
+  };
+  static RawMeshData getGLBRawMesh(const std::string &filepath);
 
   // Cook OBJ to binary gmesh (build-time, no GPU needed)
   static bool cookOBJ(const std::string &objPath, const std::string &gmeshPath);
@@ -74,6 +91,15 @@ public:
                           float outerRadius = 1.0f, float innerRadius = 0.7f,
                           float hubRadius = 0.3f, float thickness = 0.2f,
                           uint32_t teeth = 16);
+  static Model createPyramid(const Device &device, VmaAllocator allocator,
+                              float baseSize = 1.0f, float height = 1.5f);
+
+  // Load a skinned GLB: mesh + skeleton + animations + per-vertex bone data
+  // (declared here but defined after SkinnedModelData below)
+  static struct SkinnedModelData
+  loadSkinnedFromGLB(const Device &device, VmaAllocator allocator,
+                     const std::string &filepath,
+                     float targetReduction = 0.0f); // 0 = no simplification
 
   void draw(VkCommandBuffer cmd) const;
   void drawInstanced(VkCommandBuffer cmd, uint32_t instanceCount,
@@ -92,6 +118,17 @@ public:
 
 private:
   std::vector<Mesh> m_meshes;
+};
+
+// Data extracted from a skinned GLB file (skeleton, animations, per-vertex
+// bone influences, and a CPU-side copy of bind-pose vertices for skinning).
+struct SkinnedModelData {
+  Model model;
+  Skeleton skeleton;
+  std::vector<AnimationClip> animations;
+  std::vector<std::vector<SkinVertex>> skinVertices; // per-mesh
+  std::vector<std::vector<Vertex>> bindPoseVertices; // per-mesh (CPU copy)
+  std::vector<std::vector<uint32_t>> indices;        // per-mesh
 };
 
 } // namespace glory

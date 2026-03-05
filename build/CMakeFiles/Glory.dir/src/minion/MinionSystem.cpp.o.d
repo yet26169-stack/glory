@@ -1276,6 +1276,7 @@ CMakeFiles/Glory.dir/src/minion/MinionSystem.cpp.o: \
   /Users/donkey/Development/1/Glory/extern/vma/vk_mem_alloc.h \
   /Users/donkey/Development/1/Glory/src/renderer/Frustum.h \
   /opt/homebrew/include/glm/gtc/matrix_transform.hpp \
+  /Users/donkey/Development/1/Glory/src/math/FixedPoint.h \
   /opt/homebrew/include/spdlog/spdlog.h \
   /opt/homebrew/include/spdlog/common.h \
   /opt/homebrew/include/spdlog/details/null_mutex.h \

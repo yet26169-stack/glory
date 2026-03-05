@@ -1275,4 +1275,5 @@ CMakeFiles/test_minion.dir/tests/test_minion.cpp.o: \
   /opt/homebrew/include/vk_video/vulkan_video_codec_vp9std_decode.h \
   /Users/donkey/Development/1/Glory/extern/vma/vk_mem_alloc.h \
   /Users/donkey/Development/1/Glory/src/renderer/Frustum.h \
-  /opt/homebrew/include/glm/gtc/matrix_transform.hpp
+  /opt/homebrew/include/glm/gtc/matrix_transform.hpp \
+  /Users/donkey/Development/1/Glory/src/math/FixedPoint.h

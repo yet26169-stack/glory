@@ -41,6 +41,7 @@ Device::Device(VkInstance instance, VkSurfaceKHR surface)
     createLogicalDevice();
     createAllocator();
     createTransferCommandPool();
+    createGraphicsCommandPool();
 }
 
 Device::~Device() { cleanup(); }
@@ -50,6 +51,9 @@ void Device::cleanup() {
     m_cleaned = true;
     if (m_transferCommandPool != VK_NULL_HANDLE) {
         vkDestroyCommandPool(m_device, m_transferCommandPool, nullptr);
+    }
+    if (m_graphicsCommandPool != VK_NULL_HANDLE) {
+        vkDestroyCommandPool(m_device, m_graphicsCommandPool, nullptr);
     }
     if (m_allocator != VK_NULL_HANDLE) {
         vmaDestroyAllocator(m_allocator);
@@ -147,8 +151,22 @@ QueueFamilyIndices Device::findQueueFamilies(VkPhysicalDevice device) const {
         vkGetPhysicalDeviceSurfaceSupportKHR(device, i, m_surface, &present);
         if (present) indices.presentFamily = i;
 
+        // Prefer a queue that supports TRANSFER but NOT GRAPHICS — that's a
+        // dedicated DMA engine (common on discrete GPUs: NVIDIA has queue family 2,
+        // AMD has queue family 1 for DMA).
+        if ((families[i].queueFlags & VK_QUEUE_TRANSFER_BIT) &&
+            !(families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) &&
+            !indices.transferFamily.has_value()) {
+            indices.transferFamily = i;
+        }
+
         if (indices.isComplete()) break;
     }
+
+    // Fall back to graphics family if no dedicated transfer found
+    if (!indices.transferFamily.has_value())
+        indices.transferFamily = indices.graphicsFamily;
+
     return indices;
 }
 
@@ -156,7 +174,8 @@ QueueFamilyIndices Device::findQueueFamilies(VkPhysicalDevice device) const {
 void Device::createLogicalDevice() {
     std::set<uint32_t> uniqueFamilies = {
         m_indices.graphicsFamily.value(),
-        m_indices.presentFamily.value()
+        m_indices.presentFamily.value(),
+        m_indices.transferFamily.value()  // may equal graphicsFamily — set deduplicates
     };
 
     float priority = 1.0f;
@@ -171,19 +190,52 @@ void Device::createLogicalDevice() {
     }
 
     VkPhysicalDeviceFeatures features{};
-    features.samplerAnisotropy   = VK_TRUE;
-    features.fillModeNonSolid    = VK_TRUE;  // needed for wireframe rendering
+    VkPhysicalDeviceFeatures2 baseQuery{};
+    baseQuery.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &baseQuery);
 
-    // Descriptor indexing features (Vulkan 1.2 core) — bindless resources
-    VkPhysicalDeviceDescriptorIndexingFeatures indexingFeatures{};
-    indexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
-    indexingFeatures.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
-    indexingFeatures.shaderSampledImageArrayNonUniformIndexing    = VK_TRUE;
-    indexingFeatures.descriptorBindingPartiallyBound              = VK_TRUE;
+    features.samplerAnisotropy = VK_TRUE;
+    features.fillModeNonSolid  = baseQuery.features.fillModeNonSolid;
+    features.multiDrawIndirect = baseQuery.features.multiDrawIndirect;
+
+    // Query which Vulkan 1.2 features are actually available on this device
+    // before enabling them — some (e.g. drawIndirectCount) are not supported
+    // on MoltenVK / Apple Silicon.
+    // Re-use the same query with available12 chained off baseQuery.
+    VkPhysicalDeviceVulkan12Features available12{};
+    available12.sType  = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+    available12.pNext  = nullptr;
+    baseQuery.pNext    = &available12;
+    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &baseQuery);
+
+    // Build the Vulkan 1.2 feature request — only enable what is available.
+    // NOTE: VkPhysicalDeviceVulkan12Features already contains all descriptor-
+    // indexing bits (they were promoted in 1.2), so VkPhysicalDeviceDescriptorIndexingFeatures
+    // must NOT also appear in the pNext chain (VUID-VkDeviceCreateInfo-pNext-02830).
+    VkPhysicalDeviceVulkan12Features vk12Features{};
+    vk12Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+    vk12Features.pNext = nullptr;
+
+    // drawIndirectCount — optional; gracefully disabled when not available
+    m_drawIndirectCountSupported = (available12.drawIndirectCount == VK_TRUE);
+    vk12Features.drawIndirectCount = m_drawIndirectCountSupported ? VK_TRUE : VK_FALSE;
+    if (!m_drawIndirectCountSupported)
+        spdlog::warn("Device: drawIndirectCount not supported — "
+                     "GPU culling will fall back to vkCmdDrawIndexedIndirect");
+
+    // Descriptor indexing features (required for bindless textures)
+    vk12Features.descriptorBindingSampledImageUpdateAfterBind =
+        available12.descriptorBindingSampledImageUpdateAfterBind;
+    vk12Features.shaderSampledImageArrayNonUniformIndexing =
+        available12.shaderSampledImageArrayNonUniformIndexing;
+    vk12Features.descriptorBindingPartiallyBound =
+        available12.descriptorBindingPartiallyBound;
+    vk12Features.runtimeDescriptorArray =
+        available12.runtimeDescriptorArray;
 
     VkDeviceCreateInfo ci{};
     ci.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    ci.pNext                   = &indexingFeatures;
+    ci.pNext                   = &vk12Features;
     ci.queueCreateInfoCount    = static_cast<uint32_t>(queueCIs.size());
     ci.pQueueCreateInfos       = queueCIs.data();
     ci.pEnabledFeatures        = &features;
@@ -202,6 +254,11 @@ void Device::createLogicalDevice() {
 
     vkGetDeviceQueue(m_device, m_indices.graphicsFamily.value(), 0, &m_graphicsQueue);
     vkGetDeviceQueue(m_device, m_indices.presentFamily.value(),  0, &m_presentQueue);
+    vkGetDeviceQueue(m_device, m_indices.transferFamily.value(), 0, &m_transferQueue);
+    m_dedicatedTransfer = (m_indices.transferFamily.value() != m_indices.graphicsFamily.value());
+    spdlog::info("Transfer queue: family {} ({})",
+                 m_indices.transferFamily.value(),
+                 m_dedicatedTransfer ? "dedicated DMA" : "shared with graphics");
 
     spdlog::info("Logical device created (graphics: {}, present: {})",
                  m_indices.graphicsFamily.value(),
@@ -256,10 +313,22 @@ void Device::createTransferCommandPool() {
     VkCommandPoolCreateInfo ci{};
     ci.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     ci.flags            = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-    ci.queueFamilyIndex = m_indices.graphicsFamily.value();
+    // Use dedicated transfer family when available (overlaps with rendering on DMA engine)
+    ci.queueFamilyIndex = m_indices.transferFamily.value();
 
     VK_CHECK(vkCreateCommandPool(m_device, &ci, nullptr, &m_transferCommandPool),
              "Failed to create transfer command pool");
+}
+
+void Device::createGraphicsCommandPool() {
+    VkCommandPoolCreateInfo ci{};
+    ci.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    ci.flags            = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT |
+                          VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    ci.queueFamilyIndex = m_indices.graphicsFamily.value();
+
+    VK_CHECK(vkCreateCommandPool(m_device, &ci, nullptr, &m_graphicsCommandPool),
+             "Failed to create graphics command pool");
 }
 
 VkFormat Device::findSupportedFormat(const std::vector<VkFormat>& candidates,

@@ -66,11 +66,13 @@ void IsometricCamera::update(float deltaTime, float windowW, float windowH,
     m_dragging = false;
   }
 
-  // ── Scroll zoom ─────────────────────────────────────────────────────────
+  // ── Scroll zoom (smooth easing) ─────────────────────────────────────────
   if (scrollDelta != 0.0f) {
-    m_zoom -= scrollDelta * m_zoomSpeed;
-    m_zoom = std::clamp(m_zoom, m_zoomMin, m_zoomMax);
+    m_zoomTarget -= scrollDelta * m_zoomSpeed;
+    m_zoomTarget = std::clamp(m_zoomTarget, m_zoomMin, m_zoomMax);
   }
+  float zoomLerp = std::clamp(m_zoomSmooth * deltaTime, 0.0f, 1.0f);
+  m_zoom += (m_zoomTarget - m_zoom) * zoomLerp;
 
   clampTarget();
   updatePosition();

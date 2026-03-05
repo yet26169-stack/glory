@@ -1,0 +1,49 @@
+/// Visibility buffer resolve pass (Phase 4.4).
+/// Reads the visibility buffer (meshletID|primitiveID packed into R32_UINT),
+/// reconstructs per-pixel material attributes from bindless buffers, and
+/// writes G-buffer albedo/normal/material.
+/// Prerequisite: Phase 4.3 (BindlessAllocator) must be complete.
+#version 450
+#extension GL_EXT_nonuniform_qualifier : require
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(set = 0, binding = 0, r32ui) uniform readonly  uimage2D visBuffer;
+layout(set = 0, binding = 1)        uniform sampler2D textures[]; // bindless
+
+layout(set = 0, binding = 2) readonly buffer Meshlets  { uvec4 data[]; }  meshlets;
+layout(set = 0, binding = 3) readonly buffer Vertices  { vec4  data[]; }  vertices;
+layout(set = 0, binding = 4) readonly buffer Indices   { uint  data[]; }  indices;
+
+layout(set = 1, binding = 0, rgba16f) uniform writeonly image2D gbufAlbedo;
+layout(set = 1, binding = 1, rgba16f) uniform writeonly image2D gbufNormal;
+layout(set = 1, binding = 2, rgba16f) uniform writeonly image2D gbufMaterial;
+
+layout(push_constant) uniform PC {
+    uvec2 resolution;
+    mat4  invViewProj;
+} pc;
+
+void main() {
+    ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(coord, ivec2(pc.resolution)))) return;
+
+    uint vis = imageLoad(visBuffer, coord).r;
+    if (vis == 0xFFFFFFFFu) {
+        // Skybox pixel — write default G-buffer values
+        imageStore(gbufAlbedo,   coord, vec4(0.0));
+        imageStore(gbufNormal,   coord, vec4(0.0, 1.0, 0.0, 0.0));
+        imageStore(gbufMaterial, coord, vec4(0.5));
+        return;
+    }
+
+    uint meshletID   = vis >> 7u;
+    uint primitiveID = vis & 0x7Fu;
+
+    // TODO: fetch triangle vertices from bindless buffer, compute barycentrics,
+    // sample albedo/normal textures, write to G-buffer images.
+    // Placeholder: output magenta to indicate unimplemented pixels in debug builds.
+    imageStore(gbufAlbedo,   coord, vec4(1.0, 0.0, 1.0, 1.0));
+    imageStore(gbufNormal,   coord, vec4(0.0, 1.0, 0.0, 0.0));
+    imageStore(gbufMaterial, coord, vec4(0.0, 0.5, 0.0, 0.0));
+}

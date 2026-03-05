@@ -1,7 +1,9 @@
 #pragma once
 
 #include "scene/Components.h"
+#include "renderer/DynamicMesh.h"
 #include "renderer/Model.h"
+#include "renderer/StaticSkinnedMesh.h"
 #include "renderer/Texture.h"
 #include "renderer/Material.h"
 
@@ -40,16 +42,28 @@ public:
 
     void setTerrainSystem(TerrainSystem* terrain) { m_terrain = terrain; }
 
-    void update(float deltaTime);
+    // Dynamic mesh management (legacy CPU-skinned characters)
+    uint32_t addDynamicMesh(DynamicMesh mesh);
+    DynamicMesh& getDynamicMesh(uint32_t index) { return m_dynamicMeshes[index]; }
+    const std::vector<DynamicMesh>& getDynamicMeshes() const { return m_dynamicMeshes; }
+
+    // Static skinned mesh management (GPU-skinned via vertex shader + bone SSBO)
+    uint32_t addStaticSkinnedMesh(StaticSkinnedMesh mesh);
+    StaticSkinnedMesh& getStaticSkinnedMesh(uint32_t index) { return m_staticSkinnedMeshes[index]; }
+    const std::vector<StaticSkinnedMesh>& getStaticSkinnedMeshes() const { return m_staticSkinnedMeshes; }
+
+    void update(float deltaTime, uint32_t currentFrame);
     bool getFirstLight(glm::vec3& outPos, glm::vec3& outColor) const;
     uint32_t getAllLights(std::vector<std::pair<glm::vec3, glm::vec3>>& outLights) const;
 
 private:
-    entt::registry        m_registry;
-    std::vector<Model>    m_meshes;
-    std::vector<Texture>  m_textures;
-    std::vector<Material> m_materials;
-    TerrainSystem*        m_terrain = nullptr;
+    entt::registry         m_registry;
+    std::vector<Model>     m_meshes;
+    std::vector<Texture>   m_textures;
+    std::vector<Material>  m_materials;
+    std::vector<DynamicMesh> m_dynamicMeshes;
+    std::vector<StaticSkinnedMesh> m_staticSkinnedMeshes;
+    TerrainSystem*         m_terrain = nullptr;
 };
 
 } // namespace glory

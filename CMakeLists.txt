@@ -5,6 +5,9 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# ── Deterministic simulation option ──────────────────────────────────────────
+option(GLORY_DETERMINISTIC "Use fixed-point math for deterministic simulation" OFF)
+
 # ── Dependencies ─────────────────────────────────────────────────────────────
 find_package(Vulkan REQUIRED)
 find_package(glfw3 REQUIRED)
@@ -48,6 +51,19 @@ set(SHADER_SOURCES
     ${CMAKE_SOURCE_DIR}/shaders/debug.frag
     ${CMAKE_SOURCE_DIR}/shaders/fog.vert
     ${CMAKE_SOURCE_DIR}/shaders/fog.frag
+    ${CMAKE_SOURCE_DIR}/shaders/skinned.vert
+    ${CMAKE_SOURCE_DIR}/shaders/shadow_skinned.vert
+    ${CMAKE_SOURCE_DIR}/shaders/cull.comp
+    ${CMAKE_SOURCE_DIR}/shaders/skinning.comp
+    ${CMAKE_SOURCE_DIR}/shaders/click_indicator.vert
+    ${CMAKE_SOURCE_DIR}/shaders/click_indicator.frag
+    # AAA plan shaders
+    ${CMAKE_SOURCE_DIR}/shaders/fow_visibility.comp
+    ${CMAKE_SOURCE_DIR}/shaders/fow_blur.comp
+    ${CMAKE_SOURCE_DIR}/shaders/hiz_generate.comp
+    ${CMAKE_SOURCE_DIR}/shaders/hiz_cull.comp
+    ${CMAKE_SOURCE_DIR}/shaders/flow_field_integration.comp
+    ${CMAKE_SOURCE_DIR}/shaders/visbuf_resolve.comp
 )
 
 foreach(SHADER ${SHADER_SOURCES})
@@ -65,6 +81,11 @@ endforeach()
 add_custom_target(Shaders ALL DEPENDS ${SPV_SHADERS})
 
 # ── Executable ───────────────────────────────────────────────────────────────
+# ── meshoptimizer (mesh simplification) ──────────────────────────────────────
+file(GLOB MESHOPT_SOURCES ${CMAKE_SOURCE_DIR}/extern/meshoptimizer/src/*.cpp)
+add_library(meshoptimizer STATIC ${MESHOPT_SOURCES})
+target_include_directories(meshoptimizer PUBLIC ${CMAKE_SOURCE_DIR}/extern/meshoptimizer/src)
+
 set(SOURCES
     src/main.cpp
     src/core/Log.cpp
@@ -95,6 +116,7 @@ set(SOURCES
     src/renderer/Descriptors.cpp
     src/renderer/Pipeline.cpp
     src/renderer/Sync.cpp
+    src/renderer/ClickIndicatorRenderer.cpp
     src/renderer/Renderer.cpp
     src/map/MapLoader.cpp
     src/terrain/TerrainSystem.cpp
@@ -102,13 +124,53 @@ set(SOURCES
     src/terrain/IsometricCamera.cpp
     src/nav/DebugRenderer.cpp
     src/fog/FogSystem.cpp
+    src/hud/HUD.cpp
+    src/hud/MinionHealthBars.cpp
+    src/input/TargetingSystem.cpp
+    src/combat/AutoAttackSystem.cpp
     src/ability/AbilityDef.cpp
     src/ability/AbilitySystem.cpp
     src/ability/CooldownSystem.cpp
     src/ability/EffectSystem.cpp
     src/ability/StatusEffectSystem.cpp
     src/ability/ProjectileSystem.cpp
+    src/structure/StructureConfig.cpp
+    src/structure/StructureSystem.cpp
+    src/jungle/JungleConfig.cpp
+    src/jungle/JungleSystem.cpp
     src/renderer/GLBLoader.cpp
+    src/renderer/DynamicMesh.cpp
+    src/renderer/StaticSkinnedMesh.cpp
+    src/renderer/GpuProfiler.cpp
+    src/renderer/GpuCuller.cpp
+    src/renderer/CascadeShadow.cpp
+    src/renderer/TextureStreamer.cpp
+    src/renderer/ComputeSkinner.cpp
+    src/animation/AnimationPlayer.cpp
+    src/animation/CPUSkinning.cpp
+    src/minion/MinionConfig.cpp
+    src/minion/MinionSystem.cpp
+    # AAA plan sources
+    src/math/FixedPoint.cpp
+    src/math/DetRNG.cpp
+    src/math/MurmurHash3.cpp
+    src/core/SimulationLoop.cpp
+    src/core/SimToRenderSyncSystem.cpp
+    src/core/StateChecksumSystem.cpp
+    src/core/StateSnapshot.cpp
+    src/core/WorkStealQueue.cpp
+    src/net/Transport.cpp
+    src/net/GameServer.cpp
+    src/net/GameClient.cpp
+    src/nav/FlowField.cpp
+    src/nav/HierarchicalFlowField.cpp
+    src/nav/SteeringSystem.cpp
+    src/fog/FogReadback.cpp
+    src/renderer/HiZBuffer.cpp
+    src/renderer/BindlessAllocator.cpp
+    src/renderer/PipelineLibrary.cpp
+    src/renderer/QueueManager.cpp
+    src/asset/CookedLoader.cpp
     extern/vma/vma_impl.cpp
     extern/imgui/imgui.cpp
     extern/imgui/imgui_draw.cpp
@@ -138,6 +200,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     glfw
     glm::glm
     spdlog::spdlog
+    meshoptimizer
 )
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE
@@ -149,6 +212,7 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
     MAP_DATA_DIR="${CMAKE_SOURCE_DIR}/assets/maps/"
     ABILITY_DATA_DIR="${CMAKE_SOURCE_DIR}/assets/abilities/"
     MODEL_DIR="${CMAKE_SOURCE_DIR}/"
+    $<$<BOOL:${GLORY_DETERMINISTIC}>:GLORY_DETERMINISTIC>
 )
 
 # ── Mesh cook tool (OBJ → binary .gmesh) ────────────────────────────────────
@@ -228,7 +292,7 @@ target_compile_definitions(test_nav PRIVATE
     MAP_DATA_DIR="${CMAKE_SOURCE_DIR}/assets/maps/"
 )
 
-add_executable(test_fog tests/test_fog.cpp src/fog/FogSystem.cpp extern/vma/vma_impl.cpp)
+add_executable(test_fog tests/test_fog.cpp src/fog/FogSystem.cpp src/renderer/Buffer.cpp extern/vma/vma_impl.cpp)
 target_include_directories(test_fog PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/extern/vma
@@ -252,6 +316,7 @@ target_include_directories(test_ability PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/extern
     ${CMAKE_SOURCE_DIR}/extern/entt
+    ${CMAKE_SOURCE_DIR}/extern/vma
 )
 target_link_libraries(test_ability PRIVATE glm::glm spdlog::spdlog)
 target_compile_definitions(test_ability PRIVATE
@@ -259,3 +324,135 @@ target_compile_definitions(test_ability PRIVATE
     GLM_FORCE_DEPTH_ZERO_TO_ONE
     ABILITY_DATA_DIR="${CMAKE_SOURCE_DIR}/assets/abilities/"
 )
+
+add_executable(test_minion tests/test_minion.cpp
+    src/minion/MinionSystem.cpp
+    src/minion/MinionConfig.cpp
+    src/map/MapLoader.cpp
+)
+target_include_directories(test_minion PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/extern
+    ${CMAKE_SOURCE_DIR}/extern/entt
+    ${CMAKE_SOURCE_DIR}/extern/vma
+    ${CMAKE_SOURCE_DIR}/extern/tinygltf
+)
+target_link_libraries(test_minion PRIVATE glm::glm spdlog::spdlog Vulkan::Vulkan)
+target_compile_definitions(test_minion PRIVATE
+    GLM_FORCE_RADIANS
+    GLM_FORCE_DEPTH_ZERO_TO_ONE
+    CONFIG_DIR="${CMAKE_SOURCE_DIR}/assets/config/"
+    MAP_DATA_DIR="${CMAKE_SOURCE_DIR}/assets/maps/"
+)
+
+add_executable(test_structure tests/test_structure.cpp
+    src/structure/StructureSystem.cpp
+    src/structure/StructureConfig.cpp
+    src/map/MapLoader.cpp
+)
+target_include_directories(test_structure PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/extern
+    ${CMAKE_SOURCE_DIR}/extern/entt
+    ${CMAKE_SOURCE_DIR}/extern/vma
+    ${CMAKE_SOURCE_DIR}/extern/tinygltf
+)
+target_link_libraries(test_structure PRIVATE glm::glm spdlog::spdlog Vulkan::Vulkan)
+target_compile_definitions(test_structure PRIVATE
+    GLM_FORCE_RADIANS
+    GLM_FORCE_DEPTH_ZERO_TO_ONE
+    CONFIG_DIR="${CMAKE_SOURCE_DIR}/assets/config/"
+    MAP_DATA_DIR="${CMAKE_SOURCE_DIR}/assets/maps/"
+)
+
+add_executable(test_jungle tests/test_jungle.cpp
+    src/jungle/JungleSystem.cpp
+    src/jungle/JungleConfig.cpp
+    src/map/MapLoader.cpp
+)
+target_include_directories(test_jungle PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/extern
+    ${CMAKE_SOURCE_DIR}/extern/entt
+    ${CMAKE_SOURCE_DIR}/extern/vma
+    ${CMAKE_SOURCE_DIR}/extern/tinygltf
+)
+target_link_libraries(test_jungle PRIVATE glm::glm spdlog::spdlog Vulkan::Vulkan)
+target_compile_definitions(test_jungle PRIVATE
+    GLM_FORCE_RADIANS
+    GLM_FORCE_DEPTH_ZERO_TO_ONE
+    CONFIG_DIR="${CMAKE_SOURCE_DIR}/assets/config/"
+    MAP_DATA_DIR="${CMAKE_SOURCE_DIR}/assets/maps/"
+)
+
+# ── AAA plan tests ────────────────────────────────────────────────────────────
+set(_COMMON_INC
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/extern
+    ${CMAKE_SOURCE_DIR}/extern/entt
+    ${CMAKE_SOURCE_DIR}/extern/vma
+)
+set(_COMMON_DEFS GLM_FORCE_RADIANS GLM_FORCE_DEPTH_ZERO_TO_ONE)
+
+add_executable(test_fixedpoint tests/test_fixedpoint.cpp
+    src/math/FixedPoint.cpp
+    src/math/DetRNG.cpp
+)
+target_include_directories(test_fixedpoint PRIVATE ${_COMMON_INC})
+target_link_libraries(test_fixedpoint PRIVATE glm::glm)
+target_compile_definitions(test_fixedpoint PRIVATE ${_COMMON_DEFS})
+
+add_executable(test_simulation_loop tests/test_simulation_loop.cpp
+    src/math/FixedPoint.cpp
+    src/math/DetRNG.cpp
+    src/math/MurmurHash3.cpp
+    src/core/StateChecksumSystem.cpp
+)
+target_include_directories(test_simulation_loop PRIVATE ${_COMMON_INC})
+target_link_libraries(test_simulation_loop PRIVATE glm::glm spdlog::spdlog)
+target_compile_definitions(test_simulation_loop PRIVATE ${_COMMON_DEFS}
+    $<$<BOOL:${GLORY_DETERMINISTIC}>:GLORY_DETERMINISTIC>)
+
+add_executable(test_snapshot tests/test_snapshot.cpp
+    src/math/FixedPoint.cpp
+    src/math/DetRNG.cpp
+    src/math/MurmurHash3.cpp
+    src/core/StateChecksumSystem.cpp
+    src/core/StateSnapshot.cpp
+)
+target_include_directories(test_snapshot PRIVATE ${_COMMON_INC})
+target_link_libraries(test_snapshot PRIVATE glm::glm spdlog::spdlog)
+target_compile_definitions(test_snapshot PRIVATE ${_COMMON_DEFS}
+    $<$<BOOL:${GLORY_DETERMINISTIC}>:GLORY_DETERMINISTIC>)
+
+add_executable(test_networking tests/test_networking.cpp
+    src/net/Transport.cpp
+    src/net/GameServer.cpp
+    src/net/GameClient.cpp
+    src/core/StateSnapshot.cpp
+    src/core/StateChecksumSystem.cpp
+    src/math/FixedPoint.cpp
+    src/math/DetRNG.cpp
+    src/math/MurmurHash3.cpp
+)
+target_include_directories(test_networking PRIVATE ${_COMMON_INC})
+target_link_libraries(test_networking PRIVATE glm::glm spdlog::spdlog)
+target_compile_definitions(test_networking PRIVATE ${_COMMON_DEFS})
+
+add_executable(test_flowfield tests/test_flowfield.cpp
+    src/nav/FlowField.cpp
+    src/nav/HierarchicalFlowField.cpp
+)
+target_include_directories(test_flowfield PRIVATE ${_COMMON_INC})
+target_link_libraries(test_flowfield PRIVATE glm::glm)
+target_compile_definitions(test_flowfield PRIVATE ${_COMMON_DEFS})
+
+add_executable(test_determinism tests/test_determinism.cpp
+    src/math/FixedPoint.cpp
+    src/math/DetRNG.cpp
+    src/math/MurmurHash3.cpp
+    src/core/StateChecksumSystem.cpp
+)
+target_include_directories(test_determinism PRIVATE ${_COMMON_INC})
+target_link_libraries(test_determinism PRIVATE glm::glm spdlog::spdlog)
+target_compile_definitions(test_determinism PRIVATE ${_COMMON_DEFS} GLORY_DETERMINISTIC)

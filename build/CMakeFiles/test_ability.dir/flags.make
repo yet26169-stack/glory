@@ -4,7 +4,7 @@
 # compile CXX with /usr/bin/c++
 CXX_DEFINES = -DABILITY_DATA_DIR=\"/Users/donkey/Development/1/Glory/assets/abilities/\" -DFMT_SHARED -DGLM_FORCE_DEPTH_ZERO_TO_ONE -DGLM_FORCE_RADIANS -DSPDLOG_COMPILED_LIB -DSPDLOG_FMT_EXTERNAL -DSPDLOG_SHARED_LIB
 
-CXX_INCLUDES = -I/Users/donkey/Development/1/Glory/src -I/Users/donkey/Development/1/Glory/extern -I/Users/donkey/Development/1/Glory/extern/entt -isystem /opt/homebrew/include
+CXX_INCLUDES = -I/Users/donkey/Development/1/Glory/src -I/Users/donkey/Development/1/Glory/extern -I/Users/donkey/Development/1/Glory/extern/entt -I/Users/donkey/Development/1/Glory/extern/vma -isystem /opt/homebrew/include
 
 CXX_FLAGSarm64 = -g -std=gnu++20 -arch arm64
 

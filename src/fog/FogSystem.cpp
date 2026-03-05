@@ -1,5 +1,6 @@
 #include "fog/FogSystem.h"
 #include "renderer/Device.h"
+#include "renderer/VkCheck.h"
 
 #include <spdlog/spdlog.h>
 #include <vk_mem_alloc.h>
@@ -23,15 +24,15 @@ void FogSystem::cleanup() {
   VmaAllocator allocator = m_device->getAllocator();
   vkDeviceWaitIdle(vkDev);
 
-  auto destroyImg = [&](VkImage &img, void *&alloc, VkImageView &view) {
+  auto destroyImg = [&](VkImage &img, VmaAllocation &alloc, VkImageView &view) {
     if (view) {
       vkDestroyImageView(vkDev, view, nullptr);
       view = VK_NULL_HANDLE;
     }
     if (img) {
-      vmaDestroyImage(allocator, img, static_cast<VmaAllocation>(alloc));
+      vmaDestroyImage(allocator, img, alloc);
       img = VK_NULL_HANDLE;
-      alloc = nullptr;
+      alloc = VK_NULL_HANDLE;
     }
   };
 
@@ -47,16 +48,8 @@ void FogSystem::cleanup() {
     m_explorationSampler = VK_NULL_HANDLE;
   }
 
-  if (m_stagingBuffer) {
-    vmaDestroyBuffer(allocator, m_stagingBuffer,
-                     static_cast<VmaAllocation>(m_stagingAlloc));
-    m_stagingBuffer = VK_NULL_HANDLE;
-  }
-  if (m_uboBuffer) {
-    vmaDestroyBuffer(allocator, m_uboBuffer,
-                     static_cast<VmaAllocation>(m_uboAlloc));
-    m_uboBuffer = VK_NULL_HANDLE;
-  }
+  m_stagingBuffer.destroy();
+  m_uboBuffer.destroy();
 
   if (m_pipeline) {
     vkDestroyPipeline(vkDev, m_pipeline, nullptr);
@@ -158,7 +151,7 @@ void FogSystem::uploadTextures() {
 
   VkDeviceSize texSize = MAP_SIZE * MAP_SIZE;
   // Copy both vision + exploration into staging (side by side)
-  uint8_t *dst = static_cast<uint8_t *>(m_stagingMapped);
+  uint8_t *dst = static_cast<uint8_t *>(m_stagingBuffer.map());
   std::memcpy(dst, m_visionBuffer.data(), texSize);
   std::memcpy(dst + texSize, m_explorationBuffer.data(), texSize);
 
@@ -199,9 +192,9 @@ void FogSystem::uploadTextures() {
     regions[i].imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
     regions[i].imageExtent = {MAP_SIZE, MAP_SIZE, 1};
   }
-  vkCmdCopyBufferToImage(cmd, m_stagingBuffer, m_visionImage,
+  vkCmdCopyBufferToImage(cmd, m_stagingBuffer.getBuffer(), m_visionImage,
                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &regions[0]);
-  vkCmdCopyBufferToImage(cmd, m_stagingBuffer, m_explorationImage,
+  vkCmdCopyBufferToImage(cmd, m_stagingBuffer.getBuffer(), m_explorationImage,
                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &regions[1]);
 
   // Transition back to SHADER_READ
@@ -236,7 +229,7 @@ void FogSystem::render(VkCommandBuffer cmd, const glm::mat4 &invViewProj) {
   ubo.invViewProj = invViewProj;
   ubo.fogColorExplored = glm::vec4(0.0f, 0.0f, 0.0f, 0.5f);
   ubo.fogColorUnknown = glm::vec4(0.0f, 0.0f, 0.05f, 0.95f);
-  std::memcpy(m_uboMapped, &ubo, sizeof(FogUBO));
+  std::memcpy(m_uboBuffer.map(), &ubo, sizeof(FogUBO));
 
   vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
   vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -251,7 +244,7 @@ void FogSystem::createTextures(const Device &device) {
   VkDevice vkDev = device.getDevice();
   VmaAllocator allocator = device.getAllocator();
 
-  auto createR8Texture = [&](VkImage &img, void *&alloc, VkImageView &view,
+  auto createR8Texture = [&](VkImage &img, VmaAllocation &alloc, VkImageView &view,
                              VkSampler &sampler) {
     VkImageCreateInfo imgInfo{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
     imgInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -267,9 +260,7 @@ void FogSystem::createTextures(const Device &device) {
 
     VmaAllocationCreateInfo allocCI{};
     allocCI.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-    VmaAllocation vmaAlloc;
-    vmaCreateImage(allocator, &imgInfo, &allocCI, &img, &vmaAlloc, nullptr);
-    alloc = vmaAlloc;
+    VK_CHECK(vmaCreateImage(allocator, &imgInfo, &allocCI, &img, &alloc, nullptr), "fog img");
 
     VkImageViewCreateInfo viewInfo{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
     viewInfo.image = img;
@@ -326,32 +317,10 @@ void FogSystem::createTextures(const Device &device) {
 
   // Staging buffer for both textures (2 * 128*128 bytes)
   VkDeviceSize stagingSize = MAP_SIZE * MAP_SIZE * 2;
-  VkBufferCreateInfo bufInfo{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-  bufInfo.size = stagingSize;
-  bufInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-  VmaAllocationCreateInfo bufAI{};
-  bufAI.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-  bufAI.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-  VmaAllocationInfo mapInfo{};
-  VmaAllocation stgAlloc;
-  vmaCreateBuffer(allocator, &bufInfo, &bufAI, &m_stagingBuffer, &stgAlloc,
-                  &mapInfo);
-  m_stagingAlloc = stgAlloc;
-  m_stagingMapped = mapInfo.pMappedData;
+  m_stagingBuffer = Buffer(allocator, stagingSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
   // UBO buffer
-  VkBufferCreateInfo uboBufInfo{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-  uboBufInfo.size = sizeof(FogUBO);
-  uboBufInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-  VmaAllocationCreateInfo uboAI{};
-  uboAI.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-  uboAI.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-  VmaAllocationInfo uboMapInfo{};
-  VmaAllocation uboA;
-  vmaCreateBuffer(allocator, &uboBufInfo, &uboAI, &m_uboBuffer, &uboA,
-                  &uboMapInfo);
-  m_uboAlloc = uboA;
-  m_uboMapped = uboMapInfo.pMappedData;
+  m_uboBuffer = Buffer(allocator, sizeof(FogUBO), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
   spdlog::info("FogSystem textures created ({}x{} R8 UNORM)", MAP_SIZE,
                MAP_SIZE);
@@ -436,7 +405,7 @@ void FogSystem::createDescriptors(const Device &device,
       {m_visionSampler, m_visionView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
       {m_explorationSampler, m_explorationView,
        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}};
-  VkDescriptorBufferInfo bufInfo{m_uboBuffer, 0, sizeof(FogUBO)};
+  VkDescriptorBufferInfo bufInfo{m_uboBuffer.getBuffer(), 0, sizeof(FogUBO)};
 
   VkWriteDescriptorSet writes[5]{};
   for (int i = 0; i < 4; ++i) {

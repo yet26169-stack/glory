@@ -1272,6 +1272,7 @@ CMakeFiles/Glory.dir/src/ability/ProjectileSystem.cpp.o: \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/set \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/unordered_set \
   /opt/homebrew/include/glm/gtc/matrix_transform.hpp \
+  /Users/donkey/Development/1/Glory/src/math/FixedPoint.h \
   /Users/donkey/Development/1/Glory/src/renderer/DynamicMesh.h \
   /Users/donkey/Development/1/Glory/src/renderer/Sync.h \
   /Users/donkey/Development/1/Glory/src/renderer/Model.h \

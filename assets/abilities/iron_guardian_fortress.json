@@ -1,0 +1,39 @@
+{
+    "id": "iron_guardian_fortress",
+    "displayName": "Unbreakable Fortress",
+    "slot": "R",
+    "targeting": "SELF",
+    "resourceType": "MANA",
+    "costPerLevel": [100, 100, 100],
+    "cooldownPerLevel": [120.0, 100.0, 80.0],
+    "castTime": 0.5,
+    "channelDuration": 0.0,
+    "areaShape": "CIRCLE",
+    "areaRadius": 5.0,
+    "onSelfEffects": [
+        {
+            "type": "SHIELD",
+            "scaling": { "basePerLevel": [300, 500, 700], "hpRatio": 0.15, "hpBasis": "MAX" },
+            "duration": 8.0
+        },
+        {
+            "type": "BUFF_STAT",
+            "statMod": { "stat": "ARMOR", "amount": 60, "percent": false },
+            "duration": 8.0
+        },
+        {
+            "type": "BUFF_STAT",
+            "statMod": { "stat": "MAGIC_RESIST", "amount": 60, "percent": false },
+            "duration": 8.0
+        }
+    ],
+    "onHitEffects": [
+        {
+            "type": "DAMAGE",
+            "damageType": "MAGICAL",
+            "scaling": { "basePerLevel": [150, 275, 400], "apRatio": 0.5 }
+        },
+        { "type": "KNOCKUP", "duration": 1.0 }
+    ],
+    "tags": ["defense", "shield", "knockup", "aoe", "ultimate"]
+}

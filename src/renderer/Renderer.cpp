@@ -15,6 +15,7 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <imgui.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -380,58 +381,31 @@ void Renderer::drawFrame() {
 
   Profiler::instance().beginFrame();
 
-  // ── Fixed-timestep simulation (30 Hz) ────────────────────────────────────
-  // Cap deltaTime to prevent spiral-of-death on large hitches (>= 250 ms)
-  static constexpr float FIXED_DT    = 1.0f / 30.0f;
-  static constexpr float MAX_DELTA   = 0.25f;
-  static constexpr int   MAX_STEPS   = 8;   // safety guard
-
-  float cappedDelta = std::min(deltaTime, MAX_DELTA);
-  m_simAccumulator += cappedDelta;
-
-  int steps = 0;
+  // ── Fixed-timestep simulation (30 Hz) via SimulationLoop ────────────────
   {
-    GLORY_PROFILE_SCOPE("Simulation");
-    while (m_simAccumulator >= FIXED_DT && steps < MAX_STEPS) {
-      m_input->update(FIXED_DT);
-      m_scene.update(FIXED_DT, m_currentFrame);
-      m_projectileSystem.update(m_scene, FIXED_DT);
-      if (m_mobaMode) {
-        m_gameTime += FIXED_DT;
-        HeightQueryFn heightFn = nullptr;
-        if (m_terrain) {
-          heightFn = [this](float x, float z) {
-            return m_terrain->GetHeightAt(x, z);
-          };
-        }
-        if (!m_customMap) {
-          m_minionSystem.update(m_scene.getRegistry(), FIXED_DT, m_gameTime,
-                                heightFn);
-          m_structureSystem.update(m_scene.getRegistry(), FIXED_DT, m_gameTime);
-          m_jungleSystem.update(m_scene.getRegistry(), FIXED_DT, m_gameTime, heightFn);
-          m_autoAttackSystem.update(m_scene.getRegistry(), m_minionSystem,
-                                    FIXED_DT);
+    HeightQueryFn heightFn = nullptr;
+    if (m_terrain) {
+      heightFn = [this](float x, float z) {
+        return m_terrain->GetHeightAt(x, z);
+      };
+    }
 
-          // Process structure deaths
-          auto structDeaths = m_structureSystem.consumeDeathEvents();
-          for (auto &ev : structDeaths) {
-              if (ev.type == EntityType::Inhibitor) {
-                  m_minionSystem.notifyInhibitorDestroyed(ev.team, ev.lane);
-              }
-              if (ev.type == EntityType::Nexus) {
-                  spdlog::info("GAME OVER! {} wins!", ev.team == TeamID::Blue ? "Red" : "Blue");
-              }
-          }
+    SimulationContext simCtx;
+    simCtx.scene            = &m_scene;
+    simCtx.input            = m_input.get();
+    simCtx.projectileSystem = &m_projectileSystem;
+    simCtx.minionSystem     = &m_minionSystem;
+    simCtx.structureSystem  = &m_structureSystem;
+    simCtx.jungleSystem     = &m_jungleSystem;
+    simCtx.autoAttackSystem = &m_autoAttackSystem;
+    simCtx.particles        = m_particles.get();
+    simCtx.heightFn         = heightFn;
+    simCtx.gameTime         = &m_gameTime;
+    simCtx.currentFrame     = m_currentFrame;
+    simCtx.mobaMode         = m_mobaMode;
+    simCtx.customMap        = m_customMap;
 
-          auto monsterDeaths = m_jungleSystem.consumeDeathEvents();
-        } else {
-          // Custom flat map: run minion AI and auto-attack (no structures/jungle)
-          m_minionSystem.update(m_scene.getRegistry(), FIXED_DT, m_gameTime,
-                                heightFn);
-          m_autoAttackSystem.update(m_scene.getRegistry(), m_minionSystem,
-                                    FIXED_DT);
-        }
-
+    simCtx.postTickCallback = [this]() {
         // ── Clean up bone slots for destroyed minion entities ─────────────
         {
           std::vector<uint32_t> deadEntities;
@@ -456,12 +430,10 @@ void Renderer::drawFrame() {
         for (auto e : minionView) {
           auto &id = m_scene.getRegistry().get<MinionIdentityComponent>(e);
 
-          // Team color tint (same for both skinned and fallback paths)
           glm::vec4 tint = (id.team == TeamID::Blue)
               ? glm::vec4(0.3f, 0.5f, 1.0f, 1.0f)
               : glm::vec4(1.0f, 0.3f, 0.3f, 1.0f);
 
-          // Helper: attach a GPU-skinned minion using the given template
           auto attachSkinned = [&](MinionTemplate &tmpl) {
             if (tmpl.staticSkinnedMeshIndex == UINT32_MAX) return;
             if (m_freeBoneSlots.empty()) {
@@ -469,18 +441,14 @@ void Renderer::drawFrame() {
               return;
             }
 
-            // Assign shared StaticSkinnedMesh (GPU vertex buffer shared across all
-            // minions of this type)
             m_scene.getRegistry().emplace<GPUSkinnedMeshComponent>(e,
                 GPUSkinnedMeshComponent{tmpl.staticSkinnedMeshIndex});
 
-            // Allocate a bone slot from the pool
             uint32_t boneSlot = m_freeBoneSlots.front();
             m_freeBoneSlots.pop();
             uint32_t eid = static_cast<uint32_t>(e);
             m_entityBoneSlot[eid] = boneSlot;
 
-            // Allocate per-entity compute skin output buffer
             const auto& ssMesh = m_scene.getStaticSkinnedMesh(tmpl.staticSkinnedMeshIndex);
             uint32_t vtxCount = ssMesh.getVertexCount();
             Buffer outBuf(m_device->getAllocator(), 44ull * vtxCount,
@@ -488,7 +456,6 @@ void Renderer::drawFrame() {
                           VMA_MEMORY_USAGE_GPU_ONLY);
             m_minionOutputBuffers.emplace(eid, std::move(outBuf));
 
-            // Register a ComputeSkinEntry so the compute skinner processes this entity
             ComputeSkinEntry entry{};
             entry.vertexCount = vtxCount;
             entry.entitySlot  = static_cast<uint32_t>(m_computeSkinEntries.size());
@@ -497,14 +464,12 @@ void Renderer::drawFrame() {
                                        VMA_MEMORY_USAGE_GPU_ONLY);
             m_computeSkinEntries.push_back(std::move(entry));
 
-            // Copy skeleton per entity (each has its own bone state)
             SkeletonComponent skelComp;
             skelComp.skeleton         = tmpl.skeleton;
             skelComp.skinVertices     = tmpl.skinVertices;
             skelComp.bindPoseVertices = tmpl.bindPoseVertices;
             m_scene.getRegistry().emplace<SkeletonComponent>(e, std::move(skelComp));
 
-            // Animation: copy clips, start on clip 0 (walk)
             AnimationComponent animComp;
             for (const auto &clip : tmpl.animClips)
               animComp.clips.push_back(clip);
@@ -535,7 +500,6 @@ void Renderer::drawFrame() {
           } else if (id.type == MinionType::Caster && m_casterMinionTemplate.loaded) {
             attachSkinned(m_casterMinionTemplate);
           } else {
-            // Fallback: static procedural mesh (Siege/Super or unloaded template)
             uint32_t typeIdx = static_cast<uint32_t>(id.type);
             MeshComponent mc{m_minionMeshIndices[typeIdx]};
             mc.localAABB = AABB{{-0.5f, -0.5f, -0.5f}, {0.5f, 0.5f, 0.5f}};
@@ -562,21 +526,20 @@ void Renderer::drawFrame() {
             .view<MinionProjectileComponent, TransformComponent>(
                 entt::exclude<MeshComponent>);
         for (auto e : mProjNewView) {
-          MeshComponent mc{m_minionMeshIndices[0]}; // use melee mesh for projectiles
+          MeshComponent mc{m_minionMeshIndices[0]};
           mc.localAABB = AABB{{-0.3f, -0.3f, -0.3f}, {0.3f, 0.3f, 0.3f}};
           m_scene.getRegistry().emplace<MeshComponent>(e, mc);
           m_scene.getRegistry().emplace<MaterialComponent>(
               e, MaterialComponent{m_minionDefaultTex, m_minionFlatNorm,
-                                   0.0f, 0.0f, 0.3f, 0.5f}); // slightly emissive
+                                   0.0f, 0.0f, 0.3f, 0.5f});
           m_scene.getRegistry().emplace<ColorComponent>(
-              e, ColorComponent{glm::vec4(1.0f, 0.9f, 0.5f, 1.0f)}); // yellow-ish
+              e, ColorComponent{glm::vec4(1.0f, 0.9f, 0.5f, 1.0f)});
         }
-      } // m_mobaMode
-      if (m_particles)
-        m_particles->update(FIXED_DT);
-      m_simAccumulator -= FIXED_DT;
-      ++steps;
-    }
+    }; // end postTickCallback
+
+    GLORY_PROFILE_SCOPE("Simulation");
+    m_simLoop.tick(simCtx, deltaTime);
+
   }
 
   // Update particle emitter distance LOD (scale emission by camera proximity)
@@ -584,9 +547,6 @@ void Renderer::drawFrame() {
     glm::vec3 camPos = m_mobaMode ? m_isoCam.getPosition() : m_camera.getPosition();
     m_particles->setCameraPosition(camPos, 30.0f, 80.0f);
   }
-
-  // Note: remaining m_simAccumulator is sub-step remainder; used for
-  // render-side interpolation if needed in the future.
 
   // Update isometric camera to follow the player character
   if (m_mobaMode) {
@@ -696,6 +656,45 @@ void Renderer::drawFrame() {
       auto &playerTarget =
           m_scene.getRegistry().get<PlayerTargetComponent>(m_playerEntity);
       playerTarget.targetEntity = hit;
+    }
+
+    // Single-click selection: clear previous, select hit entity
+    auto &reg = m_scene.getRegistry();
+    reg.clear<SelectedComponent>();
+    if (hit != entt::null) {
+      reg.emplace_or_replace<SelectedComponent>(hit);
+    }
+  }
+
+  // Marquee drag selection (MOBA mode)
+  if (m_mobaMode && m_input->wasLeftDragReleased()) {
+    auto &reg = m_scene.getRegistry();
+    reg.clear<SelectedComponent>();
+
+    float winW = static_cast<float>(m_swapchain->getExtent().width);
+    float winH = static_cast<float>(m_swapchain->getExtent().height);
+    float aspect = winW / winH;
+    glm::mat4 proj = m_isoCam.getProjectionMatrix(aspect);
+    proj[1][1] *= -1.0f; // undo Vulkan Y-flip
+    glm::mat4 viewProj = proj * m_isoCam.getViewMatrix();
+
+    auto [boxMin, boxMax] = m_input->getLeftDragRect();
+
+    auto selectView = reg.view<TargetableComponent, TransformComponent>();
+    for (auto entity : selectView) {
+      auto *hp = reg.try_get<MinionHealthComponent>(entity);
+      if (hp && hp->isDead) continue;
+
+      auto &transform = selectView.get<TransformComponent>(entity);
+      glm::vec4 clip = viewProj * glm::vec4(transform.position + glm::vec3(0, 1.0f, 0), 1.0f);
+      if (clip.w <= 0.0f) continue;
+      glm::vec3 ndc = glm::vec3(clip) / clip.w;
+      float sx = (ndc.x * 0.5f + 0.5f) * winW;
+      float sy = (1.0f - (ndc.y * 0.5f + 0.5f)) * winH;
+
+      if (sx >= boxMin.x && sx <= boxMax.x && sy >= boxMin.y && sy <= boxMax.y) {
+        reg.emplace_or_replace<SelectedComponent>(entity);
+      }
     }
   }
 
@@ -823,6 +822,16 @@ void Renderer::drawFrame() {
   if (m_mobaMode && m_playerEntity != entt::null) {
     m_hud.setGameTime(m_gameTime);
     m_hud.draw(m_scene, m_playerEntity);
+  }
+
+  // Draw marquee selection box while dragging
+  if (m_mobaMode && m_input->isLeftDragging()) {
+    ImDrawList* dl = ImGui::GetBackgroundDrawList();
+    auto [boxMin, boxMax] = m_input->getLeftDragRect();
+    ImVec2 mn(boxMin.x, boxMin.y);
+    ImVec2 mx(boxMax.x, boxMax.y);
+    dl->AddRectFilled(mn, mx, IM_COL32(40, 200, 80, 50));
+    dl->AddRect(mn, mx, IM_COL32(60, 255, 100, 200), 0.0f, 0, 1.5f);
   }
 
   // Draw world-space health bars above damaged minions
@@ -1356,8 +1365,9 @@ void Renderer::buildScene() {
     auto mobaLight = m_scene.createEntity("MobaLight");
     auto &lt = m_scene.getRegistry().get<TransformComponent>(mobaLight);
     lt.position = glm::vec3(100.0f, 20.0f, 100.0f); // Above map center
+    // High intensity to compensate for quadratic attenuation at dist ~20
     m_scene.getRegistry().emplace<LightComponent>(
-        mobaLight, LightComponent{glm::vec3(1.0f, 0.98f, 0.95f), 1.5f,
+        mobaLight, LightComponent{glm::vec3(1.0f, 0.98f, 0.95f), 50.0f,
                                    LightComponent::Type::Point});
 
     // ── Flat LoL-style map ──────────────────────────────────────────────────
@@ -1488,10 +1498,32 @@ void Renderer::buildScene() {
     skelComp.bindPoseVertices = std::move(skinnedData.bindPoseVertices);
 
     // Build AnimationComponent — clip 0 = idle
+    // Always prefer the dedicated idle GLB (the base model may contain a
+    // single-frame bind-pose "animation" that is NOT a real idle).
     AnimationComponent animComp;
     animComp.player.setSkeleton(&skelComp.skeleton);
-    if (!skinnedData.animations.empty()) {
-      animComp.clips.push_back(std::move(skinnedData.animations[0]));
+    {
+      bool idleLoaded = false;
+      try {
+        std::string idleAnimPath =
+            std::string(MODEL_DIR) + "models/scientist/scientist_idle.glb";
+        auto idleData = Model::loadSkinnedFromGLB(
+            *m_device, m_device->getAllocator(), idleAnimPath, 0.0f);
+        if (!idleData.animations.empty()) {
+          animComp.clips.push_back(std::move(idleData.animations[0]));
+          spdlog::info("Loaded idle animation: '{}'",
+                       animComp.clips.back().name);
+          idleLoaded = true;
+        }
+      } catch (const std::exception &e) {
+        spdlog::warn("Could not load idle animation file: {}", e.what());
+      }
+      // Fall back to embedded animation only if no dedicated file
+      if (!idleLoaded && !skinnedData.animations.empty()) {
+        animComp.clips.push_back(std::move(skinnedData.animations[0]));
+        spdlog::info("Using embedded idle animation (duration {:.3f}s)",
+                     animComp.clips.back().duration);
+      }
     }
 
     // Load walking animation — clip 1
@@ -1550,7 +1582,7 @@ void Renderer::buildScene() {
                                                       std::move(animComp));
 
     m_scene.getRegistry().emplace<MaterialComponent>(
-        character, MaterialComponent{charTex, flatNorm, 0.0f, 0.3f, 0.4f});
+        character, MaterialComponent{charTex, flatNorm, 0.0f, 0.0f, 0.7f});
     m_scene.getRegistry().emplace<ColorComponent>(
         character, ColorComponent{glm::vec4(1.0f, 1.0f, 1.0f, 1.0f)});
 
@@ -1567,7 +1599,7 @@ void Renderer::buildScene() {
     m_scene.getRegistry().emplace<MeshComponent>(character,
                                                  MeshComponent{charMesh});
     m_scene.getRegistry().emplace<MaterialComponent>(
-        character, MaterialComponent{charTex, flatNorm, 0.0f, 0.3f, 0.4f});
+        character, MaterialComponent{charTex, flatNorm, 0.0f, 0.0f, 0.7f});
     m_scene.getRegistry().emplace<ColorComponent>(
         character, ColorComponent{glm::vec4(1.0f, 1.0f, 1.0f, 1.0f)});
   }
@@ -2320,11 +2352,11 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex,
       bool middleMouse =
           glfwGetMouseButton(m_window.getHandle(), GLFW_MOUSE_BUTTON_MIDDLE) ==
           GLFW_PRESS;
-      // Get scroll from a simple poll (scroll is consumed by callback, use last
-      // known)
+      // Get scroll delta accumulated since last frame
+      float scrollDelta = m_input->consumeScrollDelta();
       m_isoCam.update(deltaTime, static_cast<float>(extent.width),
                       static_cast<float>(extent.height), mx, my, middleMouse,
-                      0.0f);
+                      scrollDelta);
 
       glm::mat4 isoView = m_isoCam.getViewMatrix();
       glm::mat4 isoProj = m_isoCam.getProjectionMatrix(aspect);
@@ -2372,6 +2404,19 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex,
         m_clickIndicatorRenderer->render(cmd, isoProj * isoView, m_clickIndicator->position, t, 1.5f, tint);
       }
 
+      // Green selection circles under marquee-selected entities
+      {
+        auto selView = m_scene.getRegistry().view<SelectedComponent, TransformComponent>();
+        for (auto entity : selView) {
+          auto &selTransform = selView.get<TransformComponent>(entity);
+          float selRadius = 0.6f;
+          auto *tgt = m_scene.getRegistry().try_get<TargetableComponent>(entity);
+          if (tgt) selRadius = tgt->hitRadius;
+          m_debugRenderer.drawCircle(selTransform.position, selRadius,
+                                     glm::vec4(0.2f, 1.0f, 0.3f, 0.7f));
+        }
+      }
+
       m_debugRenderer.render(cmd, isoProj * isoView);
 
       // ── Render scene entities in MOBA mode (character, etc.) ──────────
@@ -2404,7 +2449,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex,
             lightUBOData.lights[li].color = sceneLights[li].second;
           }
           lightUBOData.viewPos = m_isoCam.getPosition();
-          lightUBOData.ambientStrength = 0.3f;
+          lightUBOData.ambientStrength = 0.55f;
           lightUBOData.specularStrength = 0.5f;
           lightUBOData.shininess = 32.0f;
           lightUBOData.fogColor = glm::vec3(0.6f, 0.65f, 0.75f);

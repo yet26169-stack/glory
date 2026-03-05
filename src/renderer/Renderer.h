@@ -3,6 +3,7 @@
 #include "ability/ProjectileSystem.h"
 #include "camera/Camera.h"
 #include "combat/AutoAttackSystem.h"
+#include "core/SimulationLoop.h"
 #include "hud/HUD.h"
 #include "hud/MinionHealthBars.h"
 #include "input/TargetingSystem.h"
@@ -93,7 +94,7 @@ private:
 
   uint32_t m_currentFrame = 0;
   float m_lastFrameTime   = 0.0f;
-  float m_simAccumulator  = 0.0f;   // fixed-timestep accumulator
+  SimulationLoop m_simLoop;   // fixed-timestep simulation (30 Hz)
   bool m_wireframe = false;
   bool m_showGrid  = false;
   bool m_mobaMode  = true; // F4 toggles MOBA terrain view

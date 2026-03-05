@@ -30,6 +30,11 @@ public:
                               const glm::vec3 &targetPos, float speed,
                               float aoeRadius, const glm::vec4 &colour);
 
+  entt::entity spawnTargeted(Scene &scene, entt::entity caster,
+                             entt::entity target,
+                             const std::string &abilityId, int level,
+                             float speed, const glm::vec4 &colour);
+
   // Called every frame from Scene::update
   void update(Scene &scene, float dt);
 

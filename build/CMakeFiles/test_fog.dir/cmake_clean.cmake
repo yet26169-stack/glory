@@ -3,6 +3,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/test_fog.dir/extern/vma/vma_impl.cpp.o.d"
   "CMakeFiles/test_fog.dir/src/fog/FogSystem.cpp.o"
   "CMakeFiles/test_fog.dir/src/fog/FogSystem.cpp.o.d"
+  "CMakeFiles/test_fog.dir/src/renderer/Buffer.cpp.o"
+  "CMakeFiles/test_fog.dir/src/renderer/Buffer.cpp.o.d"
   "CMakeFiles/test_fog.dir/tests/test_fog.cpp.o"
   "CMakeFiles/test_fog.dir/tests/test_fog.cpp.o.d"
   "test_fog"

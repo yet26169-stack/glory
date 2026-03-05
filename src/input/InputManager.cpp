@@ -1,6 +1,9 @@
 #include "input/InputManager.h"
 #include "camera/Camera.h"
 
+#include <algorithm>
+#include <cmath>
+
 namespace glory {
 
 // Static instance for GLFW callbacks (single-window engine)
@@ -49,6 +52,25 @@ bool InputManager::wasRightClicked() {
   bool clicked = m_rightClicked;
   m_rightClicked = false;
   return clicked;
+}
+
+bool InputManager::wasLeftClicked() {
+  bool clicked = m_leftClicked;
+  m_leftClicked = false;
+  return clicked;
+}
+
+bool InputManager::wasLeftDragReleased() {
+  bool released = m_leftDragReleased;
+  m_leftDragReleased = false;
+  return released;
+}
+
+std::pair<glm::vec2, glm::vec2> InputManager::getLeftDragRect() const {
+  glm::vec2 cur = getMousePos();
+  glm::vec2 mn(std::min(m_leftDragStart.x, cur.x), std::min(m_leftDragStart.y, cur.y));
+  glm::vec2 mx(std::max(m_leftDragStart.x, cur.x), std::max(m_leftDragStart.y, cur.y));
+  return {mn, mx};
 }
 
 bool InputManager::wasQPressed() {
@@ -128,6 +150,15 @@ void InputManager::update(float deltaTime) {
 
   m_camera.processKeyboard(deltaTime, forward, backward, left, right, up, down);
 
+  // Detect drag: left button held and moved past dead zone
+  if (m_leftButtonDown && !m_leftDragging) {
+    glm::vec2 cur = getMousePos();
+    float dist = glm::length(cur - m_leftDragStart);
+    if (dist > DRAG_DEAD_ZONE) {
+      m_leftDragging = true;
+    }
+  }
+
   // Escape releases cursor
   if (glfwGetKey(m_window, GLFW_KEY_ESCAPE) == GLFW_PRESS && m_cursorCaptured) {
     m_cursorCaptured = false;
@@ -160,7 +191,12 @@ void InputManager::scrollCallback(GLFWwindow * /*window*/, double /*xOffset*/,
                                   double yOffset) {
   if (!s_activeInput)
     return;
-  s_activeInput->m_camera.processScroll(static_cast<float>(yOffset));
+  float delta = static_cast<float>(yOffset);
+  // Always accumulate for isometric camera zoom
+  s_activeInput->m_scrollDelta += delta;
+  // Also forward to FPS camera if cursor is captured
+  if (s_activeInput->m_cursorCaptured)
+    s_activeInput->m_camera.processScroll(delta);
 }
 
 void InputManager::mouseButtonCallback(GLFWwindow *window, int button,
@@ -179,6 +215,33 @@ void InputManager::mouseButtonCallback(GLFWwindow *window, int button,
       s_activeInput->m_rightClickPos =
           glm::vec2(static_cast<float>(mx), static_cast<float>(my));
       s_activeInput->m_rightClicked = true;
+    }
+  }
+  if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+    if (!s_activeInput->m_captureEnabled) {
+      // MOBA mode: track left-click position for target selection
+      double mx, my;
+      glfwGetCursorPos(window, &mx, &my);
+      glm::vec2 pos(static_cast<float>(mx), static_cast<float>(my));
+      s_activeInput->m_leftClickPos = pos;
+      s_activeInput->m_leftButtonDown = true;
+      s_activeInput->m_leftDragging = false;
+      s_activeInput->m_leftDragStart = pos;
+    }
+  }
+  if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
+    if (!s_activeInput->m_captureEnabled) {
+      if (s_activeInput->m_leftDragging) {
+        s_activeInput->m_leftDragReleased = true;
+        double mx, my;
+        glfwGetCursorPos(window, &mx, &my);
+        s_activeInput->m_leftDragEnd = glm::vec2(static_cast<float>(mx), static_cast<float>(my));
+      } else if (s_activeInput->m_leftButtonDown) {
+        // Small movement — treat as a normal click
+        s_activeInput->m_leftClicked = true;
+      }
+      s_activeInput->m_leftButtonDown = false;
+      s_activeInput->m_leftDragging = false;
     }
   }
 }

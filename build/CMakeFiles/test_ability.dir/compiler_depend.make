@@ -4710,10 +4710,18 @@ CMakeFiles/test_ability.dir/src/ability/EffectSystem.cpp.o: /Users/donkey/Develo
   /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/17/include/stddef.h \
   /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/17/include/stdint.h \
   /Users/donkey/Development/1/Glory/extern/entt/entt.hpp \
+  /Users/donkey/Development/1/Glory/extern/vma/vk_mem_alloc.h \
   /Users/donkey/Development/1/Glory/src/ability/AbilityComponents.h \
   /Users/donkey/Development/1/Glory/src/ability/AbilityDef.h \
   /Users/donkey/Development/1/Glory/src/ability/AbilityTypes.h \
   /Users/donkey/Development/1/Glory/src/ability/EffectSystem.h \
+  /Users/donkey/Development/1/Glory/src/animation/AnimationClip.h \
+  /Users/donkey/Development/1/Glory/src/animation/AnimationPlayer.h \
+  /Users/donkey/Development/1/Glory/src/animation/Skeleton.h \
+  /Users/donkey/Development/1/Glory/src/math/FixedPoint.h \
+  /Users/donkey/Development/1/Glory/src/renderer/Buffer.h \
+  /Users/donkey/Development/1/Glory/src/renderer/Frustum.h \
+  /Users/donkey/Development/1/Glory/src/scene/Components.h \
   /opt/homebrew/include/fmt/base.h \
   /opt/homebrew/include/fmt/format.h \
   /opt/homebrew/include/glm/common.hpp \
@@ -4888,6 +4896,92 @@ CMakeFiles/test_ability.dir/src/ability/EffectSystem.cpp.o: /Users/donkey/Develo
   /opt/homebrew/include/glm/fwd.hpp \
   /opt/homebrew/include/glm/geometric.hpp \
   /opt/homebrew/include/glm/glm.hpp \
+  /opt/homebrew/include/glm/common.hpp \
+  /opt/homebrew/include/glm/detail/qualifier.hpp \
+  /opt/homebrew/include/glm/detail/setup.hpp \
+  /opt/homebrew/include/glm/detail/type_mat3x3.hpp \
+  /opt/homebrew/include/glm/detail/type_mat4x4.hpp \
+  /opt/homebrew/include/glm/detail/type_vec3.hpp \
+  /opt/homebrew/include/glm/detail/type_vec4.hpp \
+  /opt/homebrew/include/glm/exponential.hpp \
+  /opt/homebrew/include/glm/common.hpp \
+  /opt/homebrew/include/glm/detail/type_mat3x3.hpp \
+  /opt/homebrew/include/glm/detail/type_mat4x4.hpp \
+  /opt/homebrew/include/glm/detail/type_vec3.hpp \
+  /opt/homebrew/include/glm/detail/type_vec4.hpp \
+  /opt/homebrew/include/glm/exponential.hpp \
+  /opt/homebrew/include/glm/vector_relational.hpp \
+  /opt/homebrew/include/glm/ext/quaternion_common.hpp \
+  /opt/homebrew/include/glm/ext/quaternion_geometric.hpp \
+  /opt/homebrew/include/glm/ext/quaternion_relational.hpp \
+  /opt/homebrew/include/glm/ext/quaternion_relational.inl \
+  /opt/homebrew/include/glm/ext/vector_relational.hpp \
+  /opt/homebrew/include/glm/gtc/constants.hpp \
+  /opt/homebrew/include/glm/gtc/matrix_transform.hpp \
+  /opt/homebrew/include/glm/trigonometric.hpp \
+  /opt/homebrew/include/glm/detail/qualifier.hpp \
+  /opt/homebrew/include/glm/detail/setup.hpp \
+  /opt/homebrew/include/glm/detail/type_float.hpp \
+  /opt/homebrew/include/glm/detail/type_quat.hpp \
+  /opt/homebrew/include/glm/detail/type_quat.inl \
+  /opt/homebrew/include/glm/exponential.hpp \
+  /opt/homebrew/include/glm/exponential.hpp \
+  /opt/homebrew/include/glm/ext/vector_relational.hpp \
+  /opt/homebrew/include/glm/geometric.hpp \
+  /opt/homebrew/include/glm/ext/quaternion_geometric.hpp \
+  /opt/homebrew/include/glm/ext/quaternion_geometric.inl \
+  /opt/homebrew/include/glm/ext/scalar_constants.hpp \
+  /opt/homebrew/include/glm/geometric.hpp \
+  /opt/homebrew/include/glm/trigonometric.hpp \
+  /opt/homebrew/include/glm/vector_relational.hpp \
+  /opt/homebrew/include/glm/ext/quaternion_common.hpp \
+  /opt/homebrew/include/glm/ext/quaternion_common.inl \
+  /opt/homebrew/include/glm/ext/quaternion_double.hpp \
+  /opt/homebrew/include/glm/ext/quaternion_double_precision.hpp \
+  /opt/homebrew/include/glm/ext/quaternion_float.hpp \
+  /opt/homebrew/include/glm/ext/quaternion_float_precision.hpp \
+  /opt/homebrew/include/glm/ext/quaternion_geometric.hpp \
+  /opt/homebrew/include/glm/ext/quaternion_relational.hpp \
+  /opt/homebrew/include/glm/ext/quaternion_transform.hpp \
+  /opt/homebrew/include/glm/ext/quaternion_transform.inl \
+  /opt/homebrew/include/glm/ext/quaternion_trigonometric.hpp \
+  /opt/homebrew/include/glm/ext/quaternion_trigonometric.inl \
+  /opt/homebrew/include/glm/ext/scalar_constants.hpp \
+  /opt/homebrew/include/glm/ext/vector_relational.hpp \
+  /opt/homebrew/include/glm/ext/vector_relational.inl \
+  /opt/homebrew/include/glm/geometric.hpp \
+  /opt/homebrew/include/glm/detail/setup.hpp \
+  /opt/homebrew/include/glm/ext/scalar_constants.hpp \
+  /opt/homebrew/include/glm/geometric.hpp \
+  /opt/homebrew/include/glm/gtc/constants.hpp \
+  /opt/homebrew/include/glm/matrix.hpp \
+  /opt/homebrew/include/glm/trigonometric.hpp \
+  /opt/homebrew/include/glm/ext/matrix_clip_space.hpp \
+  /opt/homebrew/include/glm/ext/matrix_clip_space.inl \
+  /opt/homebrew/include/glm/ext/matrix_projection.hpp \
+  /opt/homebrew/include/glm/ext/matrix_projection.inl \
+  /opt/homebrew/include/glm/ext/matrix_transform.hpp \
+  /opt/homebrew/include/glm/ext/matrix_transform.inl \
+  /opt/homebrew/include/glm/ext/scalar_constants.hpp \
+  /opt/homebrew/include/glm/ext/scalar_constants.inl \
+  /opt/homebrew/include/glm/geometric.hpp \
+  /opt/homebrew/include/glm/mat4x4.hpp \
+  /opt/homebrew/include/glm/matrix.hpp \
+  /opt/homebrew/include/glm/trigonometric.hpp \
+  /opt/homebrew/include/glm/vec2.hpp \
+  /opt/homebrew/include/glm/vec3.hpp \
+  /opt/homebrew/include/glm/vec4.hpp \
+  /opt/homebrew/include/glm/gtc/constants.hpp \
+  /opt/homebrew/include/glm/gtc/constants.inl \
+  /opt/homebrew/include/glm/gtc/matrix_transform.hpp \
+  /opt/homebrew/include/glm/gtc/matrix_transform.inl \
+  /opt/homebrew/include/glm/trigonometric.hpp \
+  /opt/homebrew/include/glm/vector_relational.hpp \
+  /opt/homebrew/include/glm/gtc/epsilon.hpp \
+  /opt/homebrew/include/glm/gtc/epsilon.inl \
+  /opt/homebrew/include/glm/gtc/matrix_transform.hpp \
+  /opt/homebrew/include/glm/gtc/quaternion.hpp \
+  /opt/homebrew/include/glm/gtc/quaternion.inl \
   /opt/homebrew/include/glm/integer.hpp \
   /opt/homebrew/include/glm/mat2x2.hpp \
   /opt/homebrew/include/glm/mat2x3.hpp \
@@ -4918,7 +5012,22 @@ CMakeFiles/test_ability.dir/src/ability/EffectSystem.cpp.o: /Users/donkey/Develo
   /opt/homebrew/include/spdlog/logger.h \
   /opt/homebrew/include/spdlog/spdlog.h \
   /opt/homebrew/include/spdlog/tweakme.h \
-  /opt/homebrew/include/spdlog/version.h
+  /opt/homebrew/include/spdlog/version.h \
+  /opt/homebrew/include/vk_video/vulkan_video_codec_av1std.h \
+  /opt/homebrew/include/vk_video/vulkan_video_codec_av1std_decode.h \
+  /opt/homebrew/include/vk_video/vulkan_video_codec_av1std_encode.h \
+  /opt/homebrew/include/vk_video/vulkan_video_codec_h264std.h \
+  /opt/homebrew/include/vk_video/vulkan_video_codec_h264std_decode.h \
+  /opt/homebrew/include/vk_video/vulkan_video_codec_h264std_encode.h \
+  /opt/homebrew/include/vk_video/vulkan_video_codec_h265std.h \
+  /opt/homebrew/include/vk_video/vulkan_video_codec_h265std_decode.h \
+  /opt/homebrew/include/vk_video/vulkan_video_codec_h265std_encode.h \
+  /opt/homebrew/include/vk_video/vulkan_video_codec_vp9std.h \
+  /opt/homebrew/include/vk_video/vulkan_video_codec_vp9std_decode.h \
+  /opt/homebrew/include/vk_video/vulkan_video_codecs_common.h \
+  /opt/homebrew/include/vulkan/vk_platform.h \
+  /opt/homebrew/include/vulkan/vulkan.h \
+  /opt/homebrew/include/vulkan/vulkan_core.h
 
 CMakeFiles/test_ability.dir/src/ability/StatusEffectSystem.cpp.o: /Users/donkey/Development/1/Glory/src/ability/StatusEffectSystem.cpp \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/Availability.h \
@@ -7322,7 +7431,73 @@ CMakeFiles/test_ability.dir/tests/test_ability.cpp.o: /Users/donkey/Development/
 
 /Users/donkey/Development/1/Glory/src/ability/StatusEffectSystem.cpp:
 
+/opt/homebrew/include/vulkan/vulkan.h:
+
+/opt/homebrew/include/vk_video/vulkan_video_codecs_common.h:
+
+/opt/homebrew/include/vk_video/vulkan_video_codec_vp9std_decode.h:
+
+/opt/homebrew/include/vk_video/vulkan_video_codec_vp9std.h:
+
+/opt/homebrew/include/vk_video/vulkan_video_codec_h265std_encode.h:
+
+/opt/homebrew/include/vk_video/vulkan_video_codec_h265std_decode.h:
+
+/opt/homebrew/include/vk_video/vulkan_video_codec_h264std.h:
+
+/opt/homebrew/include/vk_video/vulkan_video_codec_av1std_encode.h:
+
+/opt/homebrew/include/vk_video/vulkan_video_codec_av1std_decode.h:
+
+/opt/homebrew/include/vk_video/vulkan_video_codec_av1std.h:
+
+/opt/homebrew/include/glm/gtc/epsilon.inl:
+
+/opt/homebrew/include/glm/gtc/epsilon.hpp:
+
+/opt/homebrew/include/glm/gtc/matrix_transform.inl:
+
+/opt/homebrew/include/glm/ext/scalar_constants.inl:
+
+/opt/homebrew/include/glm/ext/matrix_transform.inl:
+
+/opt/homebrew/include/glm/ext/quaternion_trigonometric.inl:
+
+/opt/homebrew/include/glm/ext/quaternion_trigonometric.hpp:
+
+/opt/homebrew/include/glm/ext/quaternion_float_precision.hpp:
+
+/opt/homebrew/include/glm/ext/quaternion_double_precision.hpp:
+
+/opt/homebrew/include/glm/ext/scalar_constants.hpp:
+
+/opt/homebrew/include/glm/ext/quaternion_geometric.inl:
+
+/opt/homebrew/include/glm/detail/type_quat.hpp:
+
+/opt/homebrew/include/glm/detail/type_float.hpp:
+
+/opt/homebrew/include/glm/gtc/constants.hpp:
+
+/opt/homebrew/include/glm/ext/vector_relational.hpp:
+
+/opt/homebrew/include/glm/ext/quaternion_geometric.hpp:
+
+/opt/homebrew/include/glm/ext/quaternion_common.hpp:
+
+/Users/donkey/Development/1/Glory/src/renderer/Frustum.h:
+
+/Users/donkey/Development/1/Glory/src/math/FixedPoint.h:
+
+/Users/donkey/Development/1/Glory/src/animation/Skeleton.h:
+
+/Users/donkey/Development/1/Glory/src/animation/AnimationPlayer.h:
+
+/Users/donkey/Development/1/Glory/src/animation/AnimationClip.h:
+
 /Users/donkey/Development/1/Glory/src/ability/EffectSystem.h:
+
+/Users/donkey/Development/1/Glory/extern/vma/vk_mem_alloc.h:
 
 /Users/donkey/Development/1/Glory/src/ability/EffectSystem.cpp:
 
@@ -7380,6 +7555,8 @@ CMakeFiles/test_ability.dir/tests/test_ability.cpp.o: /Users/donkey/Development/
 
 /opt/homebrew/include/glm/ext/matrix_double2x2_precision.hpp:
 
+/opt/homebrew/include/glm/ext/quaternion_float.hpp:
+
 /opt/homebrew/include/glm/ext/matrix_double2x2.hpp:
 
 /opt/homebrew/include/glm/ext/vector_uint4.hpp:
@@ -7397,6 +7574,8 @@ CMakeFiles/test_ability.dir/tests/test_ability.cpp.o: /Users/donkey/Development/
 /opt/homebrew/include/glm/vec2.hpp:
 
 /opt/homebrew/include/glm/mat3x4.hpp:
+
+/opt/homebrew/include/glm/ext/quaternion_transform.hpp:
 
 /opt/homebrew/include/glm/detail/func_matrix.inl:
 
@@ -7441,6 +7620,8 @@ CMakeFiles/test_ability.dir/tests/test_ability.cpp.o: /Users/donkey/Development/
 /opt/homebrew/include/glm/detail/type_mat4x3.inl:
 
 /opt/homebrew/include/glm/detail/type_mat4x2.inl:
+
+/opt/homebrew/include/vk_video/vulkan_video_codec_h264std_decode.h:
 
 /opt/homebrew/include/glm/detail/type_mat4x3.hpp:
 
@@ -7828,6 +8009,8 @@ CMakeFiles/test_ability.dir/tests/test_ability.cpp.o: /Users/donkey/Development/
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__utility/unreachable.h:
 
+/opt/homebrew/include/glm/ext/vector_relational.inl:
+
 /opt/homebrew/include/glm/vec4.hpp:
 
 /opt/homebrew/include/glm/detail/func_vector_relational.inl:
@@ -7842,6 +8025,8 @@ CMakeFiles/test_ability.dir/tests/test_ability.cpp.o: /Users/donkey/Development/
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__utility/piecewise_construct.h:
 
+/opt/homebrew/include/glm/ext/quaternion_relational.inl:
+
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__utility/no_destroy.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__utility/move.h:
@@ -7851,6 +8036,8 @@ CMakeFiles/test_ability.dir/tests/test_ability.cpp.o: /Users/donkey/Development/
 /Users/donkey/Development/1/Glory/tests/test_ability.cpp:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__utility/integer_sequence.h:
+
+/opt/homebrew/include/glm/ext/matrix_projection.hpp:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/sys/appleapiopts.h:
 
@@ -8302,6 +8489,8 @@ CMakeFiles/test_ability.dir/tests/test_ability.cpp.o: /Users/donkey/Development/
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__memory/allocator.h:
 
+/opt/homebrew/include/vk_video/vulkan_video_codec_h264std_encode.h:
+
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__memory/allocation_guard.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/ranges_find.h:
@@ -8466,6 +8655,8 @@ CMakeFiles/test_ability.dir/tests/test_ability.cpp.o: /Users/donkey/Development/
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__iterator/default_sentinel.h:
 
+/opt/homebrew/include/glm/gtc/constants.inl:
+
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/is_integral.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__iterator/bounded_iter.h:
@@ -8561,6 +8752,8 @@ CMakeFiles/test_ability.dir/tests/test_ability.cpp.o: /Users/donkey/Development/
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__functional/identity.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__functional/hash.h:
+
+/Users/donkey/Development/1/Glory/src/scene/Components.h:
 
 /opt/homebrew/include/glm/ext/matrix_float2x2_precision.hpp:
 
@@ -8852,6 +9045,8 @@ CMakeFiles/test_ability.dir/tests/test_ability.cpp.o: /Users/donkey/Development/
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__compare/partial_order.h:
 
+/opt/homebrew/include/vulkan/vulkan_core.h:
+
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/string_view:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/__wctype.h:
@@ -8861,6 +9056,8 @@ CMakeFiles/test_ability.dir/tests/test_ability.cpp.o: /Users/donkey/Development/
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__chrono/sys_info.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__compare/is_eq.h:
+
+/Users/donkey/Development/1/Glory/src/renderer/Buffer.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/sys/_types/_key_t.h:
 
@@ -8959,6 +9156,8 @@ CMakeFiles/test_ability.dir/tests/test_ability.cpp.o: /Users/donkey/Development/
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__charconv/from_chars_result.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__charconv/tables.h:
+
+/opt/homebrew/include/glm/ext/quaternion_common.inl:
 
 /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/17/include/__stdarg_header_macro.h:
 
@@ -9198,6 +9397,8 @@ CMakeFiles/test_ability.dir/tests/test_ability.cpp.o: /Users/donkey/Development/
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__format/format_parse_context.h:
 
+/opt/homebrew/include/glm/ext/quaternion_transform.inl:
+
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/partition_copy.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__concepts/derived_from.h:
@@ -9222,6 +9423,8 @@ CMakeFiles/test_ability.dir/tests/test_ability.cpp.o: /Users/donkey/Development/
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/ranges_shuffle.h:
 
+/opt/homebrew/include/glm/gtc/quaternion.hpp:
+
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/ranges_stable_sort.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/is_convertible.h:
@@ -9231,6 +9434,8 @@ CMakeFiles/test_ability.dir/tests/test_ability.cpp.o: /Users/donkey/Development/
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/ranges_any_of.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/ranges_set_symmetric_difference.h:
+
+/opt/homebrew/include/vk_video/vulkan_video_codec_h265std.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__concepts/same_as.h:
 
@@ -9303,6 +9508,10 @@ CMakeFiles/test_ability.dir/tests/test_ability.cpp.o: /Users/donkey/Development/
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__vector/container_traits.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__memory/unique_ptr.h:
+
+/opt/homebrew/include/glm/ext/matrix_clip_space.hpp:
+
+/opt/homebrew/include/glm/detail/type_quat.inl:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/pstl.h:
 
@@ -9410,6 +9619,8 @@ CMakeFiles/test_ability.dir/tests/test_ability.cpp.o: /Users/donkey/Development/
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/ranges_count.h:
 
+/opt/homebrew/include/glm/gtc/matrix_transform.hpp:
+
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/sys/_types/_off_t.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/_ctermid.h:
@@ -9419,6 +9630,8 @@ CMakeFiles/test_ability.dir/tests/test_ability.cpp.o: /Users/donkey/Development/
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__tuple/tuple_types.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__ranges/empty_view.h:
+
+/opt/homebrew/include/glm/ext/matrix_projection.inl:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/prev_permutation.h:
 
@@ -9439,6 +9652,8 @@ CMakeFiles/test_ability.dir/tests/test_ability.cpp.o: /Users/donkey/Development/
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/ranges_clamp.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__chrono/convert_to_tm.h:
+
+/opt/homebrew/include/vulkan/vk_platform.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__utility/rel_ops.h:
 
@@ -9550,6 +9765,8 @@ CMakeFiles/test_ability.dir/tests/test_ability.cpp.o: /Users/donkey/Development/
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__ranges/view_interface.h:
 
+/opt/homebrew/include/glm/ext/quaternion_relational.hpp:
+
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__iterator/distance.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/in_out_out_result.h:
@@ -9576,6 +9793,8 @@ CMakeFiles/test_ability.dir/tests/test_ability.cpp.o: /Users/donkey/Development/
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/ranges_merge.h:
 
+/opt/homebrew/include/glm/gtc/quaternion.inl:
+
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/_mb_cur_max.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/wctype.h:
@@ -9583,6 +9802,8 @@ CMakeFiles/test_ability.dir/tests/test_ability.cpp.o: /Users/donkey/Development/
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/sys/_pthread/_pthread_cond_t.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/ranges_minmax.h:
+
+/opt/homebrew/include/glm/ext/quaternion_double.hpp:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__fwd/ios.h:
 
@@ -9610,6 +9831,8 @@ CMakeFiles/test_ability.dir/tests/test_ability.cpp.o: /Users/donkey/Development/
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/arm/_types.h:
 
+/opt/homebrew/include/glm/ext/matrix_clip_space.inl:
+
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__format/range_formatter.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/copy_move_common.h:
@@ -9627,6 +9850,8 @@ CMakeFiles/test_ability.dir/tests/test_ability.cpp.o: /Users/donkey/Development/
 /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/17/include/__stddef_header_macro.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/comp.h:
+
+/opt/homebrew/include/glm/ext/matrix_transform.hpp:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/is_nothrow_assignable.h:
 

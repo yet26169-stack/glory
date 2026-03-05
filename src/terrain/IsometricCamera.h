@@ -62,6 +62,10 @@ private:
   float m_zoomMax = 50.0f;
   float m_zoomSpeed = 3.0f;
 
+  // Smooth zoom easing
+  float m_zoomTarget = 25.0f; // desired zoom (set by scroll)
+  float m_zoomSmooth = 10.0f; // lerp speed toward target
+
   // Edge panning (detached mode)
   float m_edgeMargin = 20.0f; // pixels
   float m_panSpeed = 60.0f;   // units/sec

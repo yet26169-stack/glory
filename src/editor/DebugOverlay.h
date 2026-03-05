@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan.h>
 #include <cstdint>
+#include <cstring>
 
 struct GLFWwindow;
 
@@ -38,6 +39,15 @@ public:
     void setCameraPos(float x, float y, float z) { m_camX=x; m_camY=y; m_camZ=z; }
 
     void setWireframe(bool w) { m_wireframe = w; }
+    void setGpuTimings(const char* summary) {
+        // Store up to 255 chars; summary is "Shadow X.Xms  Scene Y.Yms ..."
+        std::strncpy(m_gpuTimingSummary, summary, sizeof(m_gpuTimingSummary) - 1);
+        m_gpuTimingSummary[sizeof(m_gpuTimingSummary) - 1] = '\0';
+    }
+    void setCpuTimings(const char* summary) {
+        std::strncpy(m_cpuTimingSummary, summary, sizeof(m_cpuTimingSummary) - 1);
+        m_cpuTimingSummary[sizeof(m_cpuTimingSummary) - 1] = '\0';
+    }
 
     bool isVisible() const { return m_visible; }
     void toggleVisible() { m_visible = !m_visible; }
@@ -107,6 +117,8 @@ private:
     int      m_toneMapMode      = 0; // 0=ACES, 1=Reinhard, 2=Uncharted2
     bool     m_fxaaEnabled      = true;
     float    m_sharpenStrength  = 0.0f;
+    char     m_gpuTimingSummary[256] = "GPU profiling initializing...";
+    char     m_cpuTimingSummary[256] = "CPU timings initializing...";
     float    m_dofStrength      = 0.0f;
     float    m_dofFocusDist     = 5.0f;
     float    m_dofRange         = 3.0f;

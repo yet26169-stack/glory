@@ -1,7 +1,6 @@
 CMakeFiles/Glory.dir/src/renderer/CascadeShadow.cpp.o: \
   /Users/donkey/Development/1/Glory/src/renderer/CascadeShadow.cpp \
   /Users/donkey/Development/1/Glory/src/renderer/CascadeShadow.h \
-  /Users/donkey/Development/1/Glory/src/renderer/Image.h \
   /opt/homebrew/include/vulkan/vulkan.h \
   /opt/homebrew/include/vulkan/vk_platform.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/stddef.h \
@@ -1117,6 +1116,7 @@ CMakeFiles/Glory.dir/src/renderer/CascadeShadow.cpp.o: \
   /opt/homebrew/include/glm/vector_relational.hpp \
   /opt/homebrew/include/glm/integer.hpp \
   /opt/homebrew/include/glm/detail/func_integer.inl \
+  /Users/donkey/Development/1/Glory/src/renderer/Buffer.h \
   /Users/donkey/Development/1/Glory/src/renderer/Device.h \
   /Users/donkey/Development/1/Glory/src/renderer/VkCheck.h \
   /opt/homebrew/include/spdlog/spdlog.h \

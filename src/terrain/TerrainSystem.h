@@ -1,6 +1,7 @@
 #pragma once
 
 #include "renderer/Frustum.h"
+#include "renderer/Buffer.h"
 #include "terrain/TerrainTextures.h"
 #include "terrain/TerrainVertex.h"
 
@@ -54,7 +55,13 @@ public:
   }
   int getHeightmapSize() const { return m_hmSize; }
   float getWorldSize() const { return m_worldSize; }
+  float getHeightScale() const { return m_heightScale; }
   const std::vector<TerrainChunk> &getChunks() const { return m_chunks; }
+
+  void setHeightmap(const std::vector<float>& hm) {
+    if (static_cast<int>(hm.size()) == m_hmSize * m_hmSize)
+      m_heightmap = hm;
+  }
 
 private:
   const Device *m_device = nullptr;
@@ -68,16 +75,10 @@ private:
   // Terrain textures (Phase 3)
   TerrainTextures m_textures;
 
-  // VMA buffers — terrain mesh
-  VkBuffer m_vbVma = VK_NULL_HANDLE;
-  VkBuffer m_ibVma = VK_NULL_HANDLE;
-  void *m_vbAlloc = nullptr;
-  void *m_ibAlloc = nullptr;
-
-  // VMA buffer — UBO (shared by terrain + water)
-  VkBuffer m_ubVma = VK_NULL_HANDLE;
-  void *m_ubAlloc = nullptr;
-  void *m_uboMapped = nullptr;
+  // Managed GPU buffers
+  Buffer m_vb;
+  Buffer m_ib;
+  Buffer m_ub;
 
   // Terrain pipeline
   VkPipeline m_pipeline = VK_NULL_HANDLE;
@@ -100,10 +101,8 @@ private:
   VkPipelineLayout m_waterPipelineLayout = VK_NULL_HANDLE;
   VkDescriptorSetLayout m_waterTexDescLayout = VK_NULL_HANDLE;
   VkDescriptorSet m_waterTexDescSet = VK_NULL_HANDLE;
-  VkBuffer m_waterVbVma = VK_NULL_HANDLE;
-  VkBuffer m_waterIbVma = VK_NULL_HANDLE;
-  void *m_waterVbAlloc = nullptr;
-  void *m_waterIbAlloc = nullptr;
+  Buffer m_waterVb;
+  Buffer m_waterIb;
 
   // Chunks
   std::vector<TerrainChunk> m_chunks;

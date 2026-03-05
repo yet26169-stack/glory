@@ -1,6 +1,7 @@
 #pragma once
 
 #include "renderer/Image.h"
+#include "renderer/Buffer.h"
 
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
@@ -47,10 +48,8 @@ private:
     VkDescriptorPool      m_descPool   = VK_NULL_HANDLE;
     VkDescriptorSet       m_descSet    = VK_NULL_HANDLE;
 
-    // Light-space matrix UBO
-    VkBuffer      m_lightMatBuf    = VK_NULL_HANDLE;
-    VmaAllocation m_lightMatAlloc  = VK_NULL_HANDLE;
-    void*         m_lightMatMapped = nullptr;
+    // Light-space matrix UBO (persistently mapped via Buffer)
+    Buffer m_lightMatBuffer;
 
     bool m_cleaned = false;
 

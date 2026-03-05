@@ -60,7 +60,8 @@ void ShadowMap::cleanup() {
     if (m_framebuffer)    vkDestroyFramebuffer(dev, m_framebuffer, nullptr);
     if (m_renderPass)     vkDestroyRenderPass(dev, m_renderPass, nullptr);
 
-    if (m_lightMatBuf)    vmaDestroyBuffer(m_device.getAllocator(), m_lightMatBuf, m_lightMatAlloc);
+    m_lightMatBuffer.destroy();
+    
     if (m_descPool)       vkDestroyDescriptorPool(dev, m_descPool, nullptr);
     if (m_descLayout)     vkDestroyDescriptorSetLayout(dev, m_descLayout, nullptr);
     if (m_sampler)        vkDestroySampler(dev, m_sampler, nullptr);
@@ -69,7 +70,7 @@ void ShadowMap::cleanup() {
 }
 
 void ShadowMap::updateLightMatrix(const glm::mat4& lightVP) {
-    std::memcpy(m_lightMatMapped, &lightVP, sizeof(glm::mat4));
+    std::memcpy(m_lightMatBuffer.map(), &lightVP, sizeof(glm::mat4));
 }
 
 void ShadowMap::createDepthResources() {
@@ -189,26 +190,14 @@ void ShadowMap::createDescriptors() {
     VK_CHECK(vkAllocateDescriptorSets(dev, &allocInfo, &m_descSet),
              "Failed to allocate shadow descriptor set");
 
-    // Create UBO
-    VkBufferCreateInfo bufCI{};
-    bufCI.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufCI.size        = sizeof(glm::mat4);
-    bufCI.usage       = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-    bufCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-    VmaAllocationCreateInfo allocCI{};
-    allocCI.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-    allocCI.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-
-    VmaAllocationInfo vmaInfo{};
-    VK_CHECK(vmaCreateBuffer(m_device.getAllocator(), &bufCI, &allocCI,
-                             &m_lightMatBuf, &m_lightMatAlloc, &vmaInfo),
-             "Failed to create shadow UBO");
-    m_lightMatMapped = vmaInfo.pMappedData;
+    // Create UBO via Buffer class (persistently mapped)
+    m_lightMatBuffer = Buffer(m_device.getAllocator(), sizeof(glm::mat4),
+                             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                             VMA_MEMORY_USAGE_CPU_TO_GPU);
 
     // Write descriptor
     VkDescriptorBufferInfo bufInfo{};
-    bufInfo.buffer = m_lightMatBuf;
+    bufInfo.buffer = m_lightMatBuffer.getBuffer();
     bufInfo.offset = 0;
     bufInfo.range  = sizeof(glm::mat4);
 

@@ -1,0 +1,22 @@
+{
+    "id": "iron_guardian_ground_slam",
+    "displayName": "Ground Slam",
+    "slot": "E",
+    "targeting": "POINT",
+    "resourceType": "MANA",
+    "costPerLevel": [50, 55, 60, 65, 70],
+    "cooldownPerLevel": [10.0, 9.5, 9.0, 8.5, 8.0],
+    "castTime": 0.4,
+    "castRange": 700.0,
+    "areaShape": "CIRCLE",
+    "areaRadius": 3.5,
+    "onHitEffects": [
+        {
+            "type": "DAMAGE",
+            "damageType": "MAGICAL",
+            "scaling": { "basePerLevel": [70, 120, 170, 220, 270], "apRatio": 0.6, "armorRatio": 0.3 }
+        },
+        { "type": "SLOW", "duration": 2.5, "value": 0.40 }
+    ],
+    "tags": ["damage", "magical", "slow", "aoe"]
+}

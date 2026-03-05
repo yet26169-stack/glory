@@ -4,6 +4,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <array>
 #include <cstring>
 
@@ -25,12 +26,10 @@ void Descriptors::cleanup() {
     m_cleaned = true;
 
     VkDevice dev = m_device.getDevice();
-    VmaAllocator alloc = m_device.getAllocator();
 
-    for (size_t i = 0; i < m_uniformBuffers.size(); ++i)
-        vmaDestroyBuffer(alloc, m_uniformBuffers[i], m_uniformAllocations[i]);
-    for (size_t i = 0; i < m_lightBuffers.size(); ++i)
-        vmaDestroyBuffer(alloc, m_lightBuffers[i], m_lightAllocations[i]);
+    m_uniformBuffers.clear();
+    m_lightBuffers.clear();
+    m_boneBuffers.clear();
 
     if (m_pool != VK_NULL_HANDLE)
         vkDestroyDescriptorPool(dev, m_pool, nullptr);
@@ -41,11 +40,29 @@ void Descriptors::cleanup() {
 }
 
 void Descriptors::updateUniformBuffer(uint32_t frameIndex, const UniformBufferObject& ubo) {
-    std::memcpy(m_uniformMapped[frameIndex], &ubo, sizeof(ubo));
+    std::memcpy(m_uniformBuffers[frameIndex].map(), &ubo, sizeof(ubo));
 }
 
 void Descriptors::updateLightBuffer(uint32_t frameIndex, const LightUBO& light) {
-    std::memcpy(m_lightMapped[frameIndex], &light, sizeof(light));
+    std::memcpy(m_lightBuffers[frameIndex].map(), &light, sizeof(light));
+}
+
+void Descriptors::updateBoneBuffer(uint32_t frameIndex,
+                                   const std::vector<glm::mat4>& matrices) {
+    // Convenience: write to slot 0
+    writeBoneSlot(frameIndex, 0, matrices);
+}
+
+uint32_t Descriptors::writeBoneSlot(uint32_t frameIndex, uint32_t slotIndex,
+                                    const std::vector<glm::mat4>& matrices) {
+    uint32_t slot = std::min(slotIndex, MAX_SKINNED_CHARS - 1);
+    uint32_t count = std::min(static_cast<uint32_t>(matrices.size()), MAX_BONES);
+    size_t offsetBytes = static_cast<size_t>(slot) * MAX_BONES * sizeof(glm::mat4);
+    std::memcpy(static_cast<char*>(m_boneBuffers[frameIndex].map()) + offsetBytes,
+                matrices.data(), sizeof(glm::mat4) * count);
+    // Return the index of the first bone for this slot (used as push constant
+    // boneBaseIndex in the vertex shader)
+    return slot * MAX_BONES;
 }
 
 void Descriptors::writeBindlessTexture(uint32_t arrayIndex, VkImageView imageView, VkSampler sampler) {
@@ -90,7 +107,7 @@ void Descriptors::updateShadowMap(VkImageView depthView, VkSampler shadowSampler
 
 // ── Private ─────────────────────────────────────────────────────────────────
 void Descriptors::createLayout() {
-    std::array<VkDescriptorSetLayoutBinding, 4> bindings{};
+    std::array<VkDescriptorSetLayoutBinding, 5> bindings{};
 
     // binding 0: UBO (vertex + fragment)
     bindings[0].binding         = 0;
@@ -116,13 +133,20 @@ void Descriptors::createLayout() {
     bindings[3].descriptorCount = 1;
     bindings[3].stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-    // Binding flags: UPDATE_AFTER_BIND + PARTIALLY_BOUND for bindless array
-    std::array<VkDescriptorBindingFlags, 4> bindingFlags{};
+    // binding 4: bone matrix SSBO (vertex stage — GPU skinning)
+    bindings[4].binding         = 4;
+    bindings[4].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    bindings[4].descriptorCount = 1;
+    bindings[4].stageFlags      = VK_SHADER_STAGE_VERTEX_BIT;
+
+    // Binding flags
+    std::array<VkDescriptorBindingFlags, 5> bindingFlags{};
     bindingFlags[0] = 0;
     bindingFlags[1] = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT
                     | VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
     bindingFlags[2] = 0;
     bindingFlags[3] = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
+    bindingFlags[4] = 0;
 
     VkDescriptorSetLayoutBindingFlagsCreateInfo flagsCI{};
     flagsCI.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
@@ -138,53 +162,52 @@ void Descriptors::createLayout() {
 
     VK_CHECK(vkCreateDescriptorSetLayout(m_device.getDevice(), &ci, nullptr, &m_layout),
              "Failed to create descriptor set layout");
-    spdlog::info("Descriptor set layout created (bindless: {} textures)", MAX_BINDLESS_TEXTURES);
+    spdlog::info("Descriptor set layout created (bindless: {} textures, bone SSBO binding 4)",
+                 MAX_BINDLESS_TEXTURES);
 }
 
 void Descriptors::createUniformBuffers(uint32_t frameCount) {
     VmaAllocator alloc = m_device.getAllocator();
 
-    auto makeMappedBuffers = [&](VkDeviceSize size, uint32_t count,
-                                  std::vector<VkBuffer>& bufs,
-                                  std::vector<VmaAllocation>& allocs,
-                                  std::vector<void*>& mapped)
-    {
-        bufs.resize(count);
-        allocs.resize(count);
-        mapped.resize(count);
-        for (uint32_t i = 0; i < count; ++i) {
-            VkBufferCreateInfo bufCI{};
-            bufCI.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-            bufCI.size        = size;
-            bufCI.usage       = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-            bufCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    m_uniformBuffers.reserve(frameCount);
+    m_lightBuffers.reserve(frameCount);
+    for (uint32_t i = 0; i < frameCount; ++i) {
+        m_uniformBuffers.emplace_back(alloc, sizeof(UniformBufferObject),
+                                     VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                                     VMA_MEMORY_USAGE_CPU_TO_GPU);
+        m_lightBuffers.emplace_back(alloc, sizeof(LightUBO),
+                                   VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                                   VMA_MEMORY_USAGE_CPU_TO_GPU);
+    }
 
-            VmaAllocationCreateInfo allocCI{};
-            allocCI.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
-            allocCI.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-
-            VmaAllocationInfo allocInfo{};
-            VK_CHECK(vmaCreateBuffer(alloc, &bufCI, &allocCI,
-                                     &bufs[i], &allocs[i], &allocInfo),
-                     "Failed to create uniform buffer");
-            mapped[i] = allocInfo.pMappedData;
+    // Bone SSBO: MAX_SKINNED_CHARS * MAX_BONES mat4s, CPU_TO_GPU, persistently mapped via Buffer
+    VkDeviceSize boneSize = sizeof(glm::mat4) * MAX_BONES * MAX_SKINNED_CHARS;
+    m_boneBuffers.reserve(frameCount);
+    for (uint32_t i = 0; i < frameCount; ++i) {
+        m_boneBuffers.emplace_back(alloc, boneSize,
+                                  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                  VMA_MEMORY_USAGE_CPU_TO_GPU);
+        
+        // Initialize all slots to identity matrices
+        glm::mat4 identity(1.0f);
+        void* mapped = m_boneBuffers[i].map();
+        for (uint32_t b = 0; b < MAX_BONES * MAX_SKINNED_CHARS; ++b) {
+            std::memcpy(static_cast<char*>(mapped) + b * sizeof(glm::mat4),
+                        &identity, sizeof(glm::mat4));
         }
-    };
+    }
 
-    makeMappedBuffers(sizeof(UniformBufferObject), frameCount,
-                      m_uniformBuffers, m_uniformAllocations, m_uniformMapped);
-    makeMappedBuffers(sizeof(LightUBO), frameCount,
-                      m_lightBuffers, m_lightAllocations, m_lightMapped);
-
-    spdlog::info("{} uniform + light buffers created (persistently mapped)", frameCount);
+    spdlog::info("{} uniform + light + bone buffers created (persistently mapped)", frameCount);
 }
 
 void Descriptors::createPool(uint32_t frameCount) {
-    std::array<VkDescriptorPoolSize, 2> poolSizes{};
+    std::array<VkDescriptorPoolSize, 3> poolSizes{};
     poolSizes[0].type            = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = frameCount * 2; // UBO + light UBO per frame
     poolSizes[1].type            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     poolSizes[1].descriptorCount = frameCount * (MAX_BINDLESS_TEXTURES + 1); // bindless array + shadow map
+    poolSizes[2].type            = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    poolSizes[2].descriptorCount = frameCount; // bone SSBO per frame
 
     VkDescriptorPoolCreateInfo ci{};
     ci.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -212,16 +235,21 @@ void Descriptors::createSets(uint32_t frameCount) {
 
     for (uint32_t i = 0; i < frameCount; ++i) {
         VkDescriptorBufferInfo uboBufInfo{};
-        uboBufInfo.buffer = m_uniformBuffers[i];
+        uboBufInfo.buffer = m_uniformBuffers[i].getBuffer();
         uboBufInfo.offset = 0;
         uboBufInfo.range  = sizeof(UniformBufferObject);
 
         VkDescriptorBufferInfo lightBufInfo{};
-        lightBufInfo.buffer = m_lightBuffers[i];
+        lightBufInfo.buffer = m_lightBuffers[i].getBuffer();
         lightBufInfo.offset = 0;
         lightBufInfo.range  = sizeof(LightUBO);
 
-        std::array<VkWriteDescriptorSet, 2> writes{};
+        VkDescriptorBufferInfo boneBufInfo{};
+        boneBufInfo.buffer = m_boneBuffers[i].getBuffer();
+        boneBufInfo.offset = 0;
+        boneBufInfo.range  = sizeof(glm::mat4) * MAX_BONES * MAX_SKINNED_CHARS;
+
+        std::array<VkWriteDescriptorSet, 3> writes{};
 
         writes[0].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         writes[0].dstSet          = m_sets[i];
@@ -238,6 +266,14 @@ void Descriptors::createSets(uint32_t frameCount) {
         writes[1].descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         writes[1].descriptorCount = 1;
         writes[1].pBufferInfo     = &lightBufInfo;
+
+        writes[2].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[2].dstSet          = m_sets[i];
+        writes[2].dstBinding      = 4;
+        writes[2].dstArrayElement = 0;
+        writes[2].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        writes[2].descriptorCount = 1;
+        writes[2].pBufferInfo     = &boneBufInfo;
 
         vkUpdateDescriptorSets(m_device.getDevice(),
                                static_cast<uint32_t>(writes.size()),

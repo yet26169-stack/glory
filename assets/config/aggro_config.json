@@ -1,0 +1,9 @@
+{
+    "aggroRange": 10.0,
+    "leashRange": 14.0,
+    "aggroCheckInterval": 0.25,
+    "targetReEvalInterval": 3.5,
+    "championAggroDuration": 2.5,
+    "championAggroCooldown": 2.0,
+    "xpRange": 22.0
+}

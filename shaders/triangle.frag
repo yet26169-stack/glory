@@ -131,9 +131,15 @@ void main() {
     vec3 N      = normalize(fragWorldNormal);
 
     // Normal map via cotangent-frame TBN (bindless lookup)
-    vec3 mapN = texture(textures[nonuniformEXT(fragNormalIdx)], fragTexCoord).rgb * 2.0 - 1.0;
-    mat3 TBN  = cotangentFrame(N, fragWorldPos, fragTexCoord);
-    N         = normalize(TBN * mapN);
+    // Guard: skip TBN when UV derivatives are zero (e.g. no UVs) to avoid NaN
+    vec2 duv1 = dFdx(fragTexCoord);
+    vec2 duv2 = dFdy(fragTexCoord);
+    float uvDeriv = dot(duv1, duv1) + dot(duv2, duv2);
+    if (uvDeriv > 1e-12) {
+        vec3 mapN = texture(textures[nonuniformEXT(fragNormalIdx)], fragTexCoord).rgb * 2.0 - 1.0;
+        mat3 TBN  = cotangentFrame(N, fragWorldPos, fragTexCoord);
+        N         = normalize(TBN * mapN);
+    }
 
     vec3 V = normalize(lightData.viewPos - fragWorldPos);
 
@@ -234,7 +240,31 @@ void main() {
         iridescentColor *= iriStrength;
     }
 
-    vec3 result = ambient + Lo + rimLight + iridescentColor;
+    // ── Clearcoat specular layer (car paint / lacquer) ─────────────────────
+    vec3 clearcoatSpec = vec3(0.0);
+    if (metallic > 0.5 && roughness < 0.3) {
+        float ccRoughness = 0.08; // very smooth top coat
+        vec3  ccF0 = vec3(0.04);  // dielectric clear layer
+        for (int i = 0; i < lightData.lightCount; ++i) {
+            vec3  L    = normalize(lightData.lights[i].position - fragWorldPos);
+            vec3  H    = normalize(V + L);
+            float dist = length(lightData.lights[i].position - fragWorldPos);
+            float atten = 1.0 / (1.0 + 0.09 * dist + 0.032 * dist * dist);
+            vec3  rad  = lightData.lights[i].color * atten;
+
+            float ccNDF = distributionGGX(N, H, ccRoughness);
+            float ccG   = geometrySmith(N, V, L, ccRoughness);
+            vec3  ccF   = fresnelSchlick(max(dot(H, V), 0.0), ccF0);
+            float ccDen = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
+            float NdotL = max(dot(N, L), 0.0);
+            float ccShadow = (i == 0) ? shadow : 1.0;
+            clearcoatSpec += (ccNDF * ccG * ccF / ccDen) * rad * NdotL * ccShadow;
+        }
+        float ccStrength = (metallic - 0.5) * 2.0 * (1.0 - roughness / 0.3) * 0.5;
+        clearcoatSpec *= ccStrength;
+    }
+
+    vec3 result = ambient + Lo + rimLight + iridescentColor + clearcoatSpec;
 
     // ── Emissive glow ───────────────────────────────────────────────────────
     if (fragEmissive > 0.0) {

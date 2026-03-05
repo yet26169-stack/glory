@@ -47,6 +47,7 @@ public:
   static Texture createCircuit(const Device &device);
   static Texture createHexGrid(const Device &device);
   static Texture createGradient(const Device &device);
+  static Texture createNoise(const Device &device);
 
   /// Create texture from raw RGBA pixel data (generic factory).
   static Texture createFromPixels(const Device &device, const uint32_t *pixels,

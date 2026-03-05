@@ -59,6 +59,7 @@ CMakeFiles/Glory.dir/src/renderer/ShadowMap.cpp.o: \
   /opt/homebrew/include/vk_video/vulkan_video_codec_vp9std.h \
   /opt/homebrew/include/vk_video/vulkan_video_codec_vp9std_decode.h \
   /Users/donkey/Development/1/Glory/extern/vma/vk_mem_alloc.h \
+  /Users/donkey/Development/1/Glory/src/renderer/Buffer.h \
   /opt/homebrew/include/glm/glm.hpp \
   /opt/homebrew/include/glm/detail/_fixes.hpp \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/cmath \
@@ -1117,7 +1118,6 @@ CMakeFiles/Glory.dir/src/renderer/ShadowMap.cpp.o: \
   /opt/homebrew/include/glm/vector_relational.hpp \
   /opt/homebrew/include/glm/integer.hpp \
   /opt/homebrew/include/glm/detail/func_integer.inl \
-  /Users/donkey/Development/1/Glory/src/renderer/Buffer.h \
   /Users/donkey/Development/1/Glory/src/renderer/Device.h \
   /Users/donkey/Development/1/Glory/src/renderer/VkCheck.h \
   /opt/homebrew/include/spdlog/spdlog.h \

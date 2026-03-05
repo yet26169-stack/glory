@@ -11,6 +11,7 @@ namespace glory {
 struct QueueFamilyIndices {
     std::optional<uint32_t> graphicsFamily;
     std::optional<uint32_t> presentFamily;
+    std::optional<uint32_t> transferFamily; // dedicated DMA queue (may equal graphicsFamily)
 
     bool isComplete() const {
         return graphicsFamily.has_value() && presentFamily.has_value();
@@ -37,8 +38,13 @@ public:
     VkPhysicalDevice getPhysicalDevice()      const { return m_physicalDevice; }
     VkQueue          getGraphicsQueue()       const { return m_graphicsQueue; }
     VkQueue          getPresentQueue()        const { return m_presentQueue; }
+    VkQueue          getTransferQueue()       const { return m_transferQueue; }
+    // True if the transfer queue is a distinct DMA queue (not shared with graphics)
+    bool             hasDedicatedTransfer()      const { return m_dedicatedTransfer; }
+    bool             hasDrawIndirectCount()      const { return m_drawIndirectCountSupported; }
     VmaAllocator     getAllocator()           const { return m_allocator; }
     VkCommandPool    getTransferCommandPool() const { return m_transferCommandPool; }
+    VkCommandPool    getGraphicsCommandPool() const { return m_graphicsCommandPool; }
 
     QueueFamilyIndices      getQueueFamilies()      const { return m_indices; }
     SwapchainSupportDetails querySwapchainSupport() const;
@@ -56,8 +62,12 @@ private:
     VkDevice         m_device                = VK_NULL_HANDLE;
     VkQueue          m_graphicsQueue         = VK_NULL_HANDLE;
     VkQueue          m_presentQueue          = VK_NULL_HANDLE;
+    VkQueue          m_transferQueue         = VK_NULL_HANDLE;
+    bool             m_dedicatedTransfer            = false;
+    bool             m_drawIndirectCountSupported   = false;
     VmaAllocator     m_allocator             = VK_NULL_HANDLE;
     VkCommandPool    m_transferCommandPool   = VK_NULL_HANDLE;
+    VkCommandPool    m_graphicsCommandPool   = VK_NULL_HANDLE;
     QueueFamilyIndices m_indices;
     bool m_cleaned = false;
 
@@ -65,6 +75,7 @@ private:
     void createLogicalDevice();
     void createAllocator();
     void createTransferCommandPool();
+    void createGraphicsCommandPool();
 
     int  rateDeviceSuitability(VkPhysicalDevice device) const;
     bool checkDeviceExtensionSupport(VkPhysicalDevice device) const;

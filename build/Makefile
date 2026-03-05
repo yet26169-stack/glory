@@ -272,6 +272,110 @@ test_minion/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_minion.dir/build.make CMakeFiles/test_minion.dir/build
 .PHONY : test_minion/fast
 
+#=============================================================================
+# Target rules for targets named test_structure
+
+# Build rule for target.
+test_structure: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_structure
+.PHONY : test_structure
+
+# fast build rule for target.
+test_structure/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_structure.dir/build.make CMakeFiles/test_structure.dir/build
+.PHONY : test_structure/fast
+
+#=============================================================================
+# Target rules for targets named test_jungle
+
+# Build rule for target.
+test_jungle: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_jungle
+.PHONY : test_jungle
+
+# fast build rule for target.
+test_jungle/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_jungle.dir/build.make CMakeFiles/test_jungle.dir/build
+.PHONY : test_jungle/fast
+
+#=============================================================================
+# Target rules for targets named test_fixedpoint
+
+# Build rule for target.
+test_fixedpoint: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_fixedpoint
+.PHONY : test_fixedpoint
+
+# fast build rule for target.
+test_fixedpoint/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fixedpoint.dir/build.make CMakeFiles/test_fixedpoint.dir/build
+.PHONY : test_fixedpoint/fast
+
+#=============================================================================
+# Target rules for targets named test_simulation_loop
+
+# Build rule for target.
+test_simulation_loop: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_simulation_loop
+.PHONY : test_simulation_loop
+
+# fast build rule for target.
+test_simulation_loop/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_simulation_loop.dir/build.make CMakeFiles/test_simulation_loop.dir/build
+.PHONY : test_simulation_loop/fast
+
+#=============================================================================
+# Target rules for targets named test_snapshot
+
+# Build rule for target.
+test_snapshot: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_snapshot
+.PHONY : test_snapshot
+
+# fast build rule for target.
+test_snapshot/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_snapshot.dir/build.make CMakeFiles/test_snapshot.dir/build
+.PHONY : test_snapshot/fast
+
+#=============================================================================
+# Target rules for targets named test_networking
+
+# Build rule for target.
+test_networking: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_networking
+.PHONY : test_networking
+
+# fast build rule for target.
+test_networking/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/build
+.PHONY : test_networking/fast
+
+#=============================================================================
+# Target rules for targets named test_flowfield
+
+# Build rule for target.
+test_flowfield: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_flowfield
+.PHONY : test_flowfield
+
+# fast build rule for target.
+test_flowfield/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_flowfield.dir/build.make CMakeFiles/test_flowfield.dir/build
+.PHONY : test_flowfield/fast
+
+#=============================================================================
+# Target rules for targets named test_determinism
+
+# Build rule for target.
+test_determinism: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_determinism
+.PHONY : test_determinism
+
+# fast build rule for target.
+test_determinism/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_determinism.dir/build.make CMakeFiles/test_determinism.dir/build
+.PHONY : test_determinism/fast
+
 extern/imgui/imgui.o: extern/imgui/imgui.cpp.o
 .PHONY : extern/imgui/imgui.o
 
@@ -1106,6 +1210,30 @@ src/animation/CPUSkinning.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/animation/CPUSkinning.cpp.s
 .PHONY : src/animation/CPUSkinning.cpp.s
 
+src/asset/CookedLoader.o: src/asset/CookedLoader.cpp.o
+.PHONY : src/asset/CookedLoader.o
+
+# target to build an object file
+src/asset/CookedLoader.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/asset/CookedLoader.cpp.o
+.PHONY : src/asset/CookedLoader.cpp.o
+
+src/asset/CookedLoader.i: src/asset/CookedLoader.cpp.i
+.PHONY : src/asset/CookedLoader.i
+
+# target to preprocess a source file
+src/asset/CookedLoader.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/asset/CookedLoader.cpp.i
+.PHONY : src/asset/CookedLoader.cpp.i
+
+src/asset/CookedLoader.s: src/asset/CookedLoader.cpp.s
+.PHONY : src/asset/CookedLoader.s
+
+# target to generate assembly for a file
+src/asset/CookedLoader.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/asset/CookedLoader.cpp.s
+.PHONY : src/asset/CookedLoader.cpp.s
+
 src/audio/AudioEngine.o: src/audio/AudioEngine.cpp.o
 .PHONY : src/audio/AudioEngine.o
 
@@ -1153,6 +1281,30 @@ src/camera/Camera.s: src/camera/Camera.cpp.s
 src/camera/Camera.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/camera/Camera.cpp.s
 .PHONY : src/camera/Camera.cpp.s
+
+src/combat/AutoAttackSystem.o: src/combat/AutoAttackSystem.cpp.o
+.PHONY : src/combat/AutoAttackSystem.o
+
+# target to build an object file
+src/combat/AutoAttackSystem.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/combat/AutoAttackSystem.cpp.o
+.PHONY : src/combat/AutoAttackSystem.cpp.o
+
+src/combat/AutoAttackSystem.i: src/combat/AutoAttackSystem.cpp.i
+.PHONY : src/combat/AutoAttackSystem.i
+
+# target to preprocess a source file
+src/combat/AutoAttackSystem.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/combat/AutoAttackSystem.cpp.i
+.PHONY : src/combat/AutoAttackSystem.cpp.i
+
+src/combat/AutoAttackSystem.s: src/combat/AutoAttackSystem.cpp.s
+.PHONY : src/combat/AutoAttackSystem.s
+
+# target to generate assembly for a file
+src/combat/AutoAttackSystem.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/combat/AutoAttackSystem.cpp.s
+.PHONY : src/combat/AutoAttackSystem.cpp.s
 
 src/core/Application.o: src/core/Application.cpp.o
 .PHONY : src/core/Application.o
@@ -1226,6 +1378,144 @@ src/core/Profiler.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/core/Profiler.cpp.s
 .PHONY : src/core/Profiler.cpp.s
 
+src/core/SimToRenderSyncSystem.o: src/core/SimToRenderSyncSystem.cpp.o
+.PHONY : src/core/SimToRenderSyncSystem.o
+
+# target to build an object file
+src/core/SimToRenderSyncSystem.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/core/SimToRenderSyncSystem.cpp.o
+.PHONY : src/core/SimToRenderSyncSystem.cpp.o
+
+src/core/SimToRenderSyncSystem.i: src/core/SimToRenderSyncSystem.cpp.i
+.PHONY : src/core/SimToRenderSyncSystem.i
+
+# target to preprocess a source file
+src/core/SimToRenderSyncSystem.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/core/SimToRenderSyncSystem.cpp.i
+.PHONY : src/core/SimToRenderSyncSystem.cpp.i
+
+src/core/SimToRenderSyncSystem.s: src/core/SimToRenderSyncSystem.cpp.s
+.PHONY : src/core/SimToRenderSyncSystem.s
+
+# target to generate assembly for a file
+src/core/SimToRenderSyncSystem.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/core/SimToRenderSyncSystem.cpp.s
+.PHONY : src/core/SimToRenderSyncSystem.cpp.s
+
+src/core/SimulationLoop.o: src/core/SimulationLoop.cpp.o
+.PHONY : src/core/SimulationLoop.o
+
+# target to build an object file
+src/core/SimulationLoop.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/core/SimulationLoop.cpp.o
+.PHONY : src/core/SimulationLoop.cpp.o
+
+src/core/SimulationLoop.i: src/core/SimulationLoop.cpp.i
+.PHONY : src/core/SimulationLoop.i
+
+# target to preprocess a source file
+src/core/SimulationLoop.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/core/SimulationLoop.cpp.i
+.PHONY : src/core/SimulationLoop.cpp.i
+
+src/core/SimulationLoop.s: src/core/SimulationLoop.cpp.s
+.PHONY : src/core/SimulationLoop.s
+
+# target to generate assembly for a file
+src/core/SimulationLoop.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/core/SimulationLoop.cpp.s
+.PHONY : src/core/SimulationLoop.cpp.s
+
+src/core/StateChecksumSystem.o: src/core/StateChecksumSystem.cpp.o
+.PHONY : src/core/StateChecksumSystem.o
+
+# target to build an object file
+src/core/StateChecksumSystem.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/core/StateChecksumSystem.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_simulation_loop.dir/build.make CMakeFiles/test_simulation_loop.dir/src/core/StateChecksumSystem.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_snapshot.dir/build.make CMakeFiles/test_snapshot.dir/src/core/StateChecksumSystem.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/src/core/StateChecksumSystem.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_determinism.dir/build.make CMakeFiles/test_determinism.dir/src/core/StateChecksumSystem.cpp.o
+.PHONY : src/core/StateChecksumSystem.cpp.o
+
+src/core/StateChecksumSystem.i: src/core/StateChecksumSystem.cpp.i
+.PHONY : src/core/StateChecksumSystem.i
+
+# target to preprocess a source file
+src/core/StateChecksumSystem.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/core/StateChecksumSystem.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_simulation_loop.dir/build.make CMakeFiles/test_simulation_loop.dir/src/core/StateChecksumSystem.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_snapshot.dir/build.make CMakeFiles/test_snapshot.dir/src/core/StateChecksumSystem.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/src/core/StateChecksumSystem.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_determinism.dir/build.make CMakeFiles/test_determinism.dir/src/core/StateChecksumSystem.cpp.i
+.PHONY : src/core/StateChecksumSystem.cpp.i
+
+src/core/StateChecksumSystem.s: src/core/StateChecksumSystem.cpp.s
+.PHONY : src/core/StateChecksumSystem.s
+
+# target to generate assembly for a file
+src/core/StateChecksumSystem.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/core/StateChecksumSystem.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_simulation_loop.dir/build.make CMakeFiles/test_simulation_loop.dir/src/core/StateChecksumSystem.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_snapshot.dir/build.make CMakeFiles/test_snapshot.dir/src/core/StateChecksumSystem.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/src/core/StateChecksumSystem.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_determinism.dir/build.make CMakeFiles/test_determinism.dir/src/core/StateChecksumSystem.cpp.s
+.PHONY : src/core/StateChecksumSystem.cpp.s
+
+src/core/StateSnapshot.o: src/core/StateSnapshot.cpp.o
+.PHONY : src/core/StateSnapshot.o
+
+# target to build an object file
+src/core/StateSnapshot.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/core/StateSnapshot.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_snapshot.dir/build.make CMakeFiles/test_snapshot.dir/src/core/StateSnapshot.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/src/core/StateSnapshot.cpp.o
+.PHONY : src/core/StateSnapshot.cpp.o
+
+src/core/StateSnapshot.i: src/core/StateSnapshot.cpp.i
+.PHONY : src/core/StateSnapshot.i
+
+# target to preprocess a source file
+src/core/StateSnapshot.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/core/StateSnapshot.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_snapshot.dir/build.make CMakeFiles/test_snapshot.dir/src/core/StateSnapshot.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/src/core/StateSnapshot.cpp.i
+.PHONY : src/core/StateSnapshot.cpp.i
+
+src/core/StateSnapshot.s: src/core/StateSnapshot.cpp.s
+.PHONY : src/core/StateSnapshot.s
+
+# target to generate assembly for a file
+src/core/StateSnapshot.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/core/StateSnapshot.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_snapshot.dir/build.make CMakeFiles/test_snapshot.dir/src/core/StateSnapshot.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/src/core/StateSnapshot.cpp.s
+.PHONY : src/core/StateSnapshot.cpp.s
+
+src/core/WorkStealQueue.o: src/core/WorkStealQueue.cpp.o
+.PHONY : src/core/WorkStealQueue.o
+
+# target to build an object file
+src/core/WorkStealQueue.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/core/WorkStealQueue.cpp.o
+.PHONY : src/core/WorkStealQueue.cpp.o
+
+src/core/WorkStealQueue.i: src/core/WorkStealQueue.cpp.i
+.PHONY : src/core/WorkStealQueue.i
+
+# target to preprocess a source file
+src/core/WorkStealQueue.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/core/WorkStealQueue.cpp.i
+.PHONY : src/core/WorkStealQueue.cpp.i
+
+src/core/WorkStealQueue.s: src/core/WorkStealQueue.cpp.s
+.PHONY : src/core/WorkStealQueue.s
+
+# target to generate assembly for a file
+src/core/WorkStealQueue.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/core/WorkStealQueue.cpp.s
+.PHONY : src/core/WorkStealQueue.cpp.s
+
 src/editor/DebugOverlay.o: src/editor/DebugOverlay.cpp.o
 .PHONY : src/editor/DebugOverlay.o
 
@@ -1249,6 +1539,30 @@ src/editor/DebugOverlay.s: src/editor/DebugOverlay.cpp.s
 src/editor/DebugOverlay.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/editor/DebugOverlay.cpp.s
 .PHONY : src/editor/DebugOverlay.cpp.s
+
+src/fog/FogReadback.o: src/fog/FogReadback.cpp.o
+.PHONY : src/fog/FogReadback.o
+
+# target to build an object file
+src/fog/FogReadback.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/fog/FogReadback.cpp.o
+.PHONY : src/fog/FogReadback.cpp.o
+
+src/fog/FogReadback.i: src/fog/FogReadback.cpp.i
+.PHONY : src/fog/FogReadback.i
+
+# target to preprocess a source file
+src/fog/FogReadback.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/fog/FogReadback.cpp.i
+.PHONY : src/fog/FogReadback.cpp.i
+
+src/fog/FogReadback.s: src/fog/FogReadback.cpp.s
+.PHONY : src/fog/FogReadback.s
+
+# target to generate assembly for a file
+src/fog/FogReadback.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/fog/FogReadback.cpp.s
+.PHONY : src/fog/FogReadback.cpp.s
 
 src/fog/FogSystem.o: src/fog/FogSystem.cpp.o
 .PHONY : src/fog/FogSystem.o
@@ -1301,6 +1615,30 @@ src/hud/HUD.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/hud/HUD.cpp.s
 .PHONY : src/hud/HUD.cpp.s
 
+src/hud/MinionHealthBars.o: src/hud/MinionHealthBars.cpp.o
+.PHONY : src/hud/MinionHealthBars.o
+
+# target to build an object file
+src/hud/MinionHealthBars.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/hud/MinionHealthBars.cpp.o
+.PHONY : src/hud/MinionHealthBars.cpp.o
+
+src/hud/MinionHealthBars.i: src/hud/MinionHealthBars.cpp.i
+.PHONY : src/hud/MinionHealthBars.i
+
+# target to preprocess a source file
+src/hud/MinionHealthBars.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/hud/MinionHealthBars.cpp.i
+.PHONY : src/hud/MinionHealthBars.cpp.i
+
+src/hud/MinionHealthBars.s: src/hud/MinionHealthBars.cpp.s
+.PHONY : src/hud/MinionHealthBars.s
+
+# target to generate assembly for a file
+src/hud/MinionHealthBars.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/hud/MinionHealthBars.cpp.s
+.PHONY : src/hud/MinionHealthBars.cpp.s
+
 src/input/InputManager.o: src/input/InputManager.cpp.o
 .PHONY : src/input/InputManager.o
 
@@ -1324,6 +1662,84 @@ src/input/InputManager.s: src/input/InputManager.cpp.s
 src/input/InputManager.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/input/InputManager.cpp.s
 .PHONY : src/input/InputManager.cpp.s
+
+src/input/TargetingSystem.o: src/input/TargetingSystem.cpp.o
+.PHONY : src/input/TargetingSystem.o
+
+# target to build an object file
+src/input/TargetingSystem.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/input/TargetingSystem.cpp.o
+.PHONY : src/input/TargetingSystem.cpp.o
+
+src/input/TargetingSystem.i: src/input/TargetingSystem.cpp.i
+.PHONY : src/input/TargetingSystem.i
+
+# target to preprocess a source file
+src/input/TargetingSystem.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/input/TargetingSystem.cpp.i
+.PHONY : src/input/TargetingSystem.cpp.i
+
+src/input/TargetingSystem.s: src/input/TargetingSystem.cpp.s
+.PHONY : src/input/TargetingSystem.s
+
+# target to generate assembly for a file
+src/input/TargetingSystem.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/input/TargetingSystem.cpp.s
+.PHONY : src/input/TargetingSystem.cpp.s
+
+src/jungle/JungleConfig.o: src/jungle/JungleConfig.cpp.o
+.PHONY : src/jungle/JungleConfig.o
+
+# target to build an object file
+src/jungle/JungleConfig.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/jungle/JungleConfig.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_jungle.dir/build.make CMakeFiles/test_jungle.dir/src/jungle/JungleConfig.cpp.o
+.PHONY : src/jungle/JungleConfig.cpp.o
+
+src/jungle/JungleConfig.i: src/jungle/JungleConfig.cpp.i
+.PHONY : src/jungle/JungleConfig.i
+
+# target to preprocess a source file
+src/jungle/JungleConfig.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/jungle/JungleConfig.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_jungle.dir/build.make CMakeFiles/test_jungle.dir/src/jungle/JungleConfig.cpp.i
+.PHONY : src/jungle/JungleConfig.cpp.i
+
+src/jungle/JungleConfig.s: src/jungle/JungleConfig.cpp.s
+.PHONY : src/jungle/JungleConfig.s
+
+# target to generate assembly for a file
+src/jungle/JungleConfig.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/jungle/JungleConfig.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_jungle.dir/build.make CMakeFiles/test_jungle.dir/src/jungle/JungleConfig.cpp.s
+.PHONY : src/jungle/JungleConfig.cpp.s
+
+src/jungle/JungleSystem.o: src/jungle/JungleSystem.cpp.o
+.PHONY : src/jungle/JungleSystem.o
+
+# target to build an object file
+src/jungle/JungleSystem.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/jungle/JungleSystem.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_jungle.dir/build.make CMakeFiles/test_jungle.dir/src/jungle/JungleSystem.cpp.o
+.PHONY : src/jungle/JungleSystem.cpp.o
+
+src/jungle/JungleSystem.i: src/jungle/JungleSystem.cpp.i
+.PHONY : src/jungle/JungleSystem.i
+
+# target to preprocess a source file
+src/jungle/JungleSystem.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/jungle/JungleSystem.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_jungle.dir/build.make CMakeFiles/test_jungle.dir/src/jungle/JungleSystem.cpp.i
+.PHONY : src/jungle/JungleSystem.cpp.i
+
+src/jungle/JungleSystem.s: src/jungle/JungleSystem.cpp.s
+.PHONY : src/jungle/JungleSystem.s
+
+# target to generate assembly for a file
+src/jungle/JungleSystem.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/jungle/JungleSystem.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_jungle.dir/build.make CMakeFiles/test_jungle.dir/src/jungle/JungleSystem.cpp.s
+.PHONY : src/jungle/JungleSystem.cpp.s
 
 src/main.o: src/main.cpp.o
 .PHONY : src/main.o
@@ -1358,6 +1774,8 @@ src/map/MapLoader.cpp.o:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_maploader.dir/build.make CMakeFiles/test_maploader.dir/src/map/MapLoader.cpp.o
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_nav.dir/build.make CMakeFiles/test_nav.dir/src/map/MapLoader.cpp.o
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_minion.dir/build.make CMakeFiles/test_minion.dir/src/map/MapLoader.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_structure.dir/build.make CMakeFiles/test_structure.dir/src/map/MapLoader.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_jungle.dir/build.make CMakeFiles/test_jungle.dir/src/map/MapLoader.cpp.o
 .PHONY : src/map/MapLoader.cpp.o
 
 src/map/MapLoader.i: src/map/MapLoader.cpp.i
@@ -1369,6 +1787,8 @@ src/map/MapLoader.cpp.i:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_maploader.dir/build.make CMakeFiles/test_maploader.dir/src/map/MapLoader.cpp.i
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_nav.dir/build.make CMakeFiles/test_nav.dir/src/map/MapLoader.cpp.i
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_minion.dir/build.make CMakeFiles/test_minion.dir/src/map/MapLoader.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_structure.dir/build.make CMakeFiles/test_structure.dir/src/map/MapLoader.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_jungle.dir/build.make CMakeFiles/test_jungle.dir/src/map/MapLoader.cpp.i
 .PHONY : src/map/MapLoader.cpp.i
 
 src/map/MapLoader.s: src/map/MapLoader.cpp.s
@@ -1380,7 +1800,123 @@ src/map/MapLoader.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_maploader.dir/build.make CMakeFiles/test_maploader.dir/src/map/MapLoader.cpp.s
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_nav.dir/build.make CMakeFiles/test_nav.dir/src/map/MapLoader.cpp.s
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_minion.dir/build.make CMakeFiles/test_minion.dir/src/map/MapLoader.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_structure.dir/build.make CMakeFiles/test_structure.dir/src/map/MapLoader.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_jungle.dir/build.make CMakeFiles/test_jungle.dir/src/map/MapLoader.cpp.s
 .PHONY : src/map/MapLoader.cpp.s
+
+src/math/DetRNG.o: src/math/DetRNG.cpp.o
+.PHONY : src/math/DetRNG.o
+
+# target to build an object file
+src/math/DetRNG.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/math/DetRNG.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fixedpoint.dir/build.make CMakeFiles/test_fixedpoint.dir/src/math/DetRNG.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_simulation_loop.dir/build.make CMakeFiles/test_simulation_loop.dir/src/math/DetRNG.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_snapshot.dir/build.make CMakeFiles/test_snapshot.dir/src/math/DetRNG.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/src/math/DetRNG.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_determinism.dir/build.make CMakeFiles/test_determinism.dir/src/math/DetRNG.cpp.o
+.PHONY : src/math/DetRNG.cpp.o
+
+src/math/DetRNG.i: src/math/DetRNG.cpp.i
+.PHONY : src/math/DetRNG.i
+
+# target to preprocess a source file
+src/math/DetRNG.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/math/DetRNG.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fixedpoint.dir/build.make CMakeFiles/test_fixedpoint.dir/src/math/DetRNG.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_simulation_loop.dir/build.make CMakeFiles/test_simulation_loop.dir/src/math/DetRNG.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_snapshot.dir/build.make CMakeFiles/test_snapshot.dir/src/math/DetRNG.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/src/math/DetRNG.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_determinism.dir/build.make CMakeFiles/test_determinism.dir/src/math/DetRNG.cpp.i
+.PHONY : src/math/DetRNG.cpp.i
+
+src/math/DetRNG.s: src/math/DetRNG.cpp.s
+.PHONY : src/math/DetRNG.s
+
+# target to generate assembly for a file
+src/math/DetRNG.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/math/DetRNG.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fixedpoint.dir/build.make CMakeFiles/test_fixedpoint.dir/src/math/DetRNG.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_simulation_loop.dir/build.make CMakeFiles/test_simulation_loop.dir/src/math/DetRNG.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_snapshot.dir/build.make CMakeFiles/test_snapshot.dir/src/math/DetRNG.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/src/math/DetRNG.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_determinism.dir/build.make CMakeFiles/test_determinism.dir/src/math/DetRNG.cpp.s
+.PHONY : src/math/DetRNG.cpp.s
+
+src/math/FixedPoint.o: src/math/FixedPoint.cpp.o
+.PHONY : src/math/FixedPoint.o
+
+# target to build an object file
+src/math/FixedPoint.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/math/FixedPoint.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fixedpoint.dir/build.make CMakeFiles/test_fixedpoint.dir/src/math/FixedPoint.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_simulation_loop.dir/build.make CMakeFiles/test_simulation_loop.dir/src/math/FixedPoint.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_snapshot.dir/build.make CMakeFiles/test_snapshot.dir/src/math/FixedPoint.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/src/math/FixedPoint.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_determinism.dir/build.make CMakeFiles/test_determinism.dir/src/math/FixedPoint.cpp.o
+.PHONY : src/math/FixedPoint.cpp.o
+
+src/math/FixedPoint.i: src/math/FixedPoint.cpp.i
+.PHONY : src/math/FixedPoint.i
+
+# target to preprocess a source file
+src/math/FixedPoint.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/math/FixedPoint.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fixedpoint.dir/build.make CMakeFiles/test_fixedpoint.dir/src/math/FixedPoint.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_simulation_loop.dir/build.make CMakeFiles/test_simulation_loop.dir/src/math/FixedPoint.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_snapshot.dir/build.make CMakeFiles/test_snapshot.dir/src/math/FixedPoint.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/src/math/FixedPoint.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_determinism.dir/build.make CMakeFiles/test_determinism.dir/src/math/FixedPoint.cpp.i
+.PHONY : src/math/FixedPoint.cpp.i
+
+src/math/FixedPoint.s: src/math/FixedPoint.cpp.s
+.PHONY : src/math/FixedPoint.s
+
+# target to generate assembly for a file
+src/math/FixedPoint.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/math/FixedPoint.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fixedpoint.dir/build.make CMakeFiles/test_fixedpoint.dir/src/math/FixedPoint.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_simulation_loop.dir/build.make CMakeFiles/test_simulation_loop.dir/src/math/FixedPoint.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_snapshot.dir/build.make CMakeFiles/test_snapshot.dir/src/math/FixedPoint.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/src/math/FixedPoint.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_determinism.dir/build.make CMakeFiles/test_determinism.dir/src/math/FixedPoint.cpp.s
+.PHONY : src/math/FixedPoint.cpp.s
+
+src/math/MurmurHash3.o: src/math/MurmurHash3.cpp.o
+.PHONY : src/math/MurmurHash3.o
+
+# target to build an object file
+src/math/MurmurHash3.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/math/MurmurHash3.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_simulation_loop.dir/build.make CMakeFiles/test_simulation_loop.dir/src/math/MurmurHash3.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_snapshot.dir/build.make CMakeFiles/test_snapshot.dir/src/math/MurmurHash3.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/src/math/MurmurHash3.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_determinism.dir/build.make CMakeFiles/test_determinism.dir/src/math/MurmurHash3.cpp.o
+.PHONY : src/math/MurmurHash3.cpp.o
+
+src/math/MurmurHash3.i: src/math/MurmurHash3.cpp.i
+.PHONY : src/math/MurmurHash3.i
+
+# target to preprocess a source file
+src/math/MurmurHash3.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/math/MurmurHash3.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_simulation_loop.dir/build.make CMakeFiles/test_simulation_loop.dir/src/math/MurmurHash3.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_snapshot.dir/build.make CMakeFiles/test_snapshot.dir/src/math/MurmurHash3.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/src/math/MurmurHash3.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_determinism.dir/build.make CMakeFiles/test_determinism.dir/src/math/MurmurHash3.cpp.i
+.PHONY : src/math/MurmurHash3.cpp.i
+
+src/math/MurmurHash3.s: src/math/MurmurHash3.cpp.s
+.PHONY : src/math/MurmurHash3.s
+
+# target to generate assembly for a file
+src/math/MurmurHash3.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/math/MurmurHash3.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_simulation_loop.dir/build.make CMakeFiles/test_simulation_loop.dir/src/math/MurmurHash3.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_snapshot.dir/build.make CMakeFiles/test_snapshot.dir/src/math/MurmurHash3.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/src/math/MurmurHash3.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_determinism.dir/build.make CMakeFiles/test_determinism.dir/src/math/MurmurHash3.cpp.s
+.PHONY : src/math/MurmurHash3.cpp.s
 
 src/minion/MinionConfig.o: src/minion/MinionConfig.cpp.o
 .PHONY : src/minion/MinionConfig.o
@@ -1460,6 +1996,165 @@ src/nav/DebugRenderer.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/nav/DebugRenderer.cpp.s
 .PHONY : src/nav/DebugRenderer.cpp.s
 
+src/nav/FlowField.o: src/nav/FlowField.cpp.o
+.PHONY : src/nav/FlowField.o
+
+# target to build an object file
+src/nav/FlowField.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/nav/FlowField.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_flowfield.dir/build.make CMakeFiles/test_flowfield.dir/src/nav/FlowField.cpp.o
+.PHONY : src/nav/FlowField.cpp.o
+
+src/nav/FlowField.i: src/nav/FlowField.cpp.i
+.PHONY : src/nav/FlowField.i
+
+# target to preprocess a source file
+src/nav/FlowField.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/nav/FlowField.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_flowfield.dir/build.make CMakeFiles/test_flowfield.dir/src/nav/FlowField.cpp.i
+.PHONY : src/nav/FlowField.cpp.i
+
+src/nav/FlowField.s: src/nav/FlowField.cpp.s
+.PHONY : src/nav/FlowField.s
+
+# target to generate assembly for a file
+src/nav/FlowField.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/nav/FlowField.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_flowfield.dir/build.make CMakeFiles/test_flowfield.dir/src/nav/FlowField.cpp.s
+.PHONY : src/nav/FlowField.cpp.s
+
+src/nav/HierarchicalFlowField.o: src/nav/HierarchicalFlowField.cpp.o
+.PHONY : src/nav/HierarchicalFlowField.o
+
+# target to build an object file
+src/nav/HierarchicalFlowField.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/nav/HierarchicalFlowField.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_flowfield.dir/build.make CMakeFiles/test_flowfield.dir/src/nav/HierarchicalFlowField.cpp.o
+.PHONY : src/nav/HierarchicalFlowField.cpp.o
+
+src/nav/HierarchicalFlowField.i: src/nav/HierarchicalFlowField.cpp.i
+.PHONY : src/nav/HierarchicalFlowField.i
+
+# target to preprocess a source file
+src/nav/HierarchicalFlowField.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/nav/HierarchicalFlowField.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_flowfield.dir/build.make CMakeFiles/test_flowfield.dir/src/nav/HierarchicalFlowField.cpp.i
+.PHONY : src/nav/HierarchicalFlowField.cpp.i
+
+src/nav/HierarchicalFlowField.s: src/nav/HierarchicalFlowField.cpp.s
+.PHONY : src/nav/HierarchicalFlowField.s
+
+# target to generate assembly for a file
+src/nav/HierarchicalFlowField.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/nav/HierarchicalFlowField.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_flowfield.dir/build.make CMakeFiles/test_flowfield.dir/src/nav/HierarchicalFlowField.cpp.s
+.PHONY : src/nav/HierarchicalFlowField.cpp.s
+
+src/nav/SteeringSystem.o: src/nav/SteeringSystem.cpp.o
+.PHONY : src/nav/SteeringSystem.o
+
+# target to build an object file
+src/nav/SteeringSystem.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/nav/SteeringSystem.cpp.o
+.PHONY : src/nav/SteeringSystem.cpp.o
+
+src/nav/SteeringSystem.i: src/nav/SteeringSystem.cpp.i
+.PHONY : src/nav/SteeringSystem.i
+
+# target to preprocess a source file
+src/nav/SteeringSystem.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/nav/SteeringSystem.cpp.i
+.PHONY : src/nav/SteeringSystem.cpp.i
+
+src/nav/SteeringSystem.s: src/nav/SteeringSystem.cpp.s
+.PHONY : src/nav/SteeringSystem.s
+
+# target to generate assembly for a file
+src/nav/SteeringSystem.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/nav/SteeringSystem.cpp.s
+.PHONY : src/nav/SteeringSystem.cpp.s
+
+src/net/GameClient.o: src/net/GameClient.cpp.o
+.PHONY : src/net/GameClient.o
+
+# target to build an object file
+src/net/GameClient.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/net/GameClient.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/src/net/GameClient.cpp.o
+.PHONY : src/net/GameClient.cpp.o
+
+src/net/GameClient.i: src/net/GameClient.cpp.i
+.PHONY : src/net/GameClient.i
+
+# target to preprocess a source file
+src/net/GameClient.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/net/GameClient.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/src/net/GameClient.cpp.i
+.PHONY : src/net/GameClient.cpp.i
+
+src/net/GameClient.s: src/net/GameClient.cpp.s
+.PHONY : src/net/GameClient.s
+
+# target to generate assembly for a file
+src/net/GameClient.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/net/GameClient.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/src/net/GameClient.cpp.s
+.PHONY : src/net/GameClient.cpp.s
+
+src/net/GameServer.o: src/net/GameServer.cpp.o
+.PHONY : src/net/GameServer.o
+
+# target to build an object file
+src/net/GameServer.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/net/GameServer.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/src/net/GameServer.cpp.o
+.PHONY : src/net/GameServer.cpp.o
+
+src/net/GameServer.i: src/net/GameServer.cpp.i
+.PHONY : src/net/GameServer.i
+
+# target to preprocess a source file
+src/net/GameServer.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/net/GameServer.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/src/net/GameServer.cpp.i
+.PHONY : src/net/GameServer.cpp.i
+
+src/net/GameServer.s: src/net/GameServer.cpp.s
+.PHONY : src/net/GameServer.s
+
+# target to generate assembly for a file
+src/net/GameServer.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/net/GameServer.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/src/net/GameServer.cpp.s
+.PHONY : src/net/GameServer.cpp.s
+
+src/net/Transport.o: src/net/Transport.cpp.o
+.PHONY : src/net/Transport.o
+
+# target to build an object file
+src/net/Transport.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/net/Transport.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/src/net/Transport.cpp.o
+.PHONY : src/net/Transport.cpp.o
+
+src/net/Transport.i: src/net/Transport.cpp.i
+.PHONY : src/net/Transport.i
+
+# target to preprocess a source file
+src/net/Transport.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/net/Transport.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/src/net/Transport.cpp.i
+.PHONY : src/net/Transport.cpp.i
+
+src/net/Transport.s: src/net/Transport.cpp.s
+.PHONY : src/net/Transport.s
+
+# target to generate assembly for a file
+src/net/Transport.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/net/Transport.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/src/net/Transport.cpp.s
+.PHONY : src/net/Transport.cpp.s
+
 src/physics/PhysicsEngine.o: src/physics/PhysicsEngine.cpp.o
 .PHONY : src/physics/PhysicsEngine.o
 
@@ -1483,6 +2178,30 @@ src/physics/PhysicsEngine.s: src/physics/PhysicsEngine.cpp.s
 src/physics/PhysicsEngine.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/physics/PhysicsEngine.cpp.s
 .PHONY : src/physics/PhysicsEngine.cpp.s
+
+src/renderer/BindlessAllocator.o: src/renderer/BindlessAllocator.cpp.o
+.PHONY : src/renderer/BindlessAllocator.o
+
+# target to build an object file
+src/renderer/BindlessAllocator.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/BindlessAllocator.cpp.o
+.PHONY : src/renderer/BindlessAllocator.cpp.o
+
+src/renderer/BindlessAllocator.i: src/renderer/BindlessAllocator.cpp.i
+.PHONY : src/renderer/BindlessAllocator.i
+
+# target to preprocess a source file
+src/renderer/BindlessAllocator.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/BindlessAllocator.cpp.i
+.PHONY : src/renderer/BindlessAllocator.cpp.i
+
+src/renderer/BindlessAllocator.s: src/renderer/BindlessAllocator.cpp.s
+.PHONY : src/renderer/BindlessAllocator.s
+
+# target to generate assembly for a file
+src/renderer/BindlessAllocator.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/BindlessAllocator.cpp.s
+.PHONY : src/renderer/BindlessAllocator.cpp.s
 
 src/renderer/Bloom.o: src/renderer/Bloom.cpp.o
 .PHONY : src/renderer/Bloom.o
@@ -1514,6 +2233,7 @@ src/renderer/Buffer.o: src/renderer/Buffer.cpp.o
 # target to build an object file
 src/renderer/Buffer.cpp.o:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/Buffer.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fog.dir/build.make CMakeFiles/test_fog.dir/src/renderer/Buffer.cpp.o
 .PHONY : src/renderer/Buffer.cpp.o
 
 src/renderer/Buffer.i: src/renderer/Buffer.cpp.i
@@ -1522,6 +2242,7 @@ src/renderer/Buffer.i: src/renderer/Buffer.cpp.i
 # target to preprocess a source file
 src/renderer/Buffer.cpp.i:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/Buffer.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fog.dir/build.make CMakeFiles/test_fog.dir/src/renderer/Buffer.cpp.i
 .PHONY : src/renderer/Buffer.cpp.i
 
 src/renderer/Buffer.s: src/renderer/Buffer.cpp.s
@@ -1530,6 +2251,7 @@ src/renderer/Buffer.s: src/renderer/Buffer.cpp.s
 # target to generate assembly for a file
 src/renderer/Buffer.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/Buffer.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fog.dir/build.make CMakeFiles/test_fog.dir/src/renderer/Buffer.cpp.s
 .PHONY : src/renderer/Buffer.cpp.s
 
 src/renderer/CascadeShadow.o: src/renderer/CascadeShadow.cpp.o
@@ -1555,6 +2277,30 @@ src/renderer/CascadeShadow.s: src/renderer/CascadeShadow.cpp.s
 src/renderer/CascadeShadow.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/CascadeShadow.cpp.s
 .PHONY : src/renderer/CascadeShadow.cpp.s
+
+src/renderer/ClickIndicatorRenderer.o: src/renderer/ClickIndicatorRenderer.cpp.o
+.PHONY : src/renderer/ClickIndicatorRenderer.o
+
+# target to build an object file
+src/renderer/ClickIndicatorRenderer.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/ClickIndicatorRenderer.cpp.o
+.PHONY : src/renderer/ClickIndicatorRenderer.cpp.o
+
+src/renderer/ClickIndicatorRenderer.i: src/renderer/ClickIndicatorRenderer.cpp.i
+.PHONY : src/renderer/ClickIndicatorRenderer.i
+
+# target to preprocess a source file
+src/renderer/ClickIndicatorRenderer.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/ClickIndicatorRenderer.cpp.i
+.PHONY : src/renderer/ClickIndicatorRenderer.cpp.i
+
+src/renderer/ClickIndicatorRenderer.s: src/renderer/ClickIndicatorRenderer.cpp.s
+.PHONY : src/renderer/ClickIndicatorRenderer.s
+
+# target to generate assembly for a file
+src/renderer/ClickIndicatorRenderer.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/ClickIndicatorRenderer.cpp.s
+.PHONY : src/renderer/ClickIndicatorRenderer.cpp.s
 
 src/renderer/ComputeSkinner.o: src/renderer/ComputeSkinner.cpp.o
 .PHONY : src/renderer/ComputeSkinner.o
@@ -1772,6 +2518,30 @@ src/renderer/GpuProfiler.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/GpuProfiler.cpp.s
 .PHONY : src/renderer/GpuProfiler.cpp.s
 
+src/renderer/HiZBuffer.o: src/renderer/HiZBuffer.cpp.o
+.PHONY : src/renderer/HiZBuffer.o
+
+# target to build an object file
+src/renderer/HiZBuffer.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/HiZBuffer.cpp.o
+.PHONY : src/renderer/HiZBuffer.cpp.o
+
+src/renderer/HiZBuffer.i: src/renderer/HiZBuffer.cpp.i
+.PHONY : src/renderer/HiZBuffer.i
+
+# target to preprocess a source file
+src/renderer/HiZBuffer.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/HiZBuffer.cpp.i
+.PHONY : src/renderer/HiZBuffer.cpp.i
+
+src/renderer/HiZBuffer.s: src/renderer/HiZBuffer.cpp.s
+.PHONY : src/renderer/HiZBuffer.s
+
+# target to generate assembly for a file
+src/renderer/HiZBuffer.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/HiZBuffer.cpp.s
+.PHONY : src/renderer/HiZBuffer.cpp.s
+
 src/renderer/Image.o: src/renderer/Image.cpp.o
 .PHONY : src/renderer/Image.o
 
@@ -1916,6 +2686,30 @@ src/renderer/Pipeline.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/Pipeline.cpp.s
 .PHONY : src/renderer/Pipeline.cpp.s
 
+src/renderer/PipelineLibrary.o: src/renderer/PipelineLibrary.cpp.o
+.PHONY : src/renderer/PipelineLibrary.o
+
+# target to build an object file
+src/renderer/PipelineLibrary.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/PipelineLibrary.cpp.o
+.PHONY : src/renderer/PipelineLibrary.cpp.o
+
+src/renderer/PipelineLibrary.i: src/renderer/PipelineLibrary.cpp.i
+.PHONY : src/renderer/PipelineLibrary.i
+
+# target to preprocess a source file
+src/renderer/PipelineLibrary.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/PipelineLibrary.cpp.i
+.PHONY : src/renderer/PipelineLibrary.cpp.i
+
+src/renderer/PipelineLibrary.s: src/renderer/PipelineLibrary.cpp.s
+.PHONY : src/renderer/PipelineLibrary.s
+
+# target to generate assembly for a file
+src/renderer/PipelineLibrary.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/PipelineLibrary.cpp.s
+.PHONY : src/renderer/PipelineLibrary.cpp.s
+
 src/renderer/PostProcess.o: src/renderer/PostProcess.cpp.o
 .PHONY : src/renderer/PostProcess.o
 
@@ -1939,6 +2733,30 @@ src/renderer/PostProcess.s: src/renderer/PostProcess.cpp.s
 src/renderer/PostProcess.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/PostProcess.cpp.s
 .PHONY : src/renderer/PostProcess.cpp.s
+
+src/renderer/QueueManager.o: src/renderer/QueueManager.cpp.o
+.PHONY : src/renderer/QueueManager.o
+
+# target to build an object file
+src/renderer/QueueManager.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/QueueManager.cpp.o
+.PHONY : src/renderer/QueueManager.cpp.o
+
+src/renderer/QueueManager.i: src/renderer/QueueManager.cpp.i
+.PHONY : src/renderer/QueueManager.i
+
+# target to preprocess a source file
+src/renderer/QueueManager.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/QueueManager.cpp.i
+.PHONY : src/renderer/QueueManager.cpp.i
+
+src/renderer/QueueManager.s: src/renderer/QueueManager.cpp.s
+.PHONY : src/renderer/QueueManager.s
+
+# target to generate assembly for a file
+src/renderer/QueueManager.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/QueueManager.cpp.s
+.PHONY : src/renderer/QueueManager.cpp.s
 
 src/renderer/Renderer.o: src/renderer/Renderer.cpp.o
 .PHONY : src/renderer/Renderer.o
@@ -2156,6 +2974,60 @@ src/scene/Scene.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/scene/Scene.cpp.s
 .PHONY : src/scene/Scene.cpp.s
 
+src/structure/StructureConfig.o: src/structure/StructureConfig.cpp.o
+.PHONY : src/structure/StructureConfig.o
+
+# target to build an object file
+src/structure/StructureConfig.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/structure/StructureConfig.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_structure.dir/build.make CMakeFiles/test_structure.dir/src/structure/StructureConfig.cpp.o
+.PHONY : src/structure/StructureConfig.cpp.o
+
+src/structure/StructureConfig.i: src/structure/StructureConfig.cpp.i
+.PHONY : src/structure/StructureConfig.i
+
+# target to preprocess a source file
+src/structure/StructureConfig.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/structure/StructureConfig.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_structure.dir/build.make CMakeFiles/test_structure.dir/src/structure/StructureConfig.cpp.i
+.PHONY : src/structure/StructureConfig.cpp.i
+
+src/structure/StructureConfig.s: src/structure/StructureConfig.cpp.s
+.PHONY : src/structure/StructureConfig.s
+
+# target to generate assembly for a file
+src/structure/StructureConfig.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/structure/StructureConfig.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_structure.dir/build.make CMakeFiles/test_structure.dir/src/structure/StructureConfig.cpp.s
+.PHONY : src/structure/StructureConfig.cpp.s
+
+src/structure/StructureSystem.o: src/structure/StructureSystem.cpp.o
+.PHONY : src/structure/StructureSystem.o
+
+# target to build an object file
+src/structure/StructureSystem.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/structure/StructureSystem.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_structure.dir/build.make CMakeFiles/test_structure.dir/src/structure/StructureSystem.cpp.o
+.PHONY : src/structure/StructureSystem.cpp.o
+
+src/structure/StructureSystem.i: src/structure/StructureSystem.cpp.i
+.PHONY : src/structure/StructureSystem.i
+
+# target to preprocess a source file
+src/structure/StructureSystem.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/structure/StructureSystem.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_structure.dir/build.make CMakeFiles/test_structure.dir/src/structure/StructureSystem.cpp.i
+.PHONY : src/structure/StructureSystem.cpp.i
+
+src/structure/StructureSystem.s: src/structure/StructureSystem.cpp.s
+.PHONY : src/structure/StructureSystem.s
+
+# target to generate assembly for a file
+src/structure/StructureSystem.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/structure/StructureSystem.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_structure.dir/build.make CMakeFiles/test_structure.dir/src/structure/StructureSystem.cpp.s
+.PHONY : src/structure/StructureSystem.cpp.s
+
 src/terrain/IsometricCamera.o: src/terrain/IsometricCamera.cpp.o
 .PHONY : src/terrain/IsometricCamera.o
 
@@ -2279,6 +3151,78 @@ tests/test_ability.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_ability.dir/build.make CMakeFiles/test_ability.dir/tests/test_ability.cpp.s
 .PHONY : tests/test_ability.cpp.s
 
+tests/test_determinism.o: tests/test_determinism.cpp.o
+.PHONY : tests/test_determinism.o
+
+# target to build an object file
+tests/test_determinism.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_determinism.dir/build.make CMakeFiles/test_determinism.dir/tests/test_determinism.cpp.o
+.PHONY : tests/test_determinism.cpp.o
+
+tests/test_determinism.i: tests/test_determinism.cpp.i
+.PHONY : tests/test_determinism.i
+
+# target to preprocess a source file
+tests/test_determinism.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_determinism.dir/build.make CMakeFiles/test_determinism.dir/tests/test_determinism.cpp.i
+.PHONY : tests/test_determinism.cpp.i
+
+tests/test_determinism.s: tests/test_determinism.cpp.s
+.PHONY : tests/test_determinism.s
+
+# target to generate assembly for a file
+tests/test_determinism.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_determinism.dir/build.make CMakeFiles/test_determinism.dir/tests/test_determinism.cpp.s
+.PHONY : tests/test_determinism.cpp.s
+
+tests/test_fixedpoint.o: tests/test_fixedpoint.cpp.o
+.PHONY : tests/test_fixedpoint.o
+
+# target to build an object file
+tests/test_fixedpoint.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fixedpoint.dir/build.make CMakeFiles/test_fixedpoint.dir/tests/test_fixedpoint.cpp.o
+.PHONY : tests/test_fixedpoint.cpp.o
+
+tests/test_fixedpoint.i: tests/test_fixedpoint.cpp.i
+.PHONY : tests/test_fixedpoint.i
+
+# target to preprocess a source file
+tests/test_fixedpoint.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fixedpoint.dir/build.make CMakeFiles/test_fixedpoint.dir/tests/test_fixedpoint.cpp.i
+.PHONY : tests/test_fixedpoint.cpp.i
+
+tests/test_fixedpoint.s: tests/test_fixedpoint.cpp.s
+.PHONY : tests/test_fixedpoint.s
+
+# target to generate assembly for a file
+tests/test_fixedpoint.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fixedpoint.dir/build.make CMakeFiles/test_fixedpoint.dir/tests/test_fixedpoint.cpp.s
+.PHONY : tests/test_fixedpoint.cpp.s
+
+tests/test_flowfield.o: tests/test_flowfield.cpp.o
+.PHONY : tests/test_flowfield.o
+
+# target to build an object file
+tests/test_flowfield.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_flowfield.dir/build.make CMakeFiles/test_flowfield.dir/tests/test_flowfield.cpp.o
+.PHONY : tests/test_flowfield.cpp.o
+
+tests/test_flowfield.i: tests/test_flowfield.cpp.i
+.PHONY : tests/test_flowfield.i
+
+# target to preprocess a source file
+tests/test_flowfield.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_flowfield.dir/build.make CMakeFiles/test_flowfield.dir/tests/test_flowfield.cpp.i
+.PHONY : tests/test_flowfield.cpp.i
+
+tests/test_flowfield.s: tests/test_flowfield.cpp.s
+.PHONY : tests/test_flowfield.s
+
+# target to generate assembly for a file
+tests/test_flowfield.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_flowfield.dir/build.make CMakeFiles/test_flowfield.dir/tests/test_flowfield.cpp.s
+.PHONY : tests/test_flowfield.cpp.s
+
 tests/test_fog.o: tests/test_fog.cpp.o
 .PHONY : tests/test_fog.o
 
@@ -2302,6 +3246,30 @@ tests/test_fog.s: tests/test_fog.cpp.s
 tests/test_fog.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fog.dir/build.make CMakeFiles/test_fog.dir/tests/test_fog.cpp.s
 .PHONY : tests/test_fog.cpp.s
+
+tests/test_jungle.o: tests/test_jungle.cpp.o
+.PHONY : tests/test_jungle.o
+
+# target to build an object file
+tests/test_jungle.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_jungle.dir/build.make CMakeFiles/test_jungle.dir/tests/test_jungle.cpp.o
+.PHONY : tests/test_jungle.cpp.o
+
+tests/test_jungle.i: tests/test_jungle.cpp.i
+.PHONY : tests/test_jungle.i
+
+# target to preprocess a source file
+tests/test_jungle.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_jungle.dir/build.make CMakeFiles/test_jungle.dir/tests/test_jungle.cpp.i
+.PHONY : tests/test_jungle.cpp.i
+
+tests/test_jungle.s: tests/test_jungle.cpp.s
+.PHONY : tests/test_jungle.s
+
+# target to generate assembly for a file
+tests/test_jungle.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_jungle.dir/build.make CMakeFiles/test_jungle.dir/tests/test_jungle.cpp.s
+.PHONY : tests/test_jungle.cpp.s
 
 tests/test_maploader.o: tests/test_maploader.cpp.o
 .PHONY : tests/test_maploader.o
@@ -2399,6 +3367,102 @@ tests/test_nav.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_nav.dir/build.make CMakeFiles/test_nav.dir/tests/test_nav.cpp.s
 .PHONY : tests/test_nav.cpp.s
 
+tests/test_networking.o: tests/test_networking.cpp.o
+.PHONY : tests/test_networking.o
+
+# target to build an object file
+tests/test_networking.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/tests/test_networking.cpp.o
+.PHONY : tests/test_networking.cpp.o
+
+tests/test_networking.i: tests/test_networking.cpp.i
+.PHONY : tests/test_networking.i
+
+# target to preprocess a source file
+tests/test_networking.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/tests/test_networking.cpp.i
+.PHONY : tests/test_networking.cpp.i
+
+tests/test_networking.s: tests/test_networking.cpp.s
+.PHONY : tests/test_networking.s
+
+# target to generate assembly for a file
+tests/test_networking.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/tests/test_networking.cpp.s
+.PHONY : tests/test_networking.cpp.s
+
+tests/test_simulation_loop.o: tests/test_simulation_loop.cpp.o
+.PHONY : tests/test_simulation_loop.o
+
+# target to build an object file
+tests/test_simulation_loop.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_simulation_loop.dir/build.make CMakeFiles/test_simulation_loop.dir/tests/test_simulation_loop.cpp.o
+.PHONY : tests/test_simulation_loop.cpp.o
+
+tests/test_simulation_loop.i: tests/test_simulation_loop.cpp.i
+.PHONY : tests/test_simulation_loop.i
+
+# target to preprocess a source file
+tests/test_simulation_loop.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_simulation_loop.dir/build.make CMakeFiles/test_simulation_loop.dir/tests/test_simulation_loop.cpp.i
+.PHONY : tests/test_simulation_loop.cpp.i
+
+tests/test_simulation_loop.s: tests/test_simulation_loop.cpp.s
+.PHONY : tests/test_simulation_loop.s
+
+# target to generate assembly for a file
+tests/test_simulation_loop.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_simulation_loop.dir/build.make CMakeFiles/test_simulation_loop.dir/tests/test_simulation_loop.cpp.s
+.PHONY : tests/test_simulation_loop.cpp.s
+
+tests/test_snapshot.o: tests/test_snapshot.cpp.o
+.PHONY : tests/test_snapshot.o
+
+# target to build an object file
+tests/test_snapshot.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_snapshot.dir/build.make CMakeFiles/test_snapshot.dir/tests/test_snapshot.cpp.o
+.PHONY : tests/test_snapshot.cpp.o
+
+tests/test_snapshot.i: tests/test_snapshot.cpp.i
+.PHONY : tests/test_snapshot.i
+
+# target to preprocess a source file
+tests/test_snapshot.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_snapshot.dir/build.make CMakeFiles/test_snapshot.dir/tests/test_snapshot.cpp.i
+.PHONY : tests/test_snapshot.cpp.i
+
+tests/test_snapshot.s: tests/test_snapshot.cpp.s
+.PHONY : tests/test_snapshot.s
+
+# target to generate assembly for a file
+tests/test_snapshot.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_snapshot.dir/build.make CMakeFiles/test_snapshot.dir/tests/test_snapshot.cpp.s
+.PHONY : tests/test_snapshot.cpp.s
+
+tests/test_structure.o: tests/test_structure.cpp.o
+.PHONY : tests/test_structure.o
+
+# target to build an object file
+tests/test_structure.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_structure.dir/build.make CMakeFiles/test_structure.dir/tests/test_structure.cpp.o
+.PHONY : tests/test_structure.cpp.o
+
+tests/test_structure.i: tests/test_structure.cpp.i
+.PHONY : tests/test_structure.i
+
+# target to preprocess a source file
+tests/test_structure.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_structure.dir/build.make CMakeFiles/test_structure.dir/tests/test_structure.cpp.i
+.PHONY : tests/test_structure.cpp.i
+
+tests/test_structure.s: tests/test_structure.cpp.s
+.PHONY : tests/test_structure.s
+
+# target to generate assembly for a file
+tests/test_structure.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_structure.dir/build.make CMakeFiles/test_structure.dir/tests/test_structure.cpp.s
+.PHONY : tests/test_structure.cpp.s
+
 tests/test_terrain.o: tests/test_terrain.cpp.o
 .PHONY : tests/test_terrain.o
 
@@ -2461,11 +3525,19 @@ help:
 	@echo "... mesh_cook"
 	@echo "... meshoptimizer"
 	@echo "... test_ability"
+	@echo "... test_determinism"
+	@echo "... test_fixedpoint"
+	@echo "... test_flowfield"
 	@echo "... test_fog"
+	@echo "... test_jungle"
 	@echo "... test_maploader"
 	@echo "... test_minion"
 	@echo "... test_mirror"
 	@echo "... test_nav"
+	@echo "... test_networking"
+	@echo "... test_simulation_loop"
+	@echo "... test_snapshot"
+	@echo "... test_structure"
 	@echo "... test_terrain"
 	@echo "... extern/imgui/imgui.o"
 	@echo "... extern/imgui/imgui.i"
@@ -2569,12 +3641,18 @@ help:
 	@echo "... src/animation/CPUSkinning.o"
 	@echo "... src/animation/CPUSkinning.i"
 	@echo "... src/animation/CPUSkinning.s"
+	@echo "... src/asset/CookedLoader.o"
+	@echo "... src/asset/CookedLoader.i"
+	@echo "... src/asset/CookedLoader.s"
 	@echo "... src/audio/AudioEngine.o"
 	@echo "... src/audio/AudioEngine.i"
 	@echo "... src/audio/AudioEngine.s"
 	@echo "... src/camera/Camera.o"
 	@echo "... src/camera/Camera.i"
 	@echo "... src/camera/Camera.s"
+	@echo "... src/combat/AutoAttackSystem.o"
+	@echo "... src/combat/AutoAttackSystem.i"
+	@echo "... src/combat/AutoAttackSystem.s"
 	@echo "... src/core/Application.o"
 	@echo "... src/core/Application.i"
 	@echo "... src/core/Application.s"
@@ -2584,24 +3662,63 @@ help:
 	@echo "... src/core/Profiler.o"
 	@echo "... src/core/Profiler.i"
 	@echo "... src/core/Profiler.s"
+	@echo "... src/core/SimToRenderSyncSystem.o"
+	@echo "... src/core/SimToRenderSyncSystem.i"
+	@echo "... src/core/SimToRenderSyncSystem.s"
+	@echo "... src/core/SimulationLoop.o"
+	@echo "... src/core/SimulationLoop.i"
+	@echo "... src/core/SimulationLoop.s"
+	@echo "... src/core/StateChecksumSystem.o"
+	@echo "... src/core/StateChecksumSystem.i"
+	@echo "... src/core/StateChecksumSystem.s"
+	@echo "... src/core/StateSnapshot.o"
+	@echo "... src/core/StateSnapshot.i"
+	@echo "... src/core/StateSnapshot.s"
+	@echo "... src/core/WorkStealQueue.o"
+	@echo "... src/core/WorkStealQueue.i"
+	@echo "... src/core/WorkStealQueue.s"
 	@echo "... src/editor/DebugOverlay.o"
 	@echo "... src/editor/DebugOverlay.i"
 	@echo "... src/editor/DebugOverlay.s"
+	@echo "... src/fog/FogReadback.o"
+	@echo "... src/fog/FogReadback.i"
+	@echo "... src/fog/FogReadback.s"
 	@echo "... src/fog/FogSystem.o"
 	@echo "... src/fog/FogSystem.i"
 	@echo "... src/fog/FogSystem.s"
 	@echo "... src/hud/HUD.o"
 	@echo "... src/hud/HUD.i"
 	@echo "... src/hud/HUD.s"
+	@echo "... src/hud/MinionHealthBars.o"
+	@echo "... src/hud/MinionHealthBars.i"
+	@echo "... src/hud/MinionHealthBars.s"
 	@echo "... src/input/InputManager.o"
 	@echo "... src/input/InputManager.i"
 	@echo "... src/input/InputManager.s"
+	@echo "... src/input/TargetingSystem.o"
+	@echo "... src/input/TargetingSystem.i"
+	@echo "... src/input/TargetingSystem.s"
+	@echo "... src/jungle/JungleConfig.o"
+	@echo "... src/jungle/JungleConfig.i"
+	@echo "... src/jungle/JungleConfig.s"
+	@echo "... src/jungle/JungleSystem.o"
+	@echo "... src/jungle/JungleSystem.i"
+	@echo "... src/jungle/JungleSystem.s"
 	@echo "... src/main.o"
 	@echo "... src/main.i"
 	@echo "... src/main.s"
 	@echo "... src/map/MapLoader.o"
 	@echo "... src/map/MapLoader.i"
 	@echo "... src/map/MapLoader.s"
+	@echo "... src/math/DetRNG.o"
+	@echo "... src/math/DetRNG.i"
+	@echo "... src/math/DetRNG.s"
+	@echo "... src/math/FixedPoint.o"
+	@echo "... src/math/FixedPoint.i"
+	@echo "... src/math/FixedPoint.s"
+	@echo "... src/math/MurmurHash3.o"
+	@echo "... src/math/MurmurHash3.i"
+	@echo "... src/math/MurmurHash3.s"
 	@echo "... src/minion/MinionConfig.o"
 	@echo "... src/minion/MinionConfig.i"
 	@echo "... src/minion/MinionConfig.s"
@@ -2611,9 +3728,30 @@ help:
 	@echo "... src/nav/DebugRenderer.o"
 	@echo "... src/nav/DebugRenderer.i"
 	@echo "... src/nav/DebugRenderer.s"
+	@echo "... src/nav/FlowField.o"
+	@echo "... src/nav/FlowField.i"
+	@echo "... src/nav/FlowField.s"
+	@echo "... src/nav/HierarchicalFlowField.o"
+	@echo "... src/nav/HierarchicalFlowField.i"
+	@echo "... src/nav/HierarchicalFlowField.s"
+	@echo "... src/nav/SteeringSystem.o"
+	@echo "... src/nav/SteeringSystem.i"
+	@echo "... src/nav/SteeringSystem.s"
+	@echo "... src/net/GameClient.o"
+	@echo "... src/net/GameClient.i"
+	@echo "... src/net/GameClient.s"
+	@echo "... src/net/GameServer.o"
+	@echo "... src/net/GameServer.i"
+	@echo "... src/net/GameServer.s"
+	@echo "... src/net/Transport.o"
+	@echo "... src/net/Transport.i"
+	@echo "... src/net/Transport.s"
 	@echo "... src/physics/PhysicsEngine.o"
 	@echo "... src/physics/PhysicsEngine.i"
 	@echo "... src/physics/PhysicsEngine.s"
+	@echo "... src/renderer/BindlessAllocator.o"
+	@echo "... src/renderer/BindlessAllocator.i"
+	@echo "... src/renderer/BindlessAllocator.s"
 	@echo "... src/renderer/Bloom.o"
 	@echo "... src/renderer/Bloom.i"
 	@echo "... src/renderer/Bloom.s"
@@ -2623,6 +3761,9 @@ help:
 	@echo "... src/renderer/CascadeShadow.o"
 	@echo "... src/renderer/CascadeShadow.i"
 	@echo "... src/renderer/CascadeShadow.s"
+	@echo "... src/renderer/ClickIndicatorRenderer.o"
+	@echo "... src/renderer/ClickIndicatorRenderer.i"
+	@echo "... src/renderer/ClickIndicatorRenderer.s"
 	@echo "... src/renderer/ComputeSkinner.o"
 	@echo "... src/renderer/ComputeSkinner.i"
 	@echo "... src/renderer/ComputeSkinner.s"
@@ -2650,6 +3791,9 @@ help:
 	@echo "... src/renderer/GpuProfiler.o"
 	@echo "... src/renderer/GpuProfiler.i"
 	@echo "... src/renderer/GpuProfiler.s"
+	@echo "... src/renderer/HiZBuffer.o"
+	@echo "... src/renderer/HiZBuffer.i"
+	@echo "... src/renderer/HiZBuffer.s"
 	@echo "... src/renderer/Image.o"
 	@echo "... src/renderer/Image.i"
 	@echo "... src/renderer/Image.s"
@@ -2668,9 +3812,15 @@ help:
 	@echo "... src/renderer/Pipeline.o"
 	@echo "... src/renderer/Pipeline.i"
 	@echo "... src/renderer/Pipeline.s"
+	@echo "... src/renderer/PipelineLibrary.o"
+	@echo "... src/renderer/PipelineLibrary.i"
+	@echo "... src/renderer/PipelineLibrary.s"
 	@echo "... src/renderer/PostProcess.o"
 	@echo "... src/renderer/PostProcess.i"
 	@echo "... src/renderer/PostProcess.s"
+	@echo "... src/renderer/QueueManager.o"
+	@echo "... src/renderer/QueueManager.i"
+	@echo "... src/renderer/QueueManager.s"
 	@echo "... src/renderer/Renderer.o"
 	@echo "... src/renderer/Renderer.i"
 	@echo "... src/renderer/Renderer.s"
@@ -2698,6 +3848,12 @@ help:
 	@echo "... src/scene/Scene.o"
 	@echo "... src/scene/Scene.i"
 	@echo "... src/scene/Scene.s"
+	@echo "... src/structure/StructureConfig.o"
+	@echo "... src/structure/StructureConfig.i"
+	@echo "... src/structure/StructureConfig.s"
+	@echo "... src/structure/StructureSystem.o"
+	@echo "... src/structure/StructureSystem.i"
+	@echo "... src/structure/StructureSystem.s"
 	@echo "... src/terrain/IsometricCamera.o"
 	@echo "... src/terrain/IsometricCamera.i"
 	@echo "... src/terrain/IsometricCamera.s"
@@ -2713,9 +3869,21 @@ help:
 	@echo "... tests/test_ability.o"
 	@echo "... tests/test_ability.i"
 	@echo "... tests/test_ability.s"
+	@echo "... tests/test_determinism.o"
+	@echo "... tests/test_determinism.i"
+	@echo "... tests/test_determinism.s"
+	@echo "... tests/test_fixedpoint.o"
+	@echo "... tests/test_fixedpoint.i"
+	@echo "... tests/test_fixedpoint.s"
+	@echo "... tests/test_flowfield.o"
+	@echo "... tests/test_flowfield.i"
+	@echo "... tests/test_flowfield.s"
 	@echo "... tests/test_fog.o"
 	@echo "... tests/test_fog.i"
 	@echo "... tests/test_fog.s"
+	@echo "... tests/test_jungle.o"
+	@echo "... tests/test_jungle.i"
+	@echo "... tests/test_jungle.s"
 	@echo "... tests/test_maploader.o"
 	@echo "... tests/test_maploader.i"
 	@echo "... tests/test_maploader.s"
@@ -2728,6 +3896,18 @@ help:
 	@echo "... tests/test_nav.o"
 	@echo "... tests/test_nav.i"
 	@echo "... tests/test_nav.s"
+	@echo "... tests/test_networking.o"
+	@echo "... tests/test_networking.i"
+	@echo "... tests/test_networking.s"
+	@echo "... tests/test_simulation_loop.o"
+	@echo "... tests/test_simulation_loop.i"
+	@echo "... tests/test_simulation_loop.s"
+	@echo "... tests/test_snapshot.o"
+	@echo "... tests/test_snapshot.i"
+	@echo "... tests/test_snapshot.s"
+	@echo "... tests/test_structure.o"
+	@echo "... tests/test_structure.i"
+	@echo "... tests/test_structure.s"
 	@echo "... tests/test_terrain.o"
 	@echo "... tests/test_terrain.i"
 	@echo "... tests/test_terrain.s"

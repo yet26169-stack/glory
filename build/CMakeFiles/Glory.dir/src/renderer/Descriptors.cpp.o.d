@@ -1116,6 +1116,7 @@ CMakeFiles/Glory.dir/src/renderer/Descriptors.cpp.o: \
   /opt/homebrew/include/glm/vector_relational.hpp \
   /opt/homebrew/include/glm/integer.hpp \
   /opt/homebrew/include/glm/detail/func_integer.inl \
+  /Users/donkey/Development/1/Glory/src/renderer/Buffer.h \
   /Users/donkey/Development/1/Glory/src/renderer/Device.h \
   /Users/donkey/Development/1/Glory/src/renderer/VkCheck.h \
   /opt/homebrew/include/spdlog/spdlog.h \

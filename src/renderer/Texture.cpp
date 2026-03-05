@@ -72,8 +72,8 @@ void transitionImageLayout(const Device &device, VkImage image,
   submitInfo.commandBufferCount = 1;
   submitInfo.pCommandBuffers = &cmd;
 
-  vkQueueSubmit(device.getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
-  vkQueueWaitIdle(device.getGraphicsQueue());
+  vkQueueSubmit(device.getTransferQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+  vkQueueWaitIdle(device.getTransferQueue());
 
   vkFreeCommandBuffers(device.getDevice(), device.getTransferCommandPool(), 1,
                        &cmd);
@@ -116,8 +116,8 @@ void copyBufferToImage(const Device &device, VkBuffer buffer, VkImage image,
   submitInfo.commandBufferCount = 1;
   submitInfo.pCommandBuffers = &cmd;
 
-  vkQueueSubmit(device.getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
-  vkQueueWaitIdle(device.getGraphicsQueue());
+  vkQueueSubmit(device.getTransferQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+  vkQueueWaitIdle(device.getTransferQueue());
 
   vkFreeCommandBuffers(device.getDevice(), device.getTransferCommandPool(), 1,
                        &cmd);
@@ -1117,6 +1117,79 @@ Texture Texture::createGradient(const Device &device) {
   tex.createSampler(device);
   spdlog::info("Gradient texture created ({}x{})", W, H);
   return tex;
+}
+
+Texture Texture::createNoise(const Device& device) {
+    Texture tex;
+    tex.m_vkDevice = device.getDevice();
+
+    constexpr uint32_t W = 256, H = 256;
+    VkDeviceSize size = static_cast<VkDeviceSize>(W) * H * 4;
+    std::vector<uint32_t> pixels(W * H);
+
+    // Simple hash-based value noise with FBM
+    auto hash2d = [](int x, int y) -> float {
+        int n = x * 1619 + y * 31337 + 1013;
+        n = (n << 13) ^ n;
+        return 1.0f - static_cast<float>((n * (n * n * 15731 + 789221) + 1376312589) & 0x7FFFFFFF)
+               / 1073741824.0f;
+    };
+
+    auto smoothNoise = [&](float fx, float fy) -> float {
+        int ix = static_cast<int>(std::floor(fx));
+        int iy = static_cast<int>(std::floor(fy));
+        float fracX = fx - ix, fracY = fy - iy;
+        fracX = fracX * fracX * (3.0f - 2.0f * fracX);
+        fracY = fracY * fracY * (3.0f - 2.0f * fracY);
+        float v00 = hash2d(ix, iy),     v10 = hash2d(ix+1, iy);
+        float v01 = hash2d(ix, iy+1),   v11 = hash2d(ix+1, iy+1);
+        float a = v00 + (v10 - v00) * fracX;
+        float b = v01 + (v11 - v01) * fracX;
+        return a + (b - a) * fracY;
+    };
+
+    for (uint32_t py = 0; py < H; py++) {
+        for (uint32_t px = 0; px < W; px++) {
+            float fx = static_cast<float>(px) / 32.0f;
+            float fy = static_cast<float>(py) / 32.0f;
+
+            // 4-octave FBM
+            float val = 0.0f, amp = 0.5f;
+            for (int oct = 0; oct < 4; oct++) {
+                val += smoothNoise(fx, fy) * amp;
+                fx *= 2.0f; fy *= 2.0f;
+                amp *= 0.5f;
+            }
+            val = val * 0.5f + 0.5f; // normalize to [0,1]
+            val = std::max(0.0f, std::min(1.0f, val));
+
+            uint8_t v = static_cast<uint8_t>(val * 255.0f);
+            pixels[py * W + px] = (255u << 24) | (v << 16) | (v << 8) | v;
+        }
+    }
+
+    Buffer staging(device.getAllocator(), size,
+                   VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+    void* mapped = staging.map();
+    std::memcpy(mapped, pixels.data(), static_cast<size_t>(size));
+    staging.unmap();
+
+    tex.m_image = Image(device, W, H,
+                        VK_FORMAT_R8G8B8A8_SRGB,
+                        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                        VK_IMAGE_ASPECT_COLOR_BIT);
+
+    transitionImageLayout(device, tex.m_image.getImage(),
+                          VK_IMAGE_LAYOUT_UNDEFINED,
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    copyBufferToImage(device, staging.getBuffer(), tex.m_image.getImage(), W, H);
+    transitionImageLayout(device, tex.m_image.getImage(),
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    tex.createSampler(device);
+    spdlog::info("Noise texture created ({}x{})", W, H);
+    return tex;
 }
 
 // ── Generic pixel upload factory ────────────────────────────────────────────

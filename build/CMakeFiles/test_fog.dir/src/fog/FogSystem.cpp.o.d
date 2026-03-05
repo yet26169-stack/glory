@@ -1115,8 +1115,10 @@ CMakeFiles/test_fog.dir/src/fog/FogSystem.cpp.o: \
   /opt/homebrew/include/vk_video/vulkan_video_codec_av1std_encode.h \
   /opt/homebrew/include/vk_video/vulkan_video_codec_vp9std.h \
   /opt/homebrew/include/vk_video/vulkan_video_codec_vp9std_decode.h \
-  /Users/donkey/Development/1/Glory/src/renderer/Device.h \
   /Users/donkey/Development/1/Glory/extern/vma/vk_mem_alloc.h \
+  /Users/donkey/Development/1/Glory/src/renderer/Buffer.h \
+  /Users/donkey/Development/1/Glory/src/renderer/Device.h \
+  /Users/donkey/Development/1/Glory/src/renderer/VkCheck.h \
   /opt/homebrew/include/spdlog/spdlog.h \
   /opt/homebrew/include/spdlog/common.h \
   /opt/homebrew/include/spdlog/details/null_mutex.h \

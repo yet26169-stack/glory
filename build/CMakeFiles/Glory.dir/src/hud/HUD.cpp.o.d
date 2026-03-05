@@ -1275,6 +1275,7 @@ CMakeFiles/Glory.dir/src/hud/HUD.cpp.o: \
   /Users/donkey/Development/1/Glory/extern/vma/vk_mem_alloc.h \
   /Users/donkey/Development/1/Glory/src/renderer/Frustum.h \
   /opt/homebrew/include/glm/gtc/matrix_transform.hpp \
+  /Users/donkey/Development/1/Glory/src/math/FixedPoint.h \
   /Users/donkey/Development/1/Glory/src/renderer/DynamicMesh.h \
   /Users/donkey/Development/1/Glory/src/renderer/Sync.h \
   /Users/donkey/Development/1/Glory/src/renderer/Model.h \

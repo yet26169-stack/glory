@@ -10,5 +10,13 @@
 /Users/donkey/Development/1/Glory/build/CMakeFiles/test_fog.dir
 /Users/donkey/Development/1/Glory/build/CMakeFiles/test_ability.dir
 /Users/donkey/Development/1/Glory/build/CMakeFiles/test_minion.dir
+/Users/donkey/Development/1/Glory/build/CMakeFiles/test_structure.dir
+/Users/donkey/Development/1/Glory/build/CMakeFiles/test_jungle.dir
+/Users/donkey/Development/1/Glory/build/CMakeFiles/test_fixedpoint.dir
+/Users/donkey/Development/1/Glory/build/CMakeFiles/test_simulation_loop.dir
+/Users/donkey/Development/1/Glory/build/CMakeFiles/test_snapshot.dir
+/Users/donkey/Development/1/Glory/build/CMakeFiles/test_networking.dir
+/Users/donkey/Development/1/Glory/build/CMakeFiles/test_flowfield.dir
+/Users/donkey/Development/1/Glory/build/CMakeFiles/test_determinism.dir
 /Users/donkey/Development/1/Glory/build/CMakeFiles/edit_cache.dir
 /Users/donkey/Development/1/Glory/build/CMakeFiles/rebuild_cache.dir

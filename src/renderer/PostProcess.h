@@ -55,6 +55,7 @@ public:
 
     VkRenderPass     getRenderPass()     const { return m_renderPass; }
     VkPipeline       getPipeline()       const { return m_pipeline; }
+    VkPipeline       getMobaPipeline()   const { return m_mobaPipeline; }
     VkPipelineLayout getPipelineLayout() const { return m_pipelineLayout; }
     VkDescriptorSet  getDescSet()        const { return m_descSet; }
     const std::vector<VkFramebuffer>& getFramebuffers() const { return m_framebuffers; }
@@ -67,6 +68,9 @@ public:
     VkImage       getHDRDepthImage() const { return m_hdrDepthImage.getImage(); }
 
     PostProcessParams& getParams() { return m_params; }
+
+    VkImageView getDummyBloomImageView() const { return m_dummyBloomImage.getImageView(); }
+    VkImageView getDummySSAOImageView()  const { return m_dummySSAOImage.getImageView(); }
 
     void updateBloomDescriptor(VkImageView bloomView);
     void updateSSAODescriptor(VkImageView ssaoView);
@@ -83,10 +87,16 @@ private:
     VkRenderPass     m_hdrRenderPass  = VK_NULL_HANDLE;
     VkFramebuffer    m_hdrFramebuffer = VK_NULL_HANDLE;
 
+    // 1×1 white dummy images used for SSAO/Bloom descriptors in MOBA mode
+    // (valid bound image, but costs essentially no memory/bandwidth)
+    Image            m_dummyBloomImage;
+    Image            m_dummySSAOImage;
+
     // Post-process output pass (to swapchain)
     VkRenderPass     m_renderPass     = VK_NULL_HANDLE;
     VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
-    VkPipeline       m_pipeline       = VK_NULL_HANDLE;
+    VkPipeline       m_pipeline       = VK_NULL_HANDLE;  // full-quality (all effects)
+    VkPipeline       m_mobaPipeline   = VK_NULL_HANDLE;  // MOBA-mode (tone map + FXAA only)
     std::vector<VkFramebuffer> m_framebuffers;
 
     VkDescriptorSetLayout m_descLayout = VK_NULL_HANDLE;

@@ -1,0 +1,92 @@
+# Build directories
+build/
+build_debug/
+bin/
+obj/
+out/
+
+# CMake files
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+*.cmake
+
+# OS-specific
+.DS_Store
+Thumbs.db
+.AppleDouble
+.LSOverride
+Icon?
+._*
+
+# IDE/Editor configurations
+.vscode/
+.idea/
+.vs/
+*.sublime-project
+*.sublime-workspace
+.cache/
+.claude/
+.gemini/
+.history/
+*.log
+
+# Large binary assets
+*.glb
+*.gltf
+*.fbx
+*.obj
+*.mp4
+*.mkv
+*.avi
+*.mov
+*.png
+*.jpg
+*.jpeg
+*.tga
+*.dds
+*.psd
+*.pxd
+
+# But keep textures and necessary assets in assets/
+!assets/
+!assets/**/
+!assets/textures/*.png
+!assets/textures/*.jpg
+!assets/textures/*.jpeg
+!assets/config/*.json
+!assets/maps/*.json
+
+# Keep HUD/UI source if small
+!new_HUD.png
+!test_hud.png
+
+# Project-specific large folders/files
+models/
+textured models/
+first_try_clicking_animation/
+MOBA_Click_Indicator_Animation.mp4
+
+# C++ binaries/libraries
+*.exe
+*.out
+*.app
+*.a
+*.so
+*.dll
+*.dylib
+*.pdb
+*.ilk
+*.exp
+*.lib
+
+# Temporary files
+*.tmp
+*.temp
+*~
+*.swp
+*.swo

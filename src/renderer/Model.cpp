@@ -1071,6 +1071,44 @@ Model Model::createGear(const Device& device, VmaAllocator allocator,
     return model;
 }
 
+Model Model::createPyramid(const Device& device, VmaAllocator allocator,
+                             float baseSize, float height) {
+    std::vector<Vertex> vertices;
+    std::vector<uint32_t> indices;
+    float h = baseSize * 0.5f;
+
+    glm::vec3 apex(0.0f, height, 0.0f);
+    glm::vec3 bl(-h, 0.0f, -h), br(h, 0.0f, -h);
+    glm::vec3 fl(-h, 0.0f,  h), fr(h, 0.0f,  h);
+
+    auto addFace = [&](glm::vec3 a, glm::vec3 b, glm::vec3 c, float u0, float v0,
+                       float u1, float v1, float u2, float v2) {
+        glm::vec3 n = glm::normalize(glm::cross(b - a, c - a));
+        uint32_t base = static_cast<uint32_t>(vertices.size());
+        Vertex va{}; va.position = a; va.normal = n; va.texCoord = {u0, v0}; va.color = {1,1,1};
+        Vertex vb{}; vb.position = b; vb.normal = n; vb.texCoord = {u1, v1}; vb.color = {1,1,1};
+        Vertex vc{}; vc.position = c; vc.normal = n; vc.texCoord = {u2, v2}; vc.color = {1,1,1};
+        vertices.push_back(va); vertices.push_back(vb); vertices.push_back(vc);
+        indices.push_back(base); indices.push_back(base+1); indices.push_back(base+2);
+    };
+
+    // 4 side faces
+    addFace(apex, bl, br, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f); // back
+    addFace(apex, br, fr, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f); // right
+    addFace(apex, fr, fl, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f); // front
+    addFace(apex, fl, bl, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f); // left
+
+    // Bottom face (2 triangles)
+    addFace(bl, fl, fr, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
+    addFace(bl, fr, br, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 0.0f);
+
+    spdlog::info("Created pyramid: {} vertices, {} indices",
+                 vertices.size(), indices.size());
+    Model model;
+    model.m_meshes.emplace_back(device, allocator, vertices, indices);
+    return model;
+}
+
 void Model::draw(VkCommandBuffer cmd) const {
     for (const auto& mesh : m_meshes) {
         mesh.bind(cmd);

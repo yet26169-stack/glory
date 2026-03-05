@@ -1271,6 +1271,7 @@ CMakeFiles/Glory.dir/src/scene/Scene.cpp.o: \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/set \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/unordered_set \
   /opt/homebrew/include/glm/gtc/matrix_transform.hpp \
+  /Users/donkey/Development/1/Glory/src/math/FixedPoint.h \
   /Users/donkey/Development/1/Glory/src/renderer/DynamicMesh.h \
   /Users/donkey/Development/1/Glory/src/renderer/Sync.h \
   /Users/donkey/Development/1/Glory/src/renderer/Model.h \
@@ -1283,6 +1284,9 @@ CMakeFiles/Glory.dir/src/scene/Scene.cpp.o: \
   /Users/donkey/Development/1/Glory/src/terrain/TerrainSystem.h \
   /Users/donkey/Development/1/Glory/src/terrain/TerrainTextures.h \
   /Users/donkey/Development/1/Glory/src/terrain/TerrainVertex.h \
+  /Users/donkey/Development/1/Glory/src/minion/MinionComponents.h \
+  /Users/donkey/Development/1/Glory/src/minion/MinionTypes.h \
+  /Users/donkey/Development/1/Glory/src/map/MapTypes.h \
   /Users/donkey/Development/1/Glory/src/ability/AbilitySystem.h \
   /Users/donkey/Development/1/Glory/src/ability/AbilityComponents.h \
   /Users/donkey/Development/1/Glory/src/ability/AbilityDef.h \

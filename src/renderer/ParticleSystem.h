@@ -6,6 +6,7 @@
 
 #include <vector>
 #include <random>
+#include "renderer/Buffer.h"
 
 namespace glory {
 
@@ -34,6 +35,12 @@ public:
     ParticleSystem& operator=(const ParticleSystem&) = delete;
 
     void setEmitter(glm::vec3 pos, glm::vec3 baseColor, float emitRate = 60.0f);
+    // Called each frame by the renderer to scale emission rate by distance.
+    // fullRateDistance: within this distance use full emitRate
+    // cullDistance: beyond this distance suppress emission entirely
+    void setCameraPosition(const glm::vec3& camPos,
+                           float fullRateDistance = 30.0f,
+                           float cullDistance     = 80.0f);
     void update(float dt);
     void dispatchCompute(VkCommandBuffer cmd, float dt);
     void record(VkCommandBuffer cmd, const glm::mat4& viewProj, float particleSize = 40.0f);
@@ -49,23 +56,15 @@ private:
     float    m_emitAccum  = 0.0f;
 
     // Emitter config
-    glm::vec3 m_emitterPos   = glm::vec3(0.0f, 1.0f, 0.0f);
-    glm::vec3 m_baseColor    = glm::vec3(1.0f, 0.6f, 0.2f);
-    float     m_emitRate     = 60.0f;
+    glm::vec3 m_emitterPos      = glm::vec3(0.0f, 1.0f, 0.0f);
+    glm::vec3 m_baseColor       = glm::vec3(1.0f, 0.6f, 0.2f);
+    float     m_emitRate        = 60.0f;
+    float     m_emitRateScale   = 1.0f;  // [0,1] set by setCameraPosition each frame
 
-    // GPU resources: compute SSBO for particle data
-    VkBuffer      m_particleBuffer    = VK_NULL_HANDLE;
-    VmaAllocation m_particleAlloc     = VK_NULL_HANDLE;
-    void*         m_particleMapped    = nullptr;
-
-    // GPU resources: compute output vertex buffer
-    VkBuffer      m_vertexBuffer    = VK_NULL_HANDLE;
-    VmaAllocation m_vertexAlloc     = VK_NULL_HANDLE;
-
-    // GPU resources: atomic counter buffer
-    VkBuffer      m_counterBuffer   = VK_NULL_HANDLE;
-    VmaAllocation m_counterAlloc    = VK_NULL_HANDLE;
-    void*         m_counterMapped   = nullptr;
+    // GPU resources (persistently mapped via Buffer where needed)
+    Buffer m_particleBuffer;
+    Buffer m_vertexBuffer;
+    Buffer m_counterBuffer;
 
     // Compute pipeline
     VkDescriptorSetLayout m_computeDescLayout = VK_NULL_HANDLE;

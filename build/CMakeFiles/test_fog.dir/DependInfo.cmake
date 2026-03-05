@@ -10,6 +10,7 @@ set(CMAKE_DEPENDS_LANGUAGES
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
   "/Users/donkey/Development/1/Glory/extern/vma/vma_impl.cpp" "CMakeFiles/test_fog.dir/extern/vma/vma_impl.cpp.o" "gcc" "CMakeFiles/test_fog.dir/extern/vma/vma_impl.cpp.o.d"
   "/Users/donkey/Development/1/Glory/src/fog/FogSystem.cpp" "CMakeFiles/test_fog.dir/src/fog/FogSystem.cpp.o" "gcc" "CMakeFiles/test_fog.dir/src/fog/FogSystem.cpp.o.d"
+  "/Users/donkey/Development/1/Glory/src/renderer/Buffer.cpp" "CMakeFiles/test_fog.dir/src/renderer/Buffer.cpp.o" "gcc" "CMakeFiles/test_fog.dir/src/renderer/Buffer.cpp.o.d"
   "/Users/donkey/Development/1/Glory/tests/test_fog.cpp" "CMakeFiles/test_fog.dir/tests/test_fog.cpp.o" "gcc" "CMakeFiles/test_fog.dir/tests/test_fog.cpp.o.d"
   )
 

@@ -1,0 +1,99 @@
+{
+    "camps": {
+        "RedBuff": {
+            "mobs": [
+                { "name": "Red Brambleback", "hp": 1800, "ad": 75, "armor": 20, "mr": 20, "range": 2.5, "cooldown": 0.8, "big": true },
+                { "name": "Cinderling", "hp": 400, "ad": 15, "armor": 5, "mr": 5, "range": 2.0, "cooldown": 1.5, "big": false },
+                { "name": "Cinderling", "hp": 400, "ad": 15, "armor": 5, "mr": 5, "range": 2.0, "cooldown": 1.5, "big": false }
+            ],
+            "buff": { "id": "red_buff", "duration": 120.0 },
+            "xpReward": 200,
+            "goldReward": 100
+        },
+        "BlueBuff": {
+            "mobs": [
+                { "name": "Blue Sentinel", "hp": 1800, "ad": 75, "armor": 20, "mr": 20, "range": 2.5, "cooldown": 0.8, "big": true },
+                { "name": "Sentry", "hp": 400, "ad": 15, "armor": 5, "mr": 5, "range": 2.0, "cooldown": 1.5, "big": false },
+                { "name": "Sentry", "hp": 400, "ad": 15, "armor": 5, "mr": 5, "range": 2.0, "cooldown": 1.5, "big": false }
+            ],
+            "buff": { "id": "blue_buff", "duration": 120.0 },
+            "xpReward": 200,
+            "goldReward": 100
+        },
+        "Wolves": {
+            "mobs": [
+                { "name": "Greater Murk Wolf", "hp": 1300, "ad": 42, "armor": 10, "mr": 0, "range": 2.0, "cooldown": 1.0, "big": true },
+                { "name": "Murk Wolf", "hp": 480, "ad": 16, "armor": 5, "mr": 0, "range": 2.0, "cooldown": 1.2, "big": false },
+                { "name": "Murk Wolf", "hp": 480, "ad": 16, "armor": 5, "mr": 0, "range": 2.0, "cooldown": 1.2, "big": false }
+            ],
+            "xpReward": 135,
+            "goldReward": 68
+        },
+        "Raptors": {
+            "mobs": [
+                { "name": "Crimson Raptor", "hp": 800, "ad": 20, "armor": 15, "mr": 0, "range": 2.0, "cooldown": 1.0, "big": true },
+                { "name": "Raptor", "hp": 350, "ad": 10, "armor": 5, "mr": 0, "range": 2.0, "cooldown": 1.2, "big": false },
+                { "name": "Raptor", "hp": 350, "ad": 10, "armor": 5, "mr": 0, "range": 2.0, "cooldown": 1.2, "big": false },
+                { "name": "Raptor", "hp": 350, "ad": 10, "armor": 5, "mr": 0, "range": 2.0, "cooldown": 1.2, "big": false },
+                { "name": "Raptor", "hp": 350, "ad": 10, "armor": 5, "mr": 0, "range": 2.0, "cooldown": 1.2, "big": false },
+                { "name": "Raptor", "hp": 350, "ad": 10, "armor": 5, "mr": 0, "range": 2.0, "cooldown": 1.2, "big": false }
+            ],
+            "xpReward": 95,
+            "goldReward": 85
+        },
+        "Gromp": {
+            "mobs": [
+                { "name": "Gromp", "hp": 1800, "ad": 80, "armor": 0, "mr": 0, "range": 3.0, "cooldown": 1.0, "big": true }
+            ],
+            "xpReward": 135,
+            "goldReward": 80
+        },
+        "Krugs": {
+            "mobs": [
+                { "name": "Ancient Krug", "hp": 1350, "ad": 60, "armor": 25, "mr": 0, "range": 2.0, "cooldown": 1.0, "big": true },
+                { "name": "Krug", "hp": 500, "ad": 25, "armor": 10, "mr": 0, "range": 2.0, "cooldown": 1.2, "big": false }
+            ],
+            "xpReward": 168,
+            "goldReward": 100
+        },
+        "Scuttler": {
+            "mobs": [
+                { "name": "Rift Scuttler", "hp": 1050, "ad": 0, "armor": 60, "mr": 60, "range": 0, "cooldown": 99, "big": true }
+            ],
+            "xpReward": 115,
+            "goldReward": 70,
+            "passiveBehavior": "flee"
+        },
+        "Dragon": {
+            "mobs": [
+                { "name": "Elemental Drake", "hp": 4950, "ad": 150, "armor": 30, "mr": 70, "range": 5.0, "cooldown": 0.5, "big": true }
+            ],
+            "buff": { "id": "dragon_soul", "duration": 0 },
+            "xpReward": 300,
+            "goldReward": 300,
+            "isEpic": true
+        },
+        "Baron": {
+            "mobs": [
+                { "name": "Baron Nashor", "hp": 12000, "ad": 285, "armor": 120, "mr": 70, "range": 6.0, "cooldown": 0.75, "big": true }
+            ],
+            "buff": { "id": "baron_buff", "duration": 180.0 },
+            "xpReward": 600,
+            "goldReward": 500,
+            "isEpic": true
+        },
+        "Herald": {
+            "mobs": [
+                { "name": "Rift Herald", "hp": 6400, "ad": 105, "armor": 60, "mr": 50, "range": 4.0, "cooldown": 0.8, "big": true }
+            ],
+            "xpReward": 200,
+            "goldReward": 100,
+            "isEpic": true,
+            "maxKills": 2
+        }
+    },
+    "scaling": {
+        "hpPerMinute": 0.03,
+        "adPerMinute": 0.02
+    }
+}

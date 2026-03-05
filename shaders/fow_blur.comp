@@ -1,0 +1,30 @@
+/// Gaussian blur pass for Fog of War (Phase 3.5).
+/// 5-tap separable Gaussian kernel [1,4,6,4,1]/16 — first horizontal then vertical.
+/// Softens the hard fog boundary for a smoother visual transition.
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(set = 0, binding = 0, r8) uniform readonly  image2D fogIn;
+layout(set = 0, binding = 1, r8) uniform writeonly image2D fogOut;
+
+layout(push_constant) uniform PC {
+    ivec2 dir;    // (1,0) for horizontal pass, (0,1) for vertical pass
+    ivec2 size;   // image dimensions
+} pc;
+
+void main() {
+    ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(coord, pc.size))) return;
+
+    const float kernel[5] = float[](1.0/16.0, 4.0/16.0, 6.0/16.0, 4.0/16.0, 1.0/16.0);
+    float result = 0.0;
+
+    for (int i = -2; i <= 2; ++i) {
+        ivec2 s = coord + pc.dir * i;
+        s = clamp(s, ivec2(0), pc.size - 1);
+        result += kernel[i + 2] * imageLoad(fogIn, s).r;
+    }
+
+    imageStore(fogOut, coord, vec4(result));
+}

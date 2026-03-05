@@ -84,4 +84,12 @@ set(CMAKE_DEPEND_INFO_FILES
   "CMakeFiles/test_fog.dir/DependInfo.cmake"
   "CMakeFiles/test_ability.dir/DependInfo.cmake"
   "CMakeFiles/test_minion.dir/DependInfo.cmake"
+  "CMakeFiles/test_structure.dir/DependInfo.cmake"
+  "CMakeFiles/test_jungle.dir/DependInfo.cmake"
+  "CMakeFiles/test_fixedpoint.dir/DependInfo.cmake"
+  "CMakeFiles/test_simulation_loop.dir/DependInfo.cmake"
+  "CMakeFiles/test_snapshot.dir/DependInfo.cmake"
+  "CMakeFiles/test_networking.dir/DependInfo.cmake"
+  "CMakeFiles/test_flowfield.dir/DependInfo.cmake"
+  "CMakeFiles/test_determinism.dir/DependInfo.cmake"
   )

@@ -1,6 +1,7 @@
 #include "renderer/PostProcess.h"
 #include "renderer/Buffer.h"
 #include "renderer/Device.h"
+#include "renderer/Image.h"
 #include "renderer/Swapchain.h"
 #include "renderer/VkCheck.h"
 
@@ -39,6 +40,63 @@ PostProcess::PostProcess(const Device& device, const Swapchain& swapchain)
     : m_device(device)
 {
     createSampler();
+
+    // 1×1 white dummy images — valid Vulkan objects bound to SSAO/Bloom
+    // descriptor slots when those passes are skipped in MOBA mode.
+    // Using R8G8B8A8_UNORM for sampled-image compatibility.
+    m_dummyBloomImage = Image(device, 1, 1,
+        VK_FORMAT_R8G8B8A8_UNORM,
+        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+        VK_IMAGE_ASPECT_COLOR_BIT);
+    m_dummySSAOImage  = Image(device, 1, 1,
+        VK_FORMAT_R8G8B8A8_UNORM,
+        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+        VK_IMAGE_ASPECT_COLOR_BIT);
+
+    // Transition dummy images from UNDEFINED → SHADER_READ_ONLY_OPTIMAL
+    // so descriptor sets referencing them are valid from the first frame.
+    {
+      VkCommandBuffer cmd;
+      VkCommandBufferAllocateInfo cbAI{};
+      cbAI.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+      cbAI.commandPool        = device.getGraphicsCommandPool();
+      cbAI.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+      cbAI.commandBufferCount = 1;
+      vkAllocateCommandBuffers(device.getDevice(), &cbAI, &cmd);
+
+      VkCommandBufferBeginInfo beginInfo{};
+      beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+      beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+      vkBeginCommandBuffer(cmd, &beginInfo);
+
+      VkImageMemoryBarrier barriers[2]{};
+      VkImage dummies[] = { m_dummyBloomImage.getImage(), m_dummySSAOImage.getImage() };
+      for (int i = 0; i < 2; ++i) {
+        barriers[i].sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barriers[i].srcAccessMask       = 0;
+        barriers[i].dstAccessMask       = VK_ACCESS_SHADER_READ_BIT;
+        barriers[i].oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED;
+        barriers[i].newLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        barriers[i].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barriers[i].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barriers[i].image               = dummies[i];
+        barriers[i].subresourceRange    = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+      }
+      vkCmdPipelineBarrier(cmd,
+          VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+          0, 0, nullptr, 0, nullptr, 2, barriers);
+
+      vkEndCommandBuffer(cmd);
+      VkSubmitInfo submitInfo{};
+      submitInfo.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+      submitInfo.commandBufferCount = 1;
+      submitInfo.pCommandBuffers    = &cmd;
+      vkQueueSubmit(device.getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+      vkQueueWaitIdle(device.getGraphicsQueue());
+      vkFreeCommandBuffers(device.getDevice(), device.getGraphicsCommandPool(), 1, &cmd);
+    }
+
     createHDRResources(swapchain);
     createHDRRenderPass(swapchain);
     createHDRFramebuffer(swapchain);
@@ -61,6 +119,7 @@ void PostProcess::cleanup() {
     destroySwapchainResources();
 
     if (m_pipeline)       vkDestroyPipeline(dev, m_pipeline, nullptr);
+    if (m_mobaPipeline)   vkDestroyPipeline(dev, m_mobaPipeline, nullptr);
     if (m_pipelineLayout) vkDestroyPipelineLayout(dev, m_pipelineLayout, nullptr);
     if (m_renderPass)     vkDestroyRenderPass(dev, m_renderPass, nullptr);
     if (m_hdrRenderPass)  vkDestroyRenderPass(dev, m_hdrRenderPass, nullptr);
@@ -328,6 +387,63 @@ void PostProcess::createPipeline(const Swapchain&) {
     VkShaderModule vertModule = createShaderModule(dev, vertCode);
     VkShaderModule fragModule = createShaderModule(dev, fragCode);
 
+    // ── Specialization constant layout (13 entries) ────────────────────────
+    // constant_id: 0=bloom 1=ssao 2=chroma 3=godRays 4=dof 5=autoExp
+    //              6=heat  7=outline 8=sharpen 9=grain 10=dither 11=fxaa
+    //              12=toneMapMode
+    struct SpecData {
+        int32_t enableBloom       = 1;
+        int32_t enableSSAO        = 1;
+        int32_t enableChroma      = 1;
+        int32_t enableGodRays     = 1;
+        int32_t enableDOF         = 1;
+        int32_t enableAutoExp     = 1;
+        int32_t enableHeat        = 1;
+        int32_t enableOutline     = 1;
+        int32_t enableSharpen     = 1;
+        int32_t enableFilmGrain   = 1;
+        int32_t enableDither      = 1;
+        int32_t enableFXAA        = 1;
+        int32_t toneMapMode       = 0; // ACES
+    };
+
+    static constexpr uint32_t SPEC_COUNT = 13;
+    VkSpecializationMapEntry mapEntries[SPEC_COUNT];
+    for (uint32_t i = 0; i < SPEC_COUNT; ++i) {
+        mapEntries[i].constantID = i;
+        mapEntries[i].offset     = i * sizeof(int32_t);
+        mapEntries[i].size       = sizeof(int32_t);
+    }
+
+    // Full-quality pipeline: all features enabled
+    SpecData fullSpec{};
+    VkSpecializationInfo fullSpecInfo{};
+    fullSpecInfo.mapEntryCount = SPEC_COUNT;
+    fullSpecInfo.pMapEntries   = mapEntries;
+    fullSpecInfo.dataSize      = sizeof(SpecData);
+    fullSpecInfo.pData         = &fullSpec;
+
+    // MOBA-mode pipeline: only FXAA + tone mapping, everything else compiled out
+    SpecData mobaSpec{};
+    mobaSpec.enableBloom     = 0;
+    mobaSpec.enableSSAO      = 0;
+    mobaSpec.enableChroma    = 0;
+    mobaSpec.enableGodRays   = 0;
+    mobaSpec.enableDOF       = 0;
+    mobaSpec.enableAutoExp   = 0;
+    mobaSpec.enableHeat      = 0;
+    mobaSpec.enableOutline   = 0;
+    mobaSpec.enableSharpen   = 0;
+    mobaSpec.enableFilmGrain = 0;
+    mobaSpec.enableDither    = 0;
+    mobaSpec.enableFXAA      = 1;
+    mobaSpec.toneMapMode     = 0;
+    VkSpecializationInfo mobaSpecInfo{};
+    mobaSpecInfo.mapEntryCount = SPEC_COUNT;
+    mobaSpecInfo.pMapEntries   = mapEntries;
+    mobaSpecInfo.dataSize      = sizeof(SpecData);
+    mobaSpecInfo.pData         = &mobaSpec;
+
     VkPipelineShaderStageCreateInfo stages[2]{};
     stages[0].sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     stages[0].stage  = VK_SHADER_STAGE_VERTEX_BIT;
@@ -337,6 +453,8 @@ void PostProcess::createPipeline(const Swapchain&) {
     stages[1].stage  = VK_SHADER_STAGE_FRAGMENT_BIT;
     stages[1].module = fragModule;
     stages[1].pName  = "main";
+    // Full-quality: attach full spec info to frag stage
+    stages[1].pSpecializationInfo = &fullSpecInfo;
 
     VkPipelineVertexInputStateCreateInfo vertexInput{};
     vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -386,7 +504,6 @@ void PostProcess::createPipeline(const Swapchain&) {
     layoutCI.pSetLayouts            = &m_descLayout;
     layoutCI.pushConstantRangeCount = 1;
     layoutCI.pPushConstantRanges    = &pushRange;
-
     VK_CHECK(vkCreatePipelineLayout(dev, &layoutCI, nullptr, &m_pipelineLayout),
              "Failed to create post-process pipeline layout");
 
@@ -405,12 +522,25 @@ void PostProcess::createPipeline(const Swapchain&) {
     pipelineCI.renderPass          = m_renderPass;
     pipelineCI.subpass             = 0;
 
-    VK_CHECK(vkCreateGraphicsPipelines(dev, VK_NULL_HANDLE, 1, &pipelineCI, nullptr,
-                                       &m_pipeline),
-             "Failed to create post-process pipeline");
+    // Build both pipelines in one call (cheaper than two separate calls)
+    VkPipeline pipelines[2] = {VK_NULL_HANDLE, VK_NULL_HANDLE};
+    VkGraphicsPipelineCreateInfo pipelineCIs[2] = {pipelineCI, pipelineCI};
+    // MOBA pipeline: swap frag specialization info
+    pipelineCIs[1].pStages = nullptr; // must copy stages array per pipeline
+    VkPipelineShaderStageCreateInfo mobaStages[2] = {stages[0], stages[1]};
+    mobaStages[1].pSpecializationInfo = &mobaSpecInfo;
+    pipelineCIs[1] = pipelineCI;
+    pipelineCIs[1].pStages = mobaStages;
+
+    VK_CHECK(vkCreateGraphicsPipelines(dev, VK_NULL_HANDLE, 2, pipelineCIs,
+                                       nullptr, pipelines),
+             "Failed to create post-process pipelines");
+    m_pipeline     = pipelines[0];
+    m_mobaPipeline = pipelines[1];
 
     vkDestroyShaderModule(dev, fragModule, nullptr);
     vkDestroyShaderModule(dev, vertModule, nullptr);
+    spdlog::info("Post-process pipelines created (full + MOBA-optimized)");
 }
 
 void PostProcess::updateBloomDescriptor(VkImageView bloomView) {
