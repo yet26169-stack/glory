@@ -69,6 +69,7 @@ public:
 
     void* map();
     void  unmap();
+    void  flush();   // vmaFlushAllocation — call after CPU writes to staging buffers
 
     VkBuffer      getBuffer()    const { return m_buffer; }
     VmaAllocation getAllocation() const { return m_allocation; }

@@ -24,7 +24,21 @@ Image::Image(const Device& device, uint32_t width, uint32_t height,
     imgCI.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     imgCI.usage         = usage;
     imgCI.samples       = VK_SAMPLE_COUNT_1_BIT;
-    imgCI.sharingMode   = VK_SHARING_MODE_EXCLUSIVE;
+
+    // When a dedicated transfer queue exists the image may be written from the
+    // transfer family and read from the graphics family.  Use CONCURRENT sharing
+    // so no explicit queue-family ownership transfer is required.
+    uint32_t queueFamilyIndices[] = {
+        device.getQueueFamilies().graphicsFamily.value(),
+        device.getQueueFamilies().transferFamily.value()
+    };
+    if (device.hasDedicatedTransfer()) {
+        imgCI.sharingMode           = VK_SHARING_MODE_CONCURRENT;
+        imgCI.queueFamilyIndexCount = 2;
+        imgCI.pQueueFamilyIndices   = queueFamilyIndices;
+    } else {
+        imgCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    }
 
     VmaAllocationCreateInfo allocCI{};
     allocCI.usage = VMA_MEMORY_USAGE_GPU_ONLY;

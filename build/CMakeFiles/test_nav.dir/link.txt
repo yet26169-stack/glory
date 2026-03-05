@@ -1,1 +1,0 @@
-/usr/bin/c++ -g -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/test_nav.dir/tests/test_nav.cpp.o CMakeFiles/test_nav.dir/src/map/MapLoader.cpp.o -o test_nav  -Wl,-rpath,/opt/homebrew/lib /opt/homebrew/lib/libglm.dylib

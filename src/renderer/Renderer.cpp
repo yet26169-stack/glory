@@ -120,7 +120,7 @@ void Renderer::drawFrame() {
         auto& c = m_scene.getRegistry().get<CharacterComponent>(m_playerEntity);
         c.targetPosition = worldPos;
         c.hasTarget = true;
-        m_clickAnim = ClickAnim{ worldPos, 0.0f, 1.2f };
+        m_clickAnim = ClickAnim{ worldPos, 0.0f, 0.25f };
     }
 
     // ── Update character movement ─────────────────────────────────────────

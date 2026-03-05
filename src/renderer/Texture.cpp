@@ -17,10 +17,23 @@ namespace glory {
 namespace {
 void transitionImageLayout(const Device &device, VkImage image,
                            VkImageLayout oldLayout, VkImageLayout newLayout) {
+  // The TRANSFER_DST → SHADER_READ_ONLY transition uses FRAGMENT_SHADER stage
+  // which is only valid on a graphics queue.  When a dedicated transfer queue
+  // exists, submit that transition on the graphics queue instead.
+  bool useGraphicsQueue =
+      device.hasDedicatedTransfer() &&
+      oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
+      newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+  VkCommandPool pool = useGraphicsQueue ? device.getGraphicsCommandPool()
+                                        : device.getTransferCommandPool();
+  VkQueue       queue = useGraphicsQueue ? device.getGraphicsQueue()
+                                         : device.getTransferQueue();
+
   VkCommandBufferAllocateInfo allocInfo{};
   allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
   allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  allocInfo.commandPool = device.getTransferCommandPool();
+  allocInfo.commandPool = pool;
   allocInfo.commandBufferCount = 1;
 
   VkCommandBuffer cmd;
@@ -72,11 +85,10 @@ void transitionImageLayout(const Device &device, VkImage image,
   submitInfo.commandBufferCount = 1;
   submitInfo.pCommandBuffers = &cmd;
 
-  vkQueueSubmit(device.getTransferQueue(), 1, &submitInfo, VK_NULL_HANDLE);
-  vkQueueWaitIdle(device.getTransferQueue());
+  vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
+  vkQueueWaitIdle(queue);
 
-  vkFreeCommandBuffers(device.getDevice(), device.getTransferCommandPool(), 1,
-                       &cmd);
+  vkFreeCommandBuffers(device.getDevice(), pool, 1, &cmd);
 }
 
 void copyBufferToImage(const Device &device, VkBuffer buffer, VkImage image,
@@ -140,6 +152,7 @@ Texture::Texture(const Device &device, const std::string &filepath)
   void *mapped = staging.map();
   std::memcpy(mapped, pixels, static_cast<size_t>(imageSize));
   staging.unmap();
+  staging.flush();
   stbi_image_free(pixels);
 
   m_image = Image(device, static_cast<uint32_t>(texWidth),
@@ -201,6 +214,7 @@ Texture Texture::createDefault(const Device &device) {
   void *mapped = staging.map();
   std::memcpy(mapped, &white, 4);
   staging.unmap();
+  staging.flush();
 
   tex.m_image =
       Image(device, 1, 1, VK_FORMAT_R8G8B8A8_SRGB,
@@ -244,6 +258,7 @@ Texture Texture::createCheckerboard(const Device &device, uint32_t tiles,
   void *mapped = staging.map();
   std::memcpy(mapped, pixels.data(), static_cast<size_t>(size));
   staging.unmap();
+  staging.flush();
 
   tex.m_image =
       Image(device, width, height, VK_FORMAT_R8G8B8A8_SRGB,
@@ -277,6 +292,7 @@ Texture Texture::createFlatNormal(const Device &device) {
   void *mapped = staging.map();
   std::memcpy(mapped, &pixel, 4);
   staging.unmap();
+  staging.flush();
 
   tex.m_image =
       Image(device, 1, 1, VK_FORMAT_R8G8B8A8_UNORM,
@@ -359,6 +375,7 @@ Texture Texture::createBrickNormal(const Device &device) {
   void *mapped = staging.map();
   std::memcpy(mapped, pixels.data(), static_cast<size_t>(size));
   staging.unmap();
+  staging.flush();
 
   // Normal maps must use UNORM (not SRGB) to avoid gamma-mangling the normal
   // vectors
@@ -448,6 +465,7 @@ Texture Texture::createMarble(const Device &device) {
   void *mapped = staging.map();
   std::memcpy(mapped, pixels.data(), static_cast<size_t>(size));
   staging.unmap();
+  staging.flush();
 
   tex.m_image =
       Image(device, W, H, VK_FORMAT_R8G8B8A8_SRGB,
@@ -525,6 +543,7 @@ Texture Texture::createWood(const Device &device) {
   void *mapped = staging.map();
   std::memcpy(mapped, pixels.data(), static_cast<size_t>(size));
   staging.unmap();
+  staging.flush();
 
   tex.m_image =
       Image(device, W, H, VK_FORMAT_R8G8B8A8_SRGB,
@@ -612,6 +631,7 @@ Texture Texture::createLava(const Device &device) {
   void *mapped = staging.map();
   std::memcpy(mapped, pixels.data(), static_cast<size_t>(size));
   staging.unmap();
+  staging.flush();
 
   tex.m_image =
       Image(device, W, H, VK_FORMAT_R8G8B8A8_SRGB,
@@ -706,6 +726,7 @@ Texture Texture::createRock(const Device &device) {
   void *mapped = staging.map();
   std::memcpy(mapped, pixels.data(), static_cast<size_t>(size));
   staging.unmap();
+  staging.flush();
 
   tex.m_image =
       Image(device, W, H, VK_FORMAT_R8G8B8A8_SRGB,
@@ -779,6 +800,7 @@ Texture Texture::createBrushedMetal(const Device &device) {
   void *mapped = staging.map();
   std::memcpy(mapped, pixels.data(), static_cast<size_t>(size));
   staging.unmap();
+  staging.flush();
 
   tex.m_image =
       Image(device, W, H, VK_FORMAT_R8G8B8A8_SRGB,
@@ -857,6 +879,7 @@ Texture Texture::createTiles(const Device &device) {
   void *mapped = staging.map();
   std::memcpy(mapped, pixels.data(), static_cast<size_t>(size));
   staging.unmap();
+  staging.flush();
 
   tex.m_image =
       Image(device, W, H, VK_FORMAT_R8G8B8A8_SRGB,
@@ -947,6 +970,7 @@ Texture Texture::createCircuit(const Device &device) {
   void *mapped = staging.map();
   std::memcpy(mapped, pixels.data(), static_cast<size_t>(size));
   staging.unmap();
+  staging.flush();
 
   tex.m_image =
       Image(device, W, H, VK_FORMAT_R8G8B8A8_SRGB,
@@ -1039,6 +1063,7 @@ Texture Texture::createHexGrid(const Device &device) {
   void *mapped = staging.map();
   std::memcpy(mapped, pixels.data(), static_cast<size_t>(size));
   staging.unmap();
+  staging.flush();
 
   tex.m_image =
       Image(device, W, H, VK_FORMAT_R8G8B8A8_SRGB,
@@ -1100,6 +1125,7 @@ Texture Texture::createGradient(const Device &device) {
   void *mapped = staging.map();
   std::memcpy(mapped, pixels.data(), static_cast<size_t>(size));
   staging.unmap();
+  staging.flush();
 
   tex.m_image =
       Image(device, W, H, VK_FORMAT_R8G8B8A8_SRGB,
@@ -1173,7 +1199,7 @@ Texture Texture::createNoise(const Device& device) {
     void* mapped = staging.map();
     std::memcpy(mapped, pixels.data(), static_cast<size_t>(size));
     staging.unmap();
-
+    staging.flush();
     tex.m_image = Image(device, W, H,
                         VK_FORMAT_R8G8B8A8_SRGB,
                         VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
@@ -1206,6 +1232,7 @@ Texture Texture::createFromPixels(const Device &device, const uint32_t *pixels,
   void *mapped = staging.map();
   std::memcpy(mapped, pixels, static_cast<size_t>(size));
   staging.unmap();
+  staging.flush();
 
   tex.m_image =
       Image(device, width, height, format,

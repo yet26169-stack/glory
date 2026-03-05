@@ -69,7 +69,7 @@ private:
     struct ClickAnim {
         glm::vec3 position{};
         float     lifetime = 0.0f;
-        float     maxLife  = 1.2f;
+        float     maxLife  = 0.25f;
     };
     std::optional<ClickAnim> m_clickAnim;
 

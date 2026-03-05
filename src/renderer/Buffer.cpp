@@ -193,6 +193,11 @@ void Buffer::unmap() {
     }
 }
 
+void Buffer::flush() {
+    if (m_allocation != VK_NULL_HANDLE)
+        vmaFlushAllocation(m_allocator, m_allocation, 0, VK_WHOLE_SIZE);
+}
+
 void Buffer::destroy() {
     if (m_buffer != VK_NULL_HANDLE && m_allocator != VK_NULL_HANDLE) {
         unmap();
@@ -217,11 +222,37 @@ Buffer Buffer::createDeviceLocal(
     void* mapped = staging.map();
     std::memcpy(mapped, data, static_cast<size_t>(size));
     staging.unmap();
+    staging.flush();
 
-    // 2. Create device-local target buffer
-    Buffer target(allocator, size,
-                  usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                  VMA_MEMORY_USAGE_GPU_ONLY);
+    // 2. Create device-local target buffer.  Use CONCURRENT sharing when a
+    //    dedicated transfer queue is in use, matching the Image.cpp approach.
+    Buffer target;
+    target.m_allocator = allocator;
+    target.m_size      = size;
+
+    VkBufferCreateInfo bufCI{};
+    bufCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufCI.size  = size;
+    bufCI.usage = usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+
+    uint32_t familyIndices[] = {
+        device.getQueueFamilies().graphicsFamily.value(),
+        device.getQueueFamilies().transferFamily.value()
+    };
+    if (device.hasDedicatedTransfer()) {
+        bufCI.sharingMode           = VK_SHARING_MODE_CONCURRENT;
+        bufCI.queueFamilyIndexCount = 2;
+        bufCI.pQueueFamilyIndices   = familyIndices;
+    } else {
+        bufCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    }
+
+    VmaAllocationCreateInfo targetAllocCI{};
+    targetAllocCI.usage = VMA_MEMORY_USAGE_AUTO;
+
+    VK_CHECK(vmaCreateBuffer(allocator, &bufCI, &targetAllocCI,
+                             &target.m_buffer, &target.m_allocation, nullptr),
+             "Failed to create device-local buffer");
 
     // 3. One-shot command buffer for the copy
     VkCommandBufferAllocateInfo allocInfo{};
