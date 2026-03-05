@@ -244,7 +244,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
         LightUBO light{};
         light.viewPos = m_isoCam.getPosition();
         light.lightCount = 1;
-        light.ambientStrength = 0.25f;
+        light.ambientStrength = 0.5f;
         light.lights[0].position = glm::vec3(100.0f, 60.0f, 100.0f);
         light.lights[0].color    = glm::vec3(1.0f, 0.95f, 0.85f);
         m_descriptors->updateLightBuffer(m_currentFrame, light);
@@ -456,11 +456,11 @@ void Renderer::buildScene() {
             m_scene.getRegistry().emplace<GPUSkinnedMeshComponent>(character,
                 GPUSkinnedMeshComponent{ ssIdx });
             m_scene.getRegistry().emplace<MaterialComponent>(character,
-                MaterialComponent{ charTex, flatNorm, 0.0f, 0.0f, 0.5f, 0.0f });
+                MaterialComponent{ charTex, flatNorm, 0.0f, 0.0f, 0.5f, 0.2f });
 
             auto& ct = m_scene.getRegistry().get<TransformComponent>(character);
             ct.position  = glm::vec3(100.0f, 0.0f, 100.0f);
-            ct.scale     = glm::vec3(0.015f);
+            ct.scale     = glm::vec3(0.025f);
             skinnedLoaded = true;
             spdlog::info("Character loaded with GPU skinning");
         }

@@ -17,18 +17,14 @@ namespace glory {
 namespace {
 void transitionImageLayout(const Device &device, VkImage image,
                            VkImageLayout oldLayout, VkImageLayout newLayout) {
-  // The TRANSFER_DST → SHADER_READ_ONLY transition uses FRAGMENT_SHADER stage
-  // which is only valid on a graphics queue.  When a dedicated transfer queue
-  // exists, submit that transition on the graphics queue instead.
-  bool useGraphicsQueue =
-      device.hasDedicatedTransfer() &&
-      oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
-      newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-  VkCommandPool pool = useGraphicsQueue ? device.getGraphicsCommandPool()
-                                        : device.getTransferCommandPool();
-  VkQueue       queue = useGraphicsQueue ? device.getGraphicsQueue()
-                                         : device.getTransferQueue();
+  // Always use the graphics queue for layout transitions.  Using the transfer
+  // queue for TRANSFER_DST→SHADER_READ_ONLY and then the graphics queue for the
+  // barrier introduces a cross-queue race: vkQueueWaitIdle on the transfer queue
+  // provides CPU-side ordering but no GPU-side memory visibility guarantee for
+  // the graphics queue.  Routing all transitions through the graphics queue
+  // eliminates that hazard at negligible cost (transitions are load-time only).
+  VkCommandPool pool  = device.getGraphicsCommandPool();
+  VkQueue       queue = device.getGraphicsQueue();
 
   VkCommandBufferAllocateInfo allocInfo{};
   allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
