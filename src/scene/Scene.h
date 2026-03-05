@@ -15,9 +15,6 @@
 
 namespace glory {
 
-class Device;
-class TerrainSystem;
-
 class Scene {
 public:
     Scene() = default;
@@ -40,14 +37,10 @@ public:
     const std::vector<Texture>&  getTextures()  const { return m_textures; }
     const std::vector<Material>& getMaterials() const { return m_materials; }
 
-    void setTerrainSystem(TerrainSystem* terrain) { m_terrain = terrain; }
-
-    // Dynamic mesh management (legacy CPU-skinned characters)
     uint32_t addDynamicMesh(DynamicMesh mesh);
     DynamicMesh& getDynamicMesh(uint32_t index) { return m_dynamicMeshes[index]; }
     const std::vector<DynamicMesh>& getDynamicMeshes() const { return m_dynamicMeshes; }
 
-    // Static skinned mesh management (GPU-skinned via vertex shader + bone SSBO)
     uint32_t addStaticSkinnedMesh(StaticSkinnedMesh mesh);
     StaticSkinnedMesh& getStaticSkinnedMesh(uint32_t index) { return m_staticSkinnedMeshes[index]; }
     const std::vector<StaticSkinnedMesh>& getStaticSkinnedMeshes() const { return m_staticSkinnedMeshes; }
@@ -63,7 +56,6 @@ private:
     std::vector<Material>  m_materials;
     std::vector<DynamicMesh> m_dynamicMeshes;
     std::vector<StaticSkinnedMesh> m_staticSkinnedMeshes;
-    TerrainSystem*         m_terrain = nullptr;
 };
 
 } // namespace glory

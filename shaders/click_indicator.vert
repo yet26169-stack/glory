@@ -10,7 +10,9 @@ layout(push_constant) uniform PushConstants {
     vec3 center;
     float size;
     int frameIndex;
-    int gridCount; // e.g. 8 for an 8x8 atlas
+    int gridCount;
+    int _pad[2]; // Alignment padding to match C++ struct
+    vec4 tint;
 } pc;
 
 void main() {

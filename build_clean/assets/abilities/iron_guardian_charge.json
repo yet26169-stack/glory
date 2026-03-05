@@ -1,0 +1,23 @@
+{
+    "id": "iron_guardian_charge",
+    "displayName": "Unstoppable Charge",
+    "slot": "Q",
+    "targeting": "SKILLSHOT",
+    "resourceType": "MANA",
+    "costPerLevel": [60, 65, 70, 75, 80],
+    "cooldownPerLevel": [12.0, 11.0, 10.0, 9.0, 8.0],
+    "castTime": 0.0,
+    "castRange": 600.0,
+    "onHitEffects": [
+        {
+            "type": "DAMAGE",
+            "damageType": "PHYSICAL",
+            "scaling": { "basePerLevel": [60, 100, 140, 180, 220], "adRatio": 0.5, "hpRatio": 0.04, "hpBasis": "MAX" }
+        },
+        { "type": "STUN", "duration": 1.0 }
+    ],
+    "onSelfEffects": [
+        { "type": "DASH", "value": 600.0, "duration": 0.4 }
+    ],
+    "tags": ["damage", "engage", "physical", "stun", "dash"]
+}

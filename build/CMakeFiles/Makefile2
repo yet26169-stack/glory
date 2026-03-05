@@ -66,46 +66,18 @@ CMAKE_BINARY_DIR = /Users/donkey/Development/1/Glory/build
 all: CMakeFiles/Shaders.dir/all
 all: CMakeFiles/meshoptimizer.dir/all
 all: CMakeFiles/Glory.dir/all
-all: CMakeFiles/mesh_cook.dir/all
-all: CMakeFiles/Assets.dir/all
 all: CMakeFiles/test_mirror.dir/all
 all: CMakeFiles/test_maploader.dir/all
 all: CMakeFiles/test_terrain.dir/all
-all: CMakeFiles/test_nav.dir/all
-all: CMakeFiles/test_fog.dir/all
-all: CMakeFiles/test_ability.dir/all
-all: CMakeFiles/test_minion.dir/all
-all: CMakeFiles/test_structure.dir/all
-all: CMakeFiles/test_jungle.dir/all
-all: CMakeFiles/test_fixedpoint.dir/all
-all: CMakeFiles/test_simulation_loop.dir/all
-all: CMakeFiles/test_snapshot.dir/all
-all: CMakeFiles/test_networking.dir/all
-all: CMakeFiles/test_flowfield.dir/all
-all: CMakeFiles/test_determinism.dir/all
 .PHONY : all
 
 # The main recursive "codegen" target.
 codegen: CMakeFiles/Shaders.dir/codegen
 codegen: CMakeFiles/meshoptimizer.dir/codegen
 codegen: CMakeFiles/Glory.dir/codegen
-codegen: CMakeFiles/mesh_cook.dir/codegen
-codegen: CMakeFiles/Assets.dir/codegen
 codegen: CMakeFiles/test_mirror.dir/codegen
 codegen: CMakeFiles/test_maploader.dir/codegen
 codegen: CMakeFiles/test_terrain.dir/codegen
-codegen: CMakeFiles/test_nav.dir/codegen
-codegen: CMakeFiles/test_fog.dir/codegen
-codegen: CMakeFiles/test_ability.dir/codegen
-codegen: CMakeFiles/test_minion.dir/codegen
-codegen: CMakeFiles/test_structure.dir/codegen
-codegen: CMakeFiles/test_jungle.dir/codegen
-codegen: CMakeFiles/test_fixedpoint.dir/codegen
-codegen: CMakeFiles/test_simulation_loop.dir/codegen
-codegen: CMakeFiles/test_snapshot.dir/codegen
-codegen: CMakeFiles/test_networking.dir/codegen
-codegen: CMakeFiles/test_flowfield.dir/codegen
-codegen: CMakeFiles/test_determinism.dir/codegen
 .PHONY : codegen
 
 # The main recursive "preinstall" target.
@@ -116,23 +88,9 @@ preinstall:
 clean: CMakeFiles/Shaders.dir/clean
 clean: CMakeFiles/meshoptimizer.dir/clean
 clean: CMakeFiles/Glory.dir/clean
-clean: CMakeFiles/mesh_cook.dir/clean
-clean: CMakeFiles/Assets.dir/clean
 clean: CMakeFiles/test_mirror.dir/clean
 clean: CMakeFiles/test_maploader.dir/clean
 clean: CMakeFiles/test_terrain.dir/clean
-clean: CMakeFiles/test_nav.dir/clean
-clean: CMakeFiles/test_fog.dir/clean
-clean: CMakeFiles/test_ability.dir/clean
-clean: CMakeFiles/test_minion.dir/clean
-clean: CMakeFiles/test_structure.dir/clean
-clean: CMakeFiles/test_jungle.dir/clean
-clean: CMakeFiles/test_fixedpoint.dir/clean
-clean: CMakeFiles/test_simulation_loop.dir/clean
-clean: CMakeFiles/test_snapshot.dir/clean
-clean: CMakeFiles/test_networking.dir/clean
-clean: CMakeFiles/test_flowfield.dir/clean
-clean: CMakeFiles/test_determinism.dir/clean
 .PHONY : clean
 
 #=============================================================================
@@ -142,12 +100,12 @@ clean: CMakeFiles/test_determinism.dir/clean
 CMakeFiles/Shaders.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Shaders.dir/build.make CMakeFiles/Shaders.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Shaders.dir/build.make CMakeFiles/Shaders.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57 "Built target Shaders"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=40,41,42,43,44,45,46,47,48 "Built target Shaders"
 .PHONY : CMakeFiles/Shaders.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/Shaders.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 17
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 9
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/Shaders.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 0
 .PHONY : CMakeFiles/Shaders.dir/rule
@@ -159,7 +117,7 @@ Shaders: CMakeFiles/Shaders.dir/rule
 # codegen rule for target.
 CMakeFiles/Shaders.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Shaders.dir/build.make CMakeFiles/Shaders.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57 "Finished codegen for target Shaders"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=40,41,42,43,44,45,46,47,48 "Finished codegen for target Shaders"
 .PHONY : CMakeFiles/Shaders.dir/codegen
 
 # clean rule for target.
@@ -174,12 +132,12 @@ CMakeFiles/Shaders.dir/clean:
 CMakeFiles/meshoptimizer.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=59,60,61,62,63,64,65,66,67 "Built target meshoptimizer"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67 "Built target meshoptimizer"
 .PHONY : CMakeFiles/meshoptimizer.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/meshoptimizer.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 9
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 19
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/meshoptimizer.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 0
 .PHONY : CMakeFiles/meshoptimizer.dir/rule
@@ -191,7 +149,7 @@ meshoptimizer: CMakeFiles/meshoptimizer.dir/rule
 # codegen rule for target.
 CMakeFiles/meshoptimizer.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/meshoptimizer.dir/build.make CMakeFiles/meshoptimizer.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=59,60,61,62,63,64,65,66,67 "Finished codegen for target meshoptimizer"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67 "Finished codegen for target meshoptimizer"
 .PHONY : CMakeFiles/meshoptimizer.dir/codegen
 
 # clean rule for target.
@@ -205,15 +163,14 @@ CMakeFiles/meshoptimizer.dir/clean:
 # All Build rule for target.
 CMakeFiles/Glory.dir/all: CMakeFiles/Shaders.dir/all
 CMakeFiles/Glory.dir/all: CMakeFiles/meshoptimizer.dir/all
-CMakeFiles/Glory.dir/all: CMakeFiles/Assets.dir/all
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40 "Built target Glory"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39 "Built target Glory"
 .PHONY : CMakeFiles/Glory.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/Glory.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 66
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 67
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/Glory.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 0
 .PHONY : CMakeFiles/Glory.dir/rule
@@ -224,9 +181,8 @@ Glory: CMakeFiles/Glory.dir/rule
 
 # codegen rule for target.
 CMakeFiles/Glory.dir/codegen: CMakeFiles/Shaders.dir/all
-CMakeFiles/Glory.dir/codegen: CMakeFiles/Assets.dir/all
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40 "Finished codegen for target Glory"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39 "Finished codegen for target Glory"
 .PHONY : CMakeFiles/Glory.dir/codegen
 
 # clean rule for target.
@@ -235,82 +191,18 @@ CMakeFiles/Glory.dir/clean:
 .PHONY : CMakeFiles/Glory.dir/clean
 
 #=============================================================================
-# Target rules for target CMakeFiles/mesh_cook.dir
-
-# All Build rule for target.
-CMakeFiles/mesh_cook.dir/all:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/mesh_cook.dir/build.make CMakeFiles/mesh_cook.dir/depend
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/mesh_cook.dir/build.make CMakeFiles/mesh_cook.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=58 "Built target mesh_cook"
-.PHONY : CMakeFiles/mesh_cook.dir/all
-
-# Build rule for subdir invocation for target.
-CMakeFiles/mesh_cook.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 1
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/mesh_cook.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 0
-.PHONY : CMakeFiles/mesh_cook.dir/rule
-
-# Convenience name for target.
-mesh_cook: CMakeFiles/mesh_cook.dir/rule
-.PHONY : mesh_cook
-
-# codegen rule for target.
-CMakeFiles/mesh_cook.dir/codegen:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/mesh_cook.dir/build.make CMakeFiles/mesh_cook.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=58 "Finished codegen for target mesh_cook"
-.PHONY : CMakeFiles/mesh_cook.dir/codegen
-
-# clean rule for target.
-CMakeFiles/mesh_cook.dir/clean:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/mesh_cook.dir/build.make CMakeFiles/mesh_cook.dir/clean
-.PHONY : CMakeFiles/mesh_cook.dir/clean
-
-#=============================================================================
-# Target rules for target CMakeFiles/Assets.dir
-
-# All Build rule for target.
-CMakeFiles/Assets.dir/all:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Assets.dir/build.make CMakeFiles/Assets.dir/depend
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Assets.dir/build.make CMakeFiles/Assets.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num= "Built target Assets"
-.PHONY : CMakeFiles/Assets.dir/all
-
-# Build rule for subdir invocation for target.
-CMakeFiles/Assets.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 0
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/Assets.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 0
-.PHONY : CMakeFiles/Assets.dir/rule
-
-# Convenience name for target.
-Assets: CMakeFiles/Assets.dir/rule
-.PHONY : Assets
-
-# codegen rule for target.
-CMakeFiles/Assets.dir/codegen:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Assets.dir/build.make CMakeFiles/Assets.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num= "Finished codegen for target Assets"
-.PHONY : CMakeFiles/Assets.dir/codegen
-
-# clean rule for target.
-CMakeFiles/Assets.dir/clean:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Assets.dir/build.make CMakeFiles/Assets.dir/clean
-.PHONY : CMakeFiles/Assets.dir/clean
-
-#=============================================================================
 # Target rules for target CMakeFiles/test_mirror.dir
 
 # All Build rule for target.
 CMakeFiles/test_mirror.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_mirror.dir/build.make CMakeFiles/test_mirror.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_mirror.dir/build.make CMakeFiles/test_mirror.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=85 "Built target test_mirror"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=71,72 "Built target test_mirror"
 .PHONY : CMakeFiles/test_mirror.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/test_mirror.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 1
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 2
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/test_mirror.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 0
 .PHONY : CMakeFiles/test_mirror.dir/rule
@@ -322,7 +214,7 @@ test_mirror: CMakeFiles/test_mirror.dir/rule
 # codegen rule for target.
 CMakeFiles/test_mirror.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_mirror.dir/build.make CMakeFiles/test_mirror.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=85 "Finished codegen for target test_mirror"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=71,72 "Finished codegen for target test_mirror"
 .PHONY : CMakeFiles/test_mirror.dir/codegen
 
 # clean rule for target.
@@ -337,12 +229,12 @@ CMakeFiles/test_mirror.dir/clean:
 CMakeFiles/test_maploader.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_maploader.dir/build.make CMakeFiles/test_maploader.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_maploader.dir/build.make CMakeFiles/test_maploader.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=81,82 "Built target test_maploader"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=68,69,70 "Built target test_maploader"
 .PHONY : CMakeFiles/test_maploader.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/test_maploader.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 2
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 3
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/test_maploader.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 0
 .PHONY : CMakeFiles/test_maploader.dir/rule
@@ -354,7 +246,7 @@ test_maploader: CMakeFiles/test_maploader.dir/rule
 # codegen rule for target.
 CMakeFiles/test_maploader.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_maploader.dir/build.make CMakeFiles/test_maploader.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=81,82 "Finished codegen for target test_maploader"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=68,69,70 "Finished codegen for target test_maploader"
 .PHONY : CMakeFiles/test_maploader.dir/codegen
 
 # clean rule for target.
@@ -369,12 +261,12 @@ CMakeFiles/test_maploader.dir/clean:
 CMakeFiles/test_terrain.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_terrain.dir/build.make CMakeFiles/test_terrain.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_terrain.dir/build.make CMakeFiles/test_terrain.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=99,100 "Built target test_terrain"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=73,74,75 "Built target test_terrain"
 .PHONY : CMakeFiles/test_terrain.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/test_terrain.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 2
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 3
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/test_terrain.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 0
 .PHONY : CMakeFiles/test_terrain.dir/rule
@@ -386,397 +278,13 @@ test_terrain: CMakeFiles/test_terrain.dir/rule
 # codegen rule for target.
 CMakeFiles/test_terrain.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_terrain.dir/build.make CMakeFiles/test_terrain.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=99,100 "Finished codegen for target test_terrain"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=73,74,75 "Finished codegen for target test_terrain"
 .PHONY : CMakeFiles/test_terrain.dir/codegen
 
 # clean rule for target.
 CMakeFiles/test_terrain.dir/clean:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_terrain.dir/build.make CMakeFiles/test_terrain.dir/clean
 .PHONY : CMakeFiles/test_terrain.dir/clean
-
-#=============================================================================
-# Target rules for target CMakeFiles/test_nav.dir
-
-# All Build rule for target.
-CMakeFiles/test_nav.dir/all:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_nav.dir/build.make CMakeFiles/test_nav.dir/depend
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_nav.dir/build.make CMakeFiles/test_nav.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=86 "Built target test_nav"
-.PHONY : CMakeFiles/test_nav.dir/all
-
-# Build rule for subdir invocation for target.
-CMakeFiles/test_nav.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 1
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/test_nav.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 0
-.PHONY : CMakeFiles/test_nav.dir/rule
-
-# Convenience name for target.
-test_nav: CMakeFiles/test_nav.dir/rule
-.PHONY : test_nav
-
-# codegen rule for target.
-CMakeFiles/test_nav.dir/codegen:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_nav.dir/build.make CMakeFiles/test_nav.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=86 "Finished codegen for target test_nav"
-.PHONY : CMakeFiles/test_nav.dir/codegen
-
-# clean rule for target.
-CMakeFiles/test_nav.dir/clean:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_nav.dir/build.make CMakeFiles/test_nav.dir/clean
-.PHONY : CMakeFiles/test_nav.dir/clean
-
-#=============================================================================
-# Target rules for target CMakeFiles/test_fog.dir
-
-# All Build rule for target.
-CMakeFiles/test_fog.dir/all:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fog.dir/build.make CMakeFiles/test_fog.dir/depend
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fog.dir/build.make CMakeFiles/test_fog.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=77,78 "Built target test_fog"
-.PHONY : CMakeFiles/test_fog.dir/all
-
-# Build rule for subdir invocation for target.
-CMakeFiles/test_fog.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 2
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/test_fog.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 0
-.PHONY : CMakeFiles/test_fog.dir/rule
-
-# Convenience name for target.
-test_fog: CMakeFiles/test_fog.dir/rule
-.PHONY : test_fog
-
-# codegen rule for target.
-CMakeFiles/test_fog.dir/codegen:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fog.dir/build.make CMakeFiles/test_fog.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=77,78 "Finished codegen for target test_fog"
-.PHONY : CMakeFiles/test_fog.dir/codegen
-
-# clean rule for target.
-CMakeFiles/test_fog.dir/clean:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fog.dir/build.make CMakeFiles/test_fog.dir/clean
-.PHONY : CMakeFiles/test_fog.dir/clean
-
-#=============================================================================
-# Target rules for target CMakeFiles/test_ability.dir
-
-# All Build rule for target.
-CMakeFiles/test_ability.dir/all:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_ability.dir/build.make CMakeFiles/test_ability.dir/depend
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_ability.dir/build.make CMakeFiles/test_ability.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=68,69,70 "Built target test_ability"
-.PHONY : CMakeFiles/test_ability.dir/all
-
-# Build rule for subdir invocation for target.
-CMakeFiles/test_ability.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 3
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/test_ability.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 0
-.PHONY : CMakeFiles/test_ability.dir/rule
-
-# Convenience name for target.
-test_ability: CMakeFiles/test_ability.dir/rule
-.PHONY : test_ability
-
-# codegen rule for target.
-CMakeFiles/test_ability.dir/codegen:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_ability.dir/build.make CMakeFiles/test_ability.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=68,69,70 "Finished codegen for target test_ability"
-.PHONY : CMakeFiles/test_ability.dir/codegen
-
-# clean rule for target.
-CMakeFiles/test_ability.dir/clean:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_ability.dir/build.make CMakeFiles/test_ability.dir/clean
-.PHONY : CMakeFiles/test_ability.dir/clean
-
-#=============================================================================
-# Target rules for target CMakeFiles/test_minion.dir
-
-# All Build rule for target.
-CMakeFiles/test_minion.dir/all:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_minion.dir/build.make CMakeFiles/test_minion.dir/depend
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_minion.dir/build.make CMakeFiles/test_minion.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=83,84 "Built target test_minion"
-.PHONY : CMakeFiles/test_minion.dir/all
-
-# Build rule for subdir invocation for target.
-CMakeFiles/test_minion.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 2
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/test_minion.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 0
-.PHONY : CMakeFiles/test_minion.dir/rule
-
-# Convenience name for target.
-test_minion: CMakeFiles/test_minion.dir/rule
-.PHONY : test_minion
-
-# codegen rule for target.
-CMakeFiles/test_minion.dir/codegen:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_minion.dir/build.make CMakeFiles/test_minion.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=83,84 "Finished codegen for target test_minion"
-.PHONY : CMakeFiles/test_minion.dir/codegen
-
-# clean rule for target.
-CMakeFiles/test_minion.dir/clean:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_minion.dir/build.make CMakeFiles/test_minion.dir/clean
-.PHONY : CMakeFiles/test_minion.dir/clean
-
-#=============================================================================
-# Target rules for target CMakeFiles/test_structure.dir
-
-# All Build rule for target.
-CMakeFiles/test_structure.dir/all:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_structure.dir/build.make CMakeFiles/test_structure.dir/depend
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_structure.dir/build.make CMakeFiles/test_structure.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=97,98 "Built target test_structure"
-.PHONY : CMakeFiles/test_structure.dir/all
-
-# Build rule for subdir invocation for target.
-CMakeFiles/test_structure.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 2
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/test_structure.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 0
-.PHONY : CMakeFiles/test_structure.dir/rule
-
-# Convenience name for target.
-test_structure: CMakeFiles/test_structure.dir/rule
-.PHONY : test_structure
-
-# codegen rule for target.
-CMakeFiles/test_structure.dir/codegen:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_structure.dir/build.make CMakeFiles/test_structure.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=97,98 "Finished codegen for target test_structure"
-.PHONY : CMakeFiles/test_structure.dir/codegen
-
-# clean rule for target.
-CMakeFiles/test_structure.dir/clean:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_structure.dir/build.make CMakeFiles/test_structure.dir/clean
-.PHONY : CMakeFiles/test_structure.dir/clean
-
-#=============================================================================
-# Target rules for target CMakeFiles/test_jungle.dir
-
-# All Build rule for target.
-CMakeFiles/test_jungle.dir/all:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_jungle.dir/build.make CMakeFiles/test_jungle.dir/depend
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_jungle.dir/build.make CMakeFiles/test_jungle.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=79,80 "Built target test_jungle"
-.PHONY : CMakeFiles/test_jungle.dir/all
-
-# Build rule for subdir invocation for target.
-CMakeFiles/test_jungle.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 2
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/test_jungle.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 0
-.PHONY : CMakeFiles/test_jungle.dir/rule
-
-# Convenience name for target.
-test_jungle: CMakeFiles/test_jungle.dir/rule
-.PHONY : test_jungle
-
-# codegen rule for target.
-CMakeFiles/test_jungle.dir/codegen:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_jungle.dir/build.make CMakeFiles/test_jungle.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=79,80 "Finished codegen for target test_jungle"
-.PHONY : CMakeFiles/test_jungle.dir/codegen
-
-# clean rule for target.
-CMakeFiles/test_jungle.dir/clean:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_jungle.dir/build.make CMakeFiles/test_jungle.dir/clean
-.PHONY : CMakeFiles/test_jungle.dir/clean
-
-#=============================================================================
-# Target rules for target CMakeFiles/test_fixedpoint.dir
-
-# All Build rule for target.
-CMakeFiles/test_fixedpoint.dir/all:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fixedpoint.dir/build.make CMakeFiles/test_fixedpoint.dir/depend
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fixedpoint.dir/build.make CMakeFiles/test_fixedpoint.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=73,74 "Built target test_fixedpoint"
-.PHONY : CMakeFiles/test_fixedpoint.dir/all
-
-# Build rule for subdir invocation for target.
-CMakeFiles/test_fixedpoint.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 2
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/test_fixedpoint.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 0
-.PHONY : CMakeFiles/test_fixedpoint.dir/rule
-
-# Convenience name for target.
-test_fixedpoint: CMakeFiles/test_fixedpoint.dir/rule
-.PHONY : test_fixedpoint
-
-# codegen rule for target.
-CMakeFiles/test_fixedpoint.dir/codegen:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fixedpoint.dir/build.make CMakeFiles/test_fixedpoint.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=73,74 "Finished codegen for target test_fixedpoint"
-.PHONY : CMakeFiles/test_fixedpoint.dir/codegen
-
-# clean rule for target.
-CMakeFiles/test_fixedpoint.dir/clean:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fixedpoint.dir/build.make CMakeFiles/test_fixedpoint.dir/clean
-.PHONY : CMakeFiles/test_fixedpoint.dir/clean
-
-#=============================================================================
-# Target rules for target CMakeFiles/test_simulation_loop.dir
-
-# All Build rule for target.
-CMakeFiles/test_simulation_loop.dir/all:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_simulation_loop.dir/build.make CMakeFiles/test_simulation_loop.dir/depend
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_simulation_loop.dir/build.make CMakeFiles/test_simulation_loop.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=91,92,93 "Built target test_simulation_loop"
-.PHONY : CMakeFiles/test_simulation_loop.dir/all
-
-# Build rule for subdir invocation for target.
-CMakeFiles/test_simulation_loop.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 3
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/test_simulation_loop.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 0
-.PHONY : CMakeFiles/test_simulation_loop.dir/rule
-
-# Convenience name for target.
-test_simulation_loop: CMakeFiles/test_simulation_loop.dir/rule
-.PHONY : test_simulation_loop
-
-# codegen rule for target.
-CMakeFiles/test_simulation_loop.dir/codegen:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_simulation_loop.dir/build.make CMakeFiles/test_simulation_loop.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=91,92,93 "Finished codegen for target test_simulation_loop"
-.PHONY : CMakeFiles/test_simulation_loop.dir/codegen
-
-# clean rule for target.
-CMakeFiles/test_simulation_loop.dir/clean:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_simulation_loop.dir/build.make CMakeFiles/test_simulation_loop.dir/clean
-.PHONY : CMakeFiles/test_simulation_loop.dir/clean
-
-#=============================================================================
-# Target rules for target CMakeFiles/test_snapshot.dir
-
-# All Build rule for target.
-CMakeFiles/test_snapshot.dir/all:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_snapshot.dir/build.make CMakeFiles/test_snapshot.dir/depend
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_snapshot.dir/build.make CMakeFiles/test_snapshot.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=94,95,96 "Built target test_snapshot"
-.PHONY : CMakeFiles/test_snapshot.dir/all
-
-# Build rule for subdir invocation for target.
-CMakeFiles/test_snapshot.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 3
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/test_snapshot.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 0
-.PHONY : CMakeFiles/test_snapshot.dir/rule
-
-# Convenience name for target.
-test_snapshot: CMakeFiles/test_snapshot.dir/rule
-.PHONY : test_snapshot
-
-# codegen rule for target.
-CMakeFiles/test_snapshot.dir/codegen:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_snapshot.dir/build.make CMakeFiles/test_snapshot.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=94,95,96 "Finished codegen for target test_snapshot"
-.PHONY : CMakeFiles/test_snapshot.dir/codegen
-
-# clean rule for target.
-CMakeFiles/test_snapshot.dir/clean:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_snapshot.dir/build.make CMakeFiles/test_snapshot.dir/clean
-.PHONY : CMakeFiles/test_snapshot.dir/clean
-
-#=============================================================================
-# Target rules for target CMakeFiles/test_networking.dir
-
-# All Build rule for target.
-CMakeFiles/test_networking.dir/all:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/depend
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=87,88,89,90 "Built target test_networking"
-.PHONY : CMakeFiles/test_networking.dir/all
-
-# Build rule for subdir invocation for target.
-CMakeFiles/test_networking.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 4
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/test_networking.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 0
-.PHONY : CMakeFiles/test_networking.dir/rule
-
-# Convenience name for target.
-test_networking: CMakeFiles/test_networking.dir/rule
-.PHONY : test_networking
-
-# codegen rule for target.
-CMakeFiles/test_networking.dir/codegen:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=87,88,89,90 "Finished codegen for target test_networking"
-.PHONY : CMakeFiles/test_networking.dir/codegen
-
-# clean rule for target.
-CMakeFiles/test_networking.dir/clean:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_networking.dir/build.make CMakeFiles/test_networking.dir/clean
-.PHONY : CMakeFiles/test_networking.dir/clean
-
-#=============================================================================
-# Target rules for target CMakeFiles/test_flowfield.dir
-
-# All Build rule for target.
-CMakeFiles/test_flowfield.dir/all:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_flowfield.dir/build.make CMakeFiles/test_flowfield.dir/depend
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_flowfield.dir/build.make CMakeFiles/test_flowfield.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=75,76 "Built target test_flowfield"
-.PHONY : CMakeFiles/test_flowfield.dir/all
-
-# Build rule for subdir invocation for target.
-CMakeFiles/test_flowfield.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 2
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/test_flowfield.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 0
-.PHONY : CMakeFiles/test_flowfield.dir/rule
-
-# Convenience name for target.
-test_flowfield: CMakeFiles/test_flowfield.dir/rule
-.PHONY : test_flowfield
-
-# codegen rule for target.
-CMakeFiles/test_flowfield.dir/codegen:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_flowfield.dir/build.make CMakeFiles/test_flowfield.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=75,76 "Finished codegen for target test_flowfield"
-.PHONY : CMakeFiles/test_flowfield.dir/codegen
-
-# clean rule for target.
-CMakeFiles/test_flowfield.dir/clean:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_flowfield.dir/build.make CMakeFiles/test_flowfield.dir/clean
-.PHONY : CMakeFiles/test_flowfield.dir/clean
-
-#=============================================================================
-# Target rules for target CMakeFiles/test_determinism.dir
-
-# All Build rule for target.
-CMakeFiles/test_determinism.dir/all:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_determinism.dir/build.make CMakeFiles/test_determinism.dir/depend
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_determinism.dir/build.make CMakeFiles/test_determinism.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=71,72 "Built target test_determinism"
-.PHONY : CMakeFiles/test_determinism.dir/all
-
-# Build rule for subdir invocation for target.
-CMakeFiles/test_determinism.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 2
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/test_determinism.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/donkey/Development/1/Glory/build/CMakeFiles 0
-.PHONY : CMakeFiles/test_determinism.dir/rule
-
-# Convenience name for target.
-test_determinism: CMakeFiles/test_determinism.dir/rule
-.PHONY : test_determinism
-
-# codegen rule for target.
-CMakeFiles/test_determinism.dir/codegen:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_determinism.dir/build.make CMakeFiles/test_determinism.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=71,72 "Finished codegen for target test_determinism"
-.PHONY : CMakeFiles/test_determinism.dir/codegen
-
-# clean rule for target.
-CMakeFiles/test_determinism.dir/clean:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_determinism.dir/build.make CMakeFiles/test_determinism.dir/clean
-.PHONY : CMakeFiles/test_determinism.dir/clean
 
 #=============================================================================
 # Special targets to cleanup operation of make.

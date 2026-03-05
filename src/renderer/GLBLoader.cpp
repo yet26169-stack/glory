@@ -103,11 +103,28 @@ Model Model::loadFromGLB(const Device &device, VmaAllocator allocator,
       // ── UVs (optional, set 0) ───────────────────────────────────
       const uint8_t *uvRaw = nullptr;
       size_t uvStride = sizeof(float) * 2;
+      int uvComponentType = TINYGLTF_COMPONENT_TYPE_FLOAT;
       auto uvIt = prim.attributes.find("TEXCOORD_0");
       if (uvIt != prim.attributes.end()) {
         uvRaw = accessorData(gltfModel, uvIt->second);
         uvStride = getStride(uvIt->second, sizeof(float) * 2);
+        uvComponentType = gltfModel.accessors[uvIt->second].componentType;
       }
+
+      // Helper: decode one UV pair to float regardless of source packing
+      auto decodeUV = [&](size_t i) -> glm::vec2 {
+        if (!uvRaw) return glm::vec2(0.0f);
+        const uint8_t* p = uvRaw + i * uvStride;
+        if (uvComponentType == TINYGLTF_COMPONENT_TYPE_FLOAT) {
+          glm::vec2 uv; std::memcpy(&uv, p, sizeof(glm::vec2)); return uv;
+        } else if (uvComponentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
+          const uint16_t* s = reinterpret_cast<const uint16_t*>(p);
+          return glm::vec2(s[0] / 65535.0f, s[1] / 65535.0f);
+        } else if (uvComponentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
+          return glm::vec2(p[0] / 255.0f, p[1] / 255.0f);
+        }
+        return glm::vec2(0.0f);
+      };
 
       // ── Build vertex array ──────────────────────────────────────
       std::vector<Vertex> vertices(vertCount);
@@ -130,11 +147,7 @@ Model Model::loadFromGLB(const Device &device, VmaAllocator allocator,
         }
 
         // UV
-        if (uvRaw) {
-          std::memcpy(&v.texCoord, uvRaw + i * uvStride, sizeof(float) * 2);
-        } else {
-          v.texCoord = glm::vec2(0.0f);
-        }
+        v.texCoord = decodeUV(i);
       }
 
       // ── Indices ─────────────────────────────────────────────────
@@ -196,6 +209,7 @@ Model Model::loadFromGLB(const Device &device, VmaAllocator allocator,
       spdlog::info("Loaded GLB mesh '{}': {} vertices, {} indices", mesh.name,
                    vertices.size(), indices.size());
       model.m_meshes.emplace_back(device, allocator, vertices, indices);
+      model.m_meshMaterialIndices.push_back(prim.material);
     }
   }
 
@@ -207,7 +221,7 @@ Model Model::loadFromGLB(const Device &device, VmaAllocator allocator,
 }
 
 // ── Model::loadGLBTextures ──────────────────────────────────────────────────
-std::vector<Texture> Model::loadGLBTextures(const Device &device,
+std::vector<Model::GLBTexture> Model::loadGLBTextures(const Device &device,
                                             const std::string &filepath) {
   tinygltf::TinyGLTF loader;
   tinygltf::Model gltfModel;
@@ -219,10 +233,11 @@ std::vector<Texture> Model::loadGLBTextures(const Device &device,
     return {};
   }
 
-  std::vector<Texture> textures;
+  std::vector<GLBTexture> textures;
 
   // Iterate materials and pull the base-color texture from each
-  for (const auto &mat : gltfModel.materials) {
+  for (int i = 0; i < static_cast<int>(gltfModel.materials.size()); ++i) {
+    const auto &mat = gltfModel.materials[i];
     int texIdx = mat.pbrMetallicRoughness.baseColorTexture.index;
     if (texIdx < 0)
       continue;
@@ -264,8 +279,11 @@ std::vector<Texture> Model::loadGLBTextures(const Device &device,
       continue;
     }
 
-    textures.push_back(Texture::createFromPixels(device, pixels, w, h));
-    spdlog::info("Loaded GLB texture '{}' ({}x{}, {} components)", img.name, w,
+    GLBTexture glbTex;
+    glbTex.materialIndex = i;
+    glbTex.texture = Texture::createFromPixels(device, pixels, w, h);
+    textures.push_back(std::move(glbTex));
+    spdlog::info("Loaded GLB texture '{}' for material {} ({}x{}, {} components)", img.name, i, w,
                  h, img.component);
   }
 
@@ -521,12 +539,29 @@ SkinnedModelData Model::loadSkinnedFromGLB(const Device &device,
       // UVs
       const uint8_t *uvRaw = nullptr;
       size_t uvStride = sizeof(float) * 2;
+      int uvComponentType = TINYGLTF_COMPONENT_TYPE_FLOAT;
       auto uvIt = prim.attributes.find("TEXCOORD_0");
       if (uvIt != prim.attributes.end()) {
         uvRaw = accessorData(gltfModel, uvIt->second);
         uvStride =
             getAccessorStride(gltfModel, uvIt->second, sizeof(float) * 2);
+        uvComponentType = gltfModel.accessors[uvIt->second].componentType;
       }
+
+      // Helper: decode one UV pair to float regardless of source packing
+      auto decodeUV = [&](size_t i) -> glm::vec2 {
+        if (!uvRaw) return glm::vec2(0.0f);
+        const uint8_t* p = uvRaw + i * uvStride;
+        if (uvComponentType == TINYGLTF_COMPONENT_TYPE_FLOAT) {
+          glm::vec2 uv; std::memcpy(&uv, p, sizeof(glm::vec2)); return uv;
+        } else if (uvComponentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
+          const uint16_t* s = reinterpret_cast<const uint16_t*>(p);
+          return glm::vec2(s[0] / 65535.0f, s[1] / 65535.0f);
+        } else if (uvComponentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
+          return glm::vec2(p[0] / 255.0f, p[1] / 255.0f);
+        }
+        return glm::vec2(0.0f);
+      };
 
       // Build vertices
       std::vector<Vertex> vertices(vertCount);
@@ -538,10 +573,7 @@ SkinnedModelData Model::loadSkinnedFromGLB(const Device &device,
           std::memcpy(&v.normal, normRaw + i * normStride, sizeof(float) * 3);
         else
           v.normal = glm::vec3(0.0f, 1.0f, 0.0f);
-        if (uvRaw)
-          std::memcpy(&v.texCoord, uvRaw + i * uvStride, sizeof(float) * 2);
-        else
-          v.texCoord = glm::vec2(0.0f);
+        v.texCoord = decodeUV(i);
       }
 
       // ── JOINTS_0 and WEIGHTS_0 ──────────────────────────────────────
@@ -681,6 +713,7 @@ SkinnedModelData Model::loadSkinnedFromGLB(const Device &device,
       result.skinVertices.push_back(std::move(skinVerts));
       result.indices.push_back(indices);
       result.model.m_meshes.emplace_back(device, allocator, vertices, indices);
+      result.model.m_meshMaterialIndices.push_back(prim.material);
     }
   }
 

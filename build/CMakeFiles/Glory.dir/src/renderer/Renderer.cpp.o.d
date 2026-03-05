@@ -1,9 +1,6 @@
 CMakeFiles/Glory.dir/src/renderer/Renderer.cpp.o: \
   /Users/donkey/Development/1/Glory/src/renderer/Renderer.cpp \
   /Users/donkey/Development/1/Glory/src/renderer/Renderer.h \
-  /Users/donkey/Development/1/Glory/src/ability/ProjectileSystem.h \
-  /Users/donkey/Development/1/Glory/src/scene/Scene.h \
-  /Users/donkey/Development/1/Glory/src/scene/Components.h \
   /Users/donkey/Development/1/Glory/src/animation/AnimationClip.h \
   /opt/homebrew/include/glm/glm.hpp \
   /opt/homebrew/include/glm/detail/_fixes.hpp \
@@ -1191,6 +1188,8 @@ CMakeFiles/Glory.dir/src/renderer/Renderer.cpp.o: \
   /opt/homebrew/include/glm/gtc/../common.hpp \
   /Users/donkey/Development/1/Glory/src/animation/AnimationPlayer.h \
   /Users/donkey/Development/1/Glory/src/animation/Skeleton.h \
+  /Users/donkey/Development/1/Glory/src/camera/Camera.h \
+  /opt/homebrew/include/glm/gtc/matrix_transform.hpp \
   /Users/donkey/Development/1/Glory/src/renderer/Buffer.h \
   /opt/homebrew/include/vulkan/vulkan.h \
   /opt/homebrew/include/vulkan/vk_platform.h \
@@ -1208,6 +1207,23 @@ CMakeFiles/Glory.dir/src/renderer/Renderer.cpp.o: \
   /opt/homebrew/include/vk_video/vulkan_video_codec_vp9std.h \
   /opt/homebrew/include/vk_video/vulkan_video_codec_vp9std_decode.h \
   /Users/donkey/Development/1/Glory/extern/vma/vk_mem_alloc.h \
+  /Users/donkey/Development/1/Glory/src/renderer/ClickIndicatorRenderer.h \
+  /Users/donkey/Development/1/Glory/src/renderer/Texture.h \
+  /Users/donkey/Development/1/Glory/src/renderer/Image.h \
+  /Users/donkey/Development/1/Glory/src/renderer/Context.h \
+  /Users/donkey/Development/1/Glory/src/renderer/Descriptors.h \
+  /Users/donkey/Development/1/Glory/src/renderer/Device.h \
+  /Users/donkey/Development/1/Glory/src/renderer/Pipeline.h \
+  /Users/donkey/Development/1/Glory/src/renderer/Swapchain.h \
+  /Users/donkey/Development/1/Glory/src/renderer/Sync.h \
+  /Users/donkey/Development/1/Glory/src/input/InputManager.h \
+  /opt/homebrew/include/GLFW/glfw3.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/OpenGL.framework/Headers/gl.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/OpenGL.framework/Headers/gltypes.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/OpenGL.framework/Headers/OpenGLAvailability.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/os/availability.h \
+  /Users/donkey/Development/1/Glory/src/scene/Scene.h \
+  /Users/donkey/Development/1/Glory/src/scene/Components.h \
   /Users/donkey/Development/1/Glory/src/renderer/Frustum.h \
   /Users/donkey/Development/1/Glory/extern/entt/entt.hpp \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/ostream \
@@ -1272,129 +1288,12 @@ CMakeFiles/Glory.dir/src/renderer/Renderer.cpp.o: \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__tree \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/set \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/unordered_set \
-  /opt/homebrew/include/glm/gtc/matrix_transform.hpp \
-  /Users/donkey/Development/1/Glory/src/math/FixedPoint.h \
   /Users/donkey/Development/1/Glory/src/renderer/DynamicMesh.h \
-  /Users/donkey/Development/1/Glory/src/renderer/Sync.h \
   /Users/donkey/Development/1/Glory/src/renderer/Model.h \
   /Users/donkey/Development/1/Glory/src/renderer/Mesh.h \
-  /Users/donkey/Development/1/Glory/src/renderer/Texture.h \
-  /Users/donkey/Development/1/Glory/src/renderer/Image.h \
   /Users/donkey/Development/1/Glory/src/renderer/StaticSkinnedMesh.h \
   /Users/donkey/Development/1/Glory/src/renderer/Material.h \
-  /Users/donkey/Development/1/Glory/src/camera/Camera.h \
-  /Users/donkey/Development/1/Glory/src/combat/AutoAttackSystem.h \
-  /Users/donkey/Development/1/Glory/src/minion/MinionSystem.h \
-  /Users/donkey/Development/1/Glory/src/minion/MinionComponents.h \
-  /Users/donkey/Development/1/Glory/src/minion/MinionTypes.h \
-  /Users/donkey/Development/1/Glory/src/map/MapTypes.h \
-  /Users/donkey/Development/1/Glory/src/minion/MinionConfig.h \
-  /Users/donkey/Development/1/Glory/src/minion/SpatialHash.h \
-  /Users/donkey/Development/1/Glory/src/core/SimulationLoop.h \
-  /Users/donkey/Development/1/Glory/src/structure/StructureSystem.h \
-  /Users/donkey/Development/1/Glory/src/structure/StructureConfig.h \
-  /Users/donkey/Development/1/Glory/src/jungle/JungleSystem.h \
-  /Users/donkey/Development/1/Glory/src/jungle/JungleConfig.h \
-  /Users/donkey/Development/1/Glory/src/renderer/ParticleSystem.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/random \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/bernoulli_distribution.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/uniform_real_distribution.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/generate_canonical.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/binomial_distribution.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/cauchy_distribution.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/chi_squared_distribution.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/gamma_distribution.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/exponential_distribution.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/default_random_engine.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/linear_congruential_engine.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/is_seed_sequence.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/discard_block_engine.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/discrete_distribution.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/numeric \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__numeric/accumulate.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__numeric/adjacent_difference.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__numeric/inner_product.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__numeric/iota.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__numeric/exclusive_scan.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__numeric/gcd_lcm.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__numeric/inclusive_scan.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__numeric/pstl.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__numeric/reduce.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__numeric/transform_exclusive_scan.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__numeric/transform_inclusive_scan.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__numeric/transform_reduce.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__numeric/midpoint.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__numeric/saturation_arithmetic.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/execution \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__type_traits/is_execution_policy.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/extreme_value_distribution.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/fisher_f_distribution.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/geometric_distribution.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/negative_binomial_distribution.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/poisson_distribution.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/clamp_to_integral.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/normal_distribution.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/independent_bits_engine.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/knuth_b.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/shuffle_order_engine.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/lognormal_distribution.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/mersenne_twister_engine.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/piecewise_constant_distribution.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/piecewise_linear_distribution.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/random_device.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/ranlux.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/subtract_with_carry_engine.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/seed_seq.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/student_t_distribution.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/weibull_distribution.h \
-  /Users/donkey/Development/1/Glory/src/hud/HUD.h \
-  /Users/donkey/Development/1/Glory/src/hud/MinionHealthBars.h \
-  /Users/donkey/Development/1/Glory/src/input/TargetingSystem.h \
-  /Users/donkey/Development/1/Glory/src/editor/DebugOverlay.h \
-  /Users/donkey/Development/1/Glory/src/fog/FogSystem.h \
-  /Users/donkey/Development/1/Glory/src/input/InputManager.h \
-  /Users/donkey/Development/1/Glory/src/ability/AbilityTypes.h \
-  /opt/homebrew/include/GLFW/glfw3.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/OpenGL.framework/Headers/gl.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/OpenGL.framework/Headers/gltypes.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/OpenGL.framework/Headers/OpenGLAvailability.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/os/availability.h \
-  /Users/donkey/Development/1/Glory/src/map/MapLoader.h \
-  /Users/donkey/Development/1/Glory/src/nav/DebugRenderer.h \
-  /Users/donkey/Development/1/Glory/src/renderer/Bloom.h \
-  /Users/donkey/Development/1/Glory/src/renderer/ComputeSkinner.h \
-  /Users/donkey/Development/1/Glory/src/renderer/Context.h \
-  /Users/donkey/Development/1/Glory/src/renderer/ClickIndicatorRenderer.h \
-  /Users/donkey/Development/1/Glory/src/renderer/Descriptors.h \
-  /Users/donkey/Development/1/Glory/src/renderer/Device.h \
-  /Users/donkey/Development/1/Glory/src/renderer/Pipeline.h \
-  /Users/donkey/Development/1/Glory/src/renderer/PostProcess.h \
-  /Users/donkey/Development/1/Glory/src/renderer/SSAO.h \
-  /Users/donkey/Development/1/Glory/src/renderer/ShadowMap.h \
-  /Users/donkey/Development/1/Glory/src/renderer/GpuProfiler.h \
-  /Users/donkey/Development/1/Glory/src/renderer/GpuCuller.h \
-  /Users/donkey/Development/1/Glory/src/renderer/CascadeShadow.h \
-  /Users/donkey/Development/1/Glory/src/renderer/Swapchain.h \
-  /Users/donkey/Development/1/Glory/src/renderer/TextureStreamer.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/condition_variable \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__stop_token/stop_callback.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__stop_token/intrusive_shared_ptr.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__stop_token/stop_state.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__stop_token/atomic_unique_lock.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__stop_token/intrusive_list_view.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__stop_token/stop_token.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/thread \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__thread/this_thread.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__thread/thread.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/sstream \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/istream \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__thread/jthread.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__stop_token/stop_source.h \
   /Users/donkey/Development/1/Glory/src/terrain/IsometricCamera.h \
-  /Users/donkey/Development/1/Glory/src/terrain/TerrainSystem.h \
-  /Users/donkey/Development/1/Glory/src/terrain/TerrainTextures.h \
-  /Users/donkey/Development/1/Glory/src/terrain/TerrainVertex.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/future \
   /Users/donkey/Development/1/Glory/src/renderer/VkCheck.h \
   /opt/homebrew/include/spdlog/spdlog.h \
   /opt/homebrew/include/spdlog/common.h \
@@ -1423,6 +1322,8 @@ CMakeFiles/Glory.dir/src/renderer/Renderer.cpp.o: \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__chrono/utc_clock.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__chrono/zoned_time.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__chrono/ostream.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/sstream \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/istream \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__chrono/parser_std_format_spec.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/forward_list \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/charconv \
@@ -1434,6 +1335,18 @@ CMakeFiles/Glory.dir/src/renderer/Renderer.cpp.o: \
   /opt/homebrew/include/fmt/format.h /opt/homebrew/include/fmt/base.h \
   /opt/homebrew/include/spdlog/details/registry.h \
   /opt/homebrew/include/spdlog/details/periodic_worker.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/condition_variable \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__stop_token/stop_callback.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__stop_token/intrusive_shared_ptr.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__stop_token/stop_state.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__stop_token/atomic_unique_lock.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__stop_token/intrusive_list_view.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__stop_token/stop_token.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/thread \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__thread/this_thread.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__thread/thread.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__thread/jthread.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__stop_token/stop_source.h \
   /opt/homebrew/include/spdlog/details/synchronous_factory.h \
   /opt/homebrew/include/spdlog/logger.h \
   /opt/homebrew/include/spdlog/details/backtracer.h \
@@ -1442,15 +1355,6 @@ CMakeFiles/Glory.dir/src/renderer/Renderer.cpp.o: \
   /opt/homebrew/include/spdlog/details/log_msg.h \
   /opt/homebrew/include/spdlog/version.h \
   /Users/donkey/Development/1/Glory/src/window/Window.h \
-  /Users/donkey/Development/1/Glory/src/core/Profiler.h \
-  /Users/donkey/Development/1/Glory/src/ability/AbilityComponents.h \
-  /Users/donkey/Development/1/Glory/src/ability/AbilityDef.h \
-  /Users/donkey/Development/1/Glory/src/ability/AbilitySystem.h \
-  /Users/donkey/Development/1/Glory/src/ability/VFXEventQueue.h \
-  /Users/donkey/Development/1/Glory/src/structure/StructureComponents.h \
-  /Users/donkey/Development/1/Glory/src/jungle/JungleComponents.h \
-  /Users/donkey/Development/1/Glory/extern/imgui/imgui.h \
-  /Users/donkey/Development/1/Glory/extern/imgui/imconfig.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/fstream \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__filesystem/path.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/iomanip \

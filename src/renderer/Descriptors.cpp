@@ -88,7 +88,7 @@ void Descriptors::writeBindlessTexture(uint32_t arrayIndex, VkImageView imageVie
 void Descriptors::updateShadowMap(VkImageView depthView, VkSampler shadowSampler) {
     for (uint32_t i = 0; i < m_frameCount; ++i) {
         VkDescriptorImageInfo imgInfo{};
-        imgInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+        imgInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         imgInfo.imageView   = depthView;
         imgInfo.sampler     = shadowSampler;
 

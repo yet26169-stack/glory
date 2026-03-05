@@ -1131,6 +1131,13 @@ void Model::drawIndirect(VkCommandBuffer cmd, VkBuffer indirectBuffer, VkDeviceS
     }
 }
 
+void Model::drawMeshIndirect(VkCommandBuffer cmd, uint32_t meshIdx, VkBuffer indirectBuffer, VkDeviceSize offset) const {
+    if (meshIdx < m_meshes.size()) {
+        m_meshes[meshIdx].bind(cmd);
+        m_meshes[meshIdx].drawIndirect(cmd, indirectBuffer, offset);
+    }
+}
+
 uint32_t Model::getIndexCount() const {
     uint32_t total = 0;
     for (const auto& mesh : m_meshes)
@@ -1144,6 +1151,12 @@ uint32_t Model::getMeshCount() const {
 
 uint32_t Model::getMeshIndexCount(uint32_t meshIdx) const {
     return m_meshes[meshIdx].getIndexCount();
+}
+
+int Model::getMeshMaterialIndex(uint32_t meshIdx) const {
+    if (meshIdx < m_meshMaterialIndices.size())
+        return m_meshMaterialIndices[meshIdx];
+    return -1;
 }
 
 } // namespace glory

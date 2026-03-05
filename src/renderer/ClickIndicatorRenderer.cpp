@@ -193,12 +193,12 @@ void ClickIndicatorRenderer::createPipeline(VkRenderPass renderPass) {
 
 void ClickIndicatorRenderer::createVertexBuffer() {
     IndicatorVertex vertices[6] = {
-        {{-1.0f, 0.05f, -1.0f}, {0.0f, 0.0f}},
-        {{ 1.0f, 0.05f, -1.0f}, {1.0f, 0.0f}},
-        {{ 1.0f, 0.05f,  1.0f}, {1.0f, 1.0f}},
-        {{-1.0f, 0.05f, -1.0f}, {0.0f, 0.0f}},
-        {{ 1.0f, 0.05f,  1.0f}, {1.0f, 1.0f}},
-        {{-1.0f, 0.05f,  1.0f}, {0.0f, 1.0f}}
+        {{-1.0f, 0.15f, -1.0f}, {0.0f, 0.0f}},
+        {{ 1.0f, 0.15f, -1.0f}, {1.0f, 0.0f}},
+        {{ 1.0f, 0.15f,  1.0f}, {1.0f, 1.0f}},
+        {{-1.0f, 0.15f, -1.0f}, {0.0f, 0.0f}},
+        {{ 1.0f, 0.15f,  1.0f}, {1.0f, 1.0f}},
+        {{-1.0f, 0.15f,  1.0f}, {0.0f, 1.0f}}
     };
     VkDeviceSize size = sizeof(vertices);
     
@@ -219,7 +219,7 @@ void ClickIndicatorRenderer::render(VkCommandBuffer cmd, const glm::mat4& viewPr
     pc.center = center;
     pc.size = size;
     pc.gridCount = 8;
-    pc.frameIndex = 2 + static_cast<int>(t * 49.99f);
+    pc.frameIndex = 1 + static_cast<int>(t * 54.0f); // Start from frame 1, go up to 55
     pc.tint = tint;
     
     vkCmdPushConstants(cmd, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);

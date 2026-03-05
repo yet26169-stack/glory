@@ -29,6 +29,10 @@ public:
 
   bool isPlaying() const { return m_clip != nullptr; }
 
+  // Re-point to skeleton without resetting animation state.
+  // Must be called each frame to guard against EnTT storage reallocation.
+  void refreshSkeleton(const Skeleton *skeleton) { m_skeleton = skeleton; }
+
 private:
   const Skeleton *m_skeleton = nullptr;
   const AnimationClip *m_clip = nullptr;

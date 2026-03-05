@@ -1,0 +1,57 @@
+{
+    "id": "fire_mage_molten_shield",
+    "displayName": "Molten Shield",
+    "slot": "E",
+    "targeting": "SELF",
+    "resourceType": "MANA",
+    "costPerLevel": [
+        50,
+        55,
+        60,
+        65,
+        70
+    ],
+    "cooldownPerLevel": [
+        15.0,
+        14.0,
+        13.0,
+        12.0,
+        11.0
+    ],
+    "castTime": 0.0,
+    "channelDuration": 0.0,
+    "canMoveWhileCasting": true,
+    "canBeInterrupted": false,
+    "onSelfEffects": [
+        {
+            "type": "SHIELD",
+            "scaling": {
+                "basePerLevel": [
+                    100,
+                    150,
+                    200,
+                    250,
+                    300
+                ],
+                "apRatio": 0.5
+            },
+            "duration": 4.0
+        },
+        {
+            "type": "BUFF_STAT",
+            "statMod": {
+                "stat": "MOVE_SPEED",
+                "amount": 0.3,
+                "percent": true
+            },
+            "duration": 4.0
+        }
+    ],
+    "castVFX": "vfx_molten_shield_apply",
+    "castSFX": "sfx_molten_shield_apply",
+    "tags": [
+        "shield",
+        "buff",
+        "utility"
+    ]
+}

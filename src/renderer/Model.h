@@ -36,8 +36,13 @@ public:
   // glTF Binary (.glb) loader – extracts meshes with positions, normals, UVs
   static Model loadFromGLB(const Device &device, VmaAllocator allocator,
                            const std::string &filepath);
+
+  struct GLBTexture {
+    int materialIndex; // glTF material index
+    Texture texture;
+  };
   // Extract embedded base-color textures from a GLB file
-  static std::vector<Texture> loadGLBTextures(const Device &device,
+  static std::vector<GLBTexture> loadGLBTextures(const Device &device,
                                               const std::string &filepath);
 
   // Axis-aligned bounding box
@@ -106,10 +111,13 @@ public:
                      uint32_t firstInstance) const;
   void drawIndirect(VkCommandBuffer cmd, VkBuffer indirectBuffer,
                     VkDeviceSize offset) const;
+  void drawMeshIndirect(VkCommandBuffer cmd, uint32_t meshIdx, VkBuffer indirectBuffer,
+                        VkDeviceSize offset) const;
 
   uint32_t getIndexCount() const;
   uint32_t getMeshCount() const;
   uint32_t getMeshIndexCount(uint32_t meshIdx) const;
+  int getMeshMaterialIndex(uint32_t meshIdx) const;
 
   Model(const Model &) = delete;
   Model &operator=(const Model &) = delete;
@@ -118,6 +126,7 @@ public:
 
 private:
   std::vector<Mesh> m_meshes;
+  std::vector<int> m_meshMaterialIndices; // glTF material index per sub-mesh
 };
 
 // Data extracted from a skinned GLB file (skeleton, animations, per-vertex
