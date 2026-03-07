@@ -81,6 +81,8 @@ struct CharacterComponent {
   float moveSpeed = 6.0f;
   float heightOffset = 0.0f;
   bool hasTarget = false;
+  float currentYaw = 0.0f; // smooth rotation state
+  float currentSpeed = 0.0f;                          // smoothed movement speed
 };
 
 // ── Map entity tag (for GLB-based MOBA map) ──────────────────────────────────
@@ -107,6 +109,28 @@ struct DynamicMeshComponent {
 
 struct GPUSkinnedMeshComponent {
   uint32_t staticSkinnedMeshIndex = 0;
+  uint32_t boneSlot = 0;
+};
+
+// ── Unit selection and command system ────────────────────────────────────────
+
+struct SelectableComponent {
+    bool isSelected = false;
+    float selectionRadius = 1.0f;
+};
+
+struct UnitComponent {
+    enum class State { IDLE, MOVING, ATTACKING };
+    State state = State::IDLE;
+    glm::vec3 targetPosition{0.0f};
+    float moveSpeed = 5.0f;
+};
+
+// Tracking selection state for the player
+struct SelectionState {
+    bool isDragging = false;
+    glm::vec2 dragStart{0.0f}; // Screen space
+    glm::vec2 dragEnd{0.0f};   // Screen space
 };
 
 } // namespace glory

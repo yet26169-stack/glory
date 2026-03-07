@@ -6,6 +6,9 @@ e83f0e583dcec66b5ed9dda4a2784177 shaders/click_indicator.frag.spv
 c7e5420024ffb7cfb3f9932c2e58a2a4 shaders/debug.vert.spv
 889339995024a2e8b69b82924b8ef9a0 shaders/grid.frag.spv
 5d08d3f248bab8c6b36b9af70bf03a46 shaders/grid.vert.spv
+bf6d63355cf9bca26fee0792cef70b65 shaders/particle.frag.spv
+44a099c0e354766e0e9f4eaed34aaea5 shaders/particle.vert.spv
+111861538821d667c00bd1805a819631 shaders/particle_sim.comp.spv
 0cc52a1dd7feed52cb5282cea2ed9635 shaders/skinned.vert.spv
 242817ea0ddf812c547b268be2c0da6f shaders/triangle.frag.spv
 0d2d85282767ae1d74b122b3f43a44b5 shaders/triangle.vert.spv

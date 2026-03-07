@@ -1,0 +1,22 @@
+{
+    "id":              "vfx_fireball_explosion",
+    "maxParticles":    256,
+    "emitRate":        0.0,
+    "burstCount":      120.0,
+    "looping":         false,
+    "duration":        0.8,
+    "lifetimeMin":     0.5,
+    "lifetimeMax":     1.2,
+    "initialSpeedMin": 3.0,
+    "initialSpeedMax": 12.0,
+    "sizeMin":         0.3,
+    "sizeMax":         0.9,
+    "spreadAngle":     180.0,
+    "gravity":         5.0,
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [1.0, 0.9, 0.4, 1.0]},
+        {"time": 0.3, "color": [1.0, 0.3, 0.0, 0.9]},
+        {"time": 0.7, "color": [0.4, 0.1, 0.0, 0.5]},
+        {"time": 1.0, "color": [0.1, 0.0, 0.0, 0.0]}
+    ]
+}

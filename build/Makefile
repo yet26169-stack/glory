@@ -818,6 +818,30 @@ extern/vma/vma_impl.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/extern/vma/vma_impl.cpp.s
 .PHONY : extern/vma/vma_impl.cpp.s
 
+src/ability/AbilitySystem.o: src/ability/AbilitySystem.cpp.o
+.PHONY : src/ability/AbilitySystem.o
+
+# target to build an object file
+src/ability/AbilitySystem.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/ability/AbilitySystem.cpp.o
+.PHONY : src/ability/AbilitySystem.cpp.o
+
+src/ability/AbilitySystem.i: src/ability/AbilitySystem.cpp.i
+.PHONY : src/ability/AbilitySystem.i
+
+# target to preprocess a source file
+src/ability/AbilitySystem.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/ability/AbilitySystem.cpp.i
+.PHONY : src/ability/AbilitySystem.cpp.i
+
+src/ability/AbilitySystem.s: src/ability/AbilitySystem.cpp.s
+.PHONY : src/ability/AbilitySystem.s
+
+# target to generate assembly for a file
+src/ability/AbilitySystem.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/ability/AbilitySystem.cpp.s
+.PHONY : src/ability/AbilitySystem.cpp.s
+
 src/animation/AnimationPlayer.o: src/animation/AnimationPlayer.cpp.o
 .PHONY : src/animation/AnimationPlayer.o
 
@@ -1520,6 +1544,54 @@ src/terrain/IsometricCamera.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_terrain.dir/build.make CMakeFiles/test_terrain.dir/src/terrain/IsometricCamera.cpp.s
 .PHONY : src/terrain/IsometricCamera.cpp.s
 
+src/vfx/ParticleSystem.o: src/vfx/ParticleSystem.cpp.o
+.PHONY : src/vfx/ParticleSystem.o
+
+# target to build an object file
+src/vfx/ParticleSystem.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/vfx/ParticleSystem.cpp.o
+.PHONY : src/vfx/ParticleSystem.cpp.o
+
+src/vfx/ParticleSystem.i: src/vfx/ParticleSystem.cpp.i
+.PHONY : src/vfx/ParticleSystem.i
+
+# target to preprocess a source file
+src/vfx/ParticleSystem.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/vfx/ParticleSystem.cpp.i
+.PHONY : src/vfx/ParticleSystem.cpp.i
+
+src/vfx/ParticleSystem.s: src/vfx/ParticleSystem.cpp.s
+.PHONY : src/vfx/ParticleSystem.s
+
+# target to generate assembly for a file
+src/vfx/ParticleSystem.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/vfx/ParticleSystem.cpp.s
+.PHONY : src/vfx/ParticleSystem.cpp.s
+
+src/vfx/VFXRenderer.o: src/vfx/VFXRenderer.cpp.o
+.PHONY : src/vfx/VFXRenderer.o
+
+# target to build an object file
+src/vfx/VFXRenderer.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/vfx/VFXRenderer.cpp.o
+.PHONY : src/vfx/VFXRenderer.cpp.o
+
+src/vfx/VFXRenderer.i: src/vfx/VFXRenderer.cpp.i
+.PHONY : src/vfx/VFXRenderer.i
+
+# target to preprocess a source file
+src/vfx/VFXRenderer.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/vfx/VFXRenderer.cpp.i
+.PHONY : src/vfx/VFXRenderer.cpp.i
+
+src/vfx/VFXRenderer.s: src/vfx/VFXRenderer.cpp.s
+.PHONY : src/vfx/VFXRenderer.s
+
+# target to generate assembly for a file
+src/vfx/VFXRenderer.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/vfx/VFXRenderer.cpp.s
+.PHONY : src/vfx/VFXRenderer.cpp.s
+
 src/window/Window.o: src/window/Window.cpp.o
 .PHONY : src/window/Window.o
 
@@ -1708,6 +1780,9 @@ help:
 	@echo "... extern/vma/vma_impl.o"
 	@echo "... extern/vma/vma_impl.i"
 	@echo "... extern/vma/vma_impl.s"
+	@echo "... src/ability/AbilitySystem.o"
+	@echo "... src/ability/AbilitySystem.i"
+	@echo "... src/ability/AbilitySystem.s"
 	@echo "... src/animation/AnimationPlayer.o"
 	@echo "... src/animation/AnimationPlayer.i"
 	@echo "... src/animation/AnimationPlayer.s"
@@ -1795,6 +1870,12 @@ help:
 	@echo "... src/terrain/IsometricCamera.o"
 	@echo "... src/terrain/IsometricCamera.i"
 	@echo "... src/terrain/IsometricCamera.s"
+	@echo "... src/vfx/ParticleSystem.o"
+	@echo "... src/vfx/ParticleSystem.i"
+	@echo "... src/vfx/ParticleSystem.s"
+	@echo "... src/vfx/VFXRenderer.o"
+	@echo "... src/vfx/VFXRenderer.i"
+	@echo "... src/vfx/VFXRenderer.s"
 	@echo "... src/window/Window.o"
 	@echo "... src/window/Window.i"
 	@echo "... src/window/Window.s"

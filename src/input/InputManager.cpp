@@ -16,6 +16,10 @@ InputManager::InputManager(GLFWwindow *window, Camera &camera)
 
 bool InputManager::wasF4Pressed() { bool p = m_f4Pressed; m_f4Pressed = false; return p; }
 bool InputManager::wasYPressed()  { bool p = m_yPressed;  m_yPressed  = false; return p; }
+bool InputManager::wasQPressed()  { bool p = m_qPressed;  m_qPressed  = false; return p; }
+bool InputManager::wasWPressed()  { bool p = m_wPressed;  m_wPressed  = false; return p; }
+bool InputManager::wasEPressed()  { bool p = m_ePressed;  m_ePressed  = false; return p; }
+bool InputManager::wasRPressed()  { bool p = m_rPressed;  m_rPressed  = false; return p; }
 bool InputManager::wasRightClicked() { bool p = m_rightClicked; m_rightClicked = false; return p; }
 bool InputManager::wasLeftClicked()  { bool p = m_leftClicked;  m_leftClicked  = false; return p; }
 
@@ -23,6 +27,10 @@ void InputManager::keyCallback(GLFWwindow*, int key, int, int action, int) {
   if (!s_activeInput) return;
   if (key == GLFW_KEY_F4 && action == GLFW_PRESS) s_activeInput->m_f4Pressed = true;
   if (key == GLFW_KEY_Y  && action == GLFW_PRESS) s_activeInput->m_yPressed  = true;
+  if (key == GLFW_KEY_Q  && action == GLFW_PRESS) s_activeInput->m_qPressed  = true;
+  if (key == GLFW_KEY_W  && action == GLFW_PRESS) s_activeInput->m_wPressed  = true;
+  if (key == GLFW_KEY_E  && action == GLFW_PRESS) s_activeInput->m_ePressed  = true;
+  if (key == GLFW_KEY_R  && action == GLFW_PRESS) s_activeInput->m_rPressed  = true;
   if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS && s_activeInput->m_cursorCaptured) {
     s_activeInput->m_cursorCaptured = false;
     glfwSetInputMode(s_activeInput->m_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);

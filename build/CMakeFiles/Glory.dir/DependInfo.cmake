@@ -16,6 +16,7 @@ set(CMAKE_DEPENDS_DEPENDENCY_FILES
   "/Users/donkey/Development/1/Glory/extern/imgui/imgui_tables.cpp" "CMakeFiles/Glory.dir/extern/imgui/imgui_tables.cpp.o" "gcc" "CMakeFiles/Glory.dir/extern/imgui/imgui_tables.cpp.o.d"
   "/Users/donkey/Development/1/Glory/extern/imgui/imgui_widgets.cpp" "CMakeFiles/Glory.dir/extern/imgui/imgui_widgets.cpp.o" "gcc" "CMakeFiles/Glory.dir/extern/imgui/imgui_widgets.cpp.o.d"
   "/Users/donkey/Development/1/Glory/extern/vma/vma_impl.cpp" "CMakeFiles/Glory.dir/extern/vma/vma_impl.cpp.o" "gcc" "CMakeFiles/Glory.dir/extern/vma/vma_impl.cpp.o.d"
+  "/Users/donkey/Development/1/Glory/src/ability/AbilitySystem.cpp" "CMakeFiles/Glory.dir/src/ability/AbilitySystem.cpp.o" "gcc" "CMakeFiles/Glory.dir/src/ability/AbilitySystem.cpp.o.d"
   "/Users/donkey/Development/1/Glory/src/animation/AnimationPlayer.cpp" "CMakeFiles/Glory.dir/src/animation/AnimationPlayer.cpp.o" "gcc" "CMakeFiles/Glory.dir/src/animation/AnimationPlayer.cpp.o.d"
   "/Users/donkey/Development/1/Glory/src/animation/CPUSkinning.cpp" "CMakeFiles/Glory.dir/src/animation/CPUSkinning.cpp.o" "gcc" "CMakeFiles/Glory.dir/src/animation/CPUSkinning.cpp.o.d"
   "/Users/donkey/Development/1/Glory/src/camera/Camera.cpp" "CMakeFiles/Glory.dir/src/camera/Camera.cpp.o" "gcc" "CMakeFiles/Glory.dir/src/camera/Camera.cpp.o.d"
@@ -45,6 +46,8 @@ set(CMAKE_DEPENDS_DEPENDENCY_FILES
   "/Users/donkey/Development/1/Glory/src/renderer/Texture.cpp" "CMakeFiles/Glory.dir/src/renderer/Texture.cpp.o" "gcc" "CMakeFiles/Glory.dir/src/renderer/Texture.cpp.o.d"
   "/Users/donkey/Development/1/Glory/src/scene/Scene.cpp" "CMakeFiles/Glory.dir/src/scene/Scene.cpp.o" "gcc" "CMakeFiles/Glory.dir/src/scene/Scene.cpp.o.d"
   "/Users/donkey/Development/1/Glory/src/terrain/IsometricCamera.cpp" "CMakeFiles/Glory.dir/src/terrain/IsometricCamera.cpp.o" "gcc" "CMakeFiles/Glory.dir/src/terrain/IsometricCamera.cpp.o.d"
+  "/Users/donkey/Development/1/Glory/src/vfx/ParticleSystem.cpp" "CMakeFiles/Glory.dir/src/vfx/ParticleSystem.cpp.o" "gcc" "CMakeFiles/Glory.dir/src/vfx/ParticleSystem.cpp.o.d"
+  "/Users/donkey/Development/1/Glory/src/vfx/VFXRenderer.cpp" "CMakeFiles/Glory.dir/src/vfx/VFXRenderer.cpp.o" "gcc" "CMakeFiles/Glory.dir/src/vfx/VFXRenderer.cpp.o.d"
   "/Users/donkey/Development/1/Glory/src/window/Window.cpp" "CMakeFiles/Glory.dir/src/window/Window.cpp.o" "gcc" "CMakeFiles/Glory.dir/src/window/Window.cpp.o.d"
   )
 

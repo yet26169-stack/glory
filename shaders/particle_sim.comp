@@ -1,0 +1,62 @@
+#version 450
+
+// ── GPU Particle Simulation Compute Shader ────────────────────────────────────
+// Runs once per active particle. Updates position via Euler integration,
+// applies gravity, decrements lifetime, and marks dead particles.
+// Work-group size chosen for warp/wavefront alignment on AMD and NVIDIA.
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+struct Particle {
+    vec4 posLife;   // xyz = world position,   w = remaining lifetime (seconds)
+    vec4 velAge;    // xyz = velocity (m/s),   w = age (seconds elapsed)
+    vec4 color;     // rgba (premultiplied alpha at spawn, fades to 0 at death)
+    vec4 params;    // x = size,  y = rotation,  z = atlas frame index,  w = active (1) / dead (0)
+};
+
+layout(std430, set = 0, binding = 0) buffer ParticleSSBO {
+    Particle particles[];
+};
+
+layout(push_constant) uniform SimPC {
+    float    dt;
+    float    gravity;
+    uint     count;
+    float    _pad;
+} pc;
+
+void main() {
+    uint i = gl_GlobalInvocationID.x;
+    if (i >= pc.count) return;
+
+    Particle p = particles[i];
+
+    // Skip dead particles (avoids unnecessary writes)
+    if (p.params.w < 0.5) return;
+
+    // Tick lifetime and age
+    p.posLife.w -= pc.dt;
+    p.velAge.w  += pc.dt;
+
+    if (p.posLife.w <= 0.0) {
+        p.params.w = 0.0;   // mark dead
+        particles[i] = p;
+        return;
+    }
+
+    // Apply gravity (Y-up world, gravity is downward)
+    p.velAge.y -= pc.gravity * pc.dt;
+
+    // Euler integration
+    p.posLife.xyz += p.velAge.xyz * pc.dt;
+
+    // Fade alpha linearly with remaining lifetime (baked into color.a)
+    // Note: full alpha at spawn stored separately; we scale by normalised lifetime.
+    // (max lifetime stored in velAge.w + posLife.w at any point)
+    // Simple linear fade: alpha proportional to posLife.w / (posLife.w + velAge.w)
+    float totalLife = p.posLife.w + p.velAge.w;
+    float lifeFrac  = (totalLife > 0.0) ? (p.posLife.w / totalLife) : 0.0;
+    p.color.a = lifeFrac;
+
+    particles[i] = p;
+}

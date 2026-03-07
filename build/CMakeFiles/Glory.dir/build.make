@@ -492,10 +492,52 @@ CMakeFiles/Glory.dir/src/animation/CPUSkinning.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/Glory.dir/src/animation/CPUSkinning.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/donkey/Development/1/Glory/src/animation/CPUSkinning.cpp -o CMakeFiles/Glory.dir/src/animation/CPUSkinning.cpp.s
 
+CMakeFiles/Glory.dir/src/vfx/ParticleSystem.cpp.o: CMakeFiles/Glory.dir/flags.make
+CMakeFiles/Glory.dir/src/vfx/ParticleSystem.cpp.o: /Users/donkey/Development/1/Glory/src/vfx/ParticleSystem.cpp
+CMakeFiles/Glory.dir/src/vfx/ParticleSystem.cpp.o: CMakeFiles/Glory.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_31) "Building CXX object CMakeFiles/Glory.dir/src/vfx/ParticleSystem.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Glory.dir/src/vfx/ParticleSystem.cpp.o -MF CMakeFiles/Glory.dir/src/vfx/ParticleSystem.cpp.o.d -o CMakeFiles/Glory.dir/src/vfx/ParticleSystem.cpp.o -c /Users/donkey/Development/1/Glory/src/vfx/ParticleSystem.cpp
+
+CMakeFiles/Glory.dir/src/vfx/ParticleSystem.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/Glory.dir/src/vfx/ParticleSystem.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /Users/donkey/Development/1/Glory/src/vfx/ParticleSystem.cpp > CMakeFiles/Glory.dir/src/vfx/ParticleSystem.cpp.i
+
+CMakeFiles/Glory.dir/src/vfx/ParticleSystem.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/Glory.dir/src/vfx/ParticleSystem.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/donkey/Development/1/Glory/src/vfx/ParticleSystem.cpp -o CMakeFiles/Glory.dir/src/vfx/ParticleSystem.cpp.s
+
+CMakeFiles/Glory.dir/src/vfx/VFXRenderer.cpp.o: CMakeFiles/Glory.dir/flags.make
+CMakeFiles/Glory.dir/src/vfx/VFXRenderer.cpp.o: /Users/donkey/Development/1/Glory/src/vfx/VFXRenderer.cpp
+CMakeFiles/Glory.dir/src/vfx/VFXRenderer.cpp.o: CMakeFiles/Glory.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_32) "Building CXX object CMakeFiles/Glory.dir/src/vfx/VFXRenderer.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Glory.dir/src/vfx/VFXRenderer.cpp.o -MF CMakeFiles/Glory.dir/src/vfx/VFXRenderer.cpp.o.d -o CMakeFiles/Glory.dir/src/vfx/VFXRenderer.cpp.o -c /Users/donkey/Development/1/Glory/src/vfx/VFXRenderer.cpp
+
+CMakeFiles/Glory.dir/src/vfx/VFXRenderer.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/Glory.dir/src/vfx/VFXRenderer.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /Users/donkey/Development/1/Glory/src/vfx/VFXRenderer.cpp > CMakeFiles/Glory.dir/src/vfx/VFXRenderer.cpp.i
+
+CMakeFiles/Glory.dir/src/vfx/VFXRenderer.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/Glory.dir/src/vfx/VFXRenderer.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/donkey/Development/1/Glory/src/vfx/VFXRenderer.cpp -o CMakeFiles/Glory.dir/src/vfx/VFXRenderer.cpp.s
+
+CMakeFiles/Glory.dir/src/ability/AbilitySystem.cpp.o: CMakeFiles/Glory.dir/flags.make
+CMakeFiles/Glory.dir/src/ability/AbilitySystem.cpp.o: /Users/donkey/Development/1/Glory/src/ability/AbilitySystem.cpp
+CMakeFiles/Glory.dir/src/ability/AbilitySystem.cpp.o: CMakeFiles/Glory.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_33) "Building CXX object CMakeFiles/Glory.dir/src/ability/AbilitySystem.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Glory.dir/src/ability/AbilitySystem.cpp.o -MF CMakeFiles/Glory.dir/src/ability/AbilitySystem.cpp.o.d -o CMakeFiles/Glory.dir/src/ability/AbilitySystem.cpp.o -c /Users/donkey/Development/1/Glory/src/ability/AbilitySystem.cpp
+
+CMakeFiles/Glory.dir/src/ability/AbilitySystem.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/Glory.dir/src/ability/AbilitySystem.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /Users/donkey/Development/1/Glory/src/ability/AbilitySystem.cpp > CMakeFiles/Glory.dir/src/ability/AbilitySystem.cpp.i
+
+CMakeFiles/Glory.dir/src/ability/AbilitySystem.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/Glory.dir/src/ability/AbilitySystem.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/donkey/Development/1/Glory/src/ability/AbilitySystem.cpp -o CMakeFiles/Glory.dir/src/ability/AbilitySystem.cpp.s
+
 CMakeFiles/Glory.dir/extern/vma/vma_impl.cpp.o: CMakeFiles/Glory.dir/flags.make
 CMakeFiles/Glory.dir/extern/vma/vma_impl.cpp.o: /Users/donkey/Development/1/Glory/extern/vma/vma_impl.cpp
 CMakeFiles/Glory.dir/extern/vma/vma_impl.cpp.o: CMakeFiles/Glory.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_31) "Building CXX object CMakeFiles/Glory.dir/extern/vma/vma_impl.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_34) "Building CXX object CMakeFiles/Glory.dir/extern/vma/vma_impl.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Glory.dir/extern/vma/vma_impl.cpp.o -MF CMakeFiles/Glory.dir/extern/vma/vma_impl.cpp.o.d -o CMakeFiles/Glory.dir/extern/vma/vma_impl.cpp.o -c /Users/donkey/Development/1/Glory/extern/vma/vma_impl.cpp
 
 CMakeFiles/Glory.dir/extern/vma/vma_impl.cpp.i: cmake_force
@@ -509,7 +551,7 @@ CMakeFiles/Glory.dir/extern/vma/vma_impl.cpp.s: cmake_force
 CMakeFiles/Glory.dir/extern/imgui/imgui.cpp.o: CMakeFiles/Glory.dir/flags.make
 CMakeFiles/Glory.dir/extern/imgui/imgui.cpp.o: /Users/donkey/Development/1/Glory/extern/imgui/imgui.cpp
 CMakeFiles/Glory.dir/extern/imgui/imgui.cpp.o: CMakeFiles/Glory.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_32) "Building CXX object CMakeFiles/Glory.dir/extern/imgui/imgui.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_35) "Building CXX object CMakeFiles/Glory.dir/extern/imgui/imgui.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Glory.dir/extern/imgui/imgui.cpp.o -MF CMakeFiles/Glory.dir/extern/imgui/imgui.cpp.o.d -o CMakeFiles/Glory.dir/extern/imgui/imgui.cpp.o -c /Users/donkey/Development/1/Glory/extern/imgui/imgui.cpp
 
 CMakeFiles/Glory.dir/extern/imgui/imgui.cpp.i: cmake_force
@@ -523,7 +565,7 @@ CMakeFiles/Glory.dir/extern/imgui/imgui.cpp.s: cmake_force
 CMakeFiles/Glory.dir/extern/imgui/imgui_draw.cpp.o: CMakeFiles/Glory.dir/flags.make
 CMakeFiles/Glory.dir/extern/imgui/imgui_draw.cpp.o: /Users/donkey/Development/1/Glory/extern/imgui/imgui_draw.cpp
 CMakeFiles/Glory.dir/extern/imgui/imgui_draw.cpp.o: CMakeFiles/Glory.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_33) "Building CXX object CMakeFiles/Glory.dir/extern/imgui/imgui_draw.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_36) "Building CXX object CMakeFiles/Glory.dir/extern/imgui/imgui_draw.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Glory.dir/extern/imgui/imgui_draw.cpp.o -MF CMakeFiles/Glory.dir/extern/imgui/imgui_draw.cpp.o.d -o CMakeFiles/Glory.dir/extern/imgui/imgui_draw.cpp.o -c /Users/donkey/Development/1/Glory/extern/imgui/imgui_draw.cpp
 
 CMakeFiles/Glory.dir/extern/imgui/imgui_draw.cpp.i: cmake_force
@@ -537,7 +579,7 @@ CMakeFiles/Glory.dir/extern/imgui/imgui_draw.cpp.s: cmake_force
 CMakeFiles/Glory.dir/extern/imgui/imgui_tables.cpp.o: CMakeFiles/Glory.dir/flags.make
 CMakeFiles/Glory.dir/extern/imgui/imgui_tables.cpp.o: /Users/donkey/Development/1/Glory/extern/imgui/imgui_tables.cpp
 CMakeFiles/Glory.dir/extern/imgui/imgui_tables.cpp.o: CMakeFiles/Glory.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_34) "Building CXX object CMakeFiles/Glory.dir/extern/imgui/imgui_tables.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_37) "Building CXX object CMakeFiles/Glory.dir/extern/imgui/imgui_tables.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Glory.dir/extern/imgui/imgui_tables.cpp.o -MF CMakeFiles/Glory.dir/extern/imgui/imgui_tables.cpp.o.d -o CMakeFiles/Glory.dir/extern/imgui/imgui_tables.cpp.o -c /Users/donkey/Development/1/Glory/extern/imgui/imgui_tables.cpp
 
 CMakeFiles/Glory.dir/extern/imgui/imgui_tables.cpp.i: cmake_force
@@ -551,7 +593,7 @@ CMakeFiles/Glory.dir/extern/imgui/imgui_tables.cpp.s: cmake_force
 CMakeFiles/Glory.dir/extern/imgui/imgui_widgets.cpp.o: CMakeFiles/Glory.dir/flags.make
 CMakeFiles/Glory.dir/extern/imgui/imgui_widgets.cpp.o: /Users/donkey/Development/1/Glory/extern/imgui/imgui_widgets.cpp
 CMakeFiles/Glory.dir/extern/imgui/imgui_widgets.cpp.o: CMakeFiles/Glory.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_35) "Building CXX object CMakeFiles/Glory.dir/extern/imgui/imgui_widgets.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_38) "Building CXX object CMakeFiles/Glory.dir/extern/imgui/imgui_widgets.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Glory.dir/extern/imgui/imgui_widgets.cpp.o -MF CMakeFiles/Glory.dir/extern/imgui/imgui_widgets.cpp.o.d -o CMakeFiles/Glory.dir/extern/imgui/imgui_widgets.cpp.o -c /Users/donkey/Development/1/Glory/extern/imgui/imgui_widgets.cpp
 
 CMakeFiles/Glory.dir/extern/imgui/imgui_widgets.cpp.i: cmake_force
@@ -565,7 +607,7 @@ CMakeFiles/Glory.dir/extern/imgui/imgui_widgets.cpp.s: cmake_force
 CMakeFiles/Glory.dir/extern/imgui/imgui_demo.cpp.o: CMakeFiles/Glory.dir/flags.make
 CMakeFiles/Glory.dir/extern/imgui/imgui_demo.cpp.o: /Users/donkey/Development/1/Glory/extern/imgui/imgui_demo.cpp
 CMakeFiles/Glory.dir/extern/imgui/imgui_demo.cpp.o: CMakeFiles/Glory.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_36) "Building CXX object CMakeFiles/Glory.dir/extern/imgui/imgui_demo.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_39) "Building CXX object CMakeFiles/Glory.dir/extern/imgui/imgui_demo.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Glory.dir/extern/imgui/imgui_demo.cpp.o -MF CMakeFiles/Glory.dir/extern/imgui/imgui_demo.cpp.o.d -o CMakeFiles/Glory.dir/extern/imgui/imgui_demo.cpp.o -c /Users/donkey/Development/1/Glory/extern/imgui/imgui_demo.cpp
 
 CMakeFiles/Glory.dir/extern/imgui/imgui_demo.cpp.i: cmake_force
@@ -579,7 +621,7 @@ CMakeFiles/Glory.dir/extern/imgui/imgui_demo.cpp.s: cmake_force
 CMakeFiles/Glory.dir/extern/imgui/imgui_impl_glfw.cpp.o: CMakeFiles/Glory.dir/flags.make
 CMakeFiles/Glory.dir/extern/imgui/imgui_impl_glfw.cpp.o: /Users/donkey/Development/1/Glory/extern/imgui/imgui_impl_glfw.cpp
 CMakeFiles/Glory.dir/extern/imgui/imgui_impl_glfw.cpp.o: CMakeFiles/Glory.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_37) "Building CXX object CMakeFiles/Glory.dir/extern/imgui/imgui_impl_glfw.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_40) "Building CXX object CMakeFiles/Glory.dir/extern/imgui/imgui_impl_glfw.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Glory.dir/extern/imgui/imgui_impl_glfw.cpp.o -MF CMakeFiles/Glory.dir/extern/imgui/imgui_impl_glfw.cpp.o.d -o CMakeFiles/Glory.dir/extern/imgui/imgui_impl_glfw.cpp.o -c /Users/donkey/Development/1/Glory/extern/imgui/imgui_impl_glfw.cpp
 
 CMakeFiles/Glory.dir/extern/imgui/imgui_impl_glfw.cpp.i: cmake_force
@@ -593,7 +635,7 @@ CMakeFiles/Glory.dir/extern/imgui/imgui_impl_glfw.cpp.s: cmake_force
 CMakeFiles/Glory.dir/extern/imgui/imgui_impl_vulkan.cpp.o: CMakeFiles/Glory.dir/flags.make
 CMakeFiles/Glory.dir/extern/imgui/imgui_impl_vulkan.cpp.o: /Users/donkey/Development/1/Glory/extern/imgui/imgui_impl_vulkan.cpp
 CMakeFiles/Glory.dir/extern/imgui/imgui_impl_vulkan.cpp.o: CMakeFiles/Glory.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_38) "Building CXX object CMakeFiles/Glory.dir/extern/imgui/imgui_impl_vulkan.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_41) "Building CXX object CMakeFiles/Glory.dir/extern/imgui/imgui_impl_vulkan.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/Glory.dir/extern/imgui/imgui_impl_vulkan.cpp.o -MF CMakeFiles/Glory.dir/extern/imgui/imgui_impl_vulkan.cpp.o.d -o CMakeFiles/Glory.dir/extern/imgui/imgui_impl_vulkan.cpp.o -c /Users/donkey/Development/1/Glory/extern/imgui/imgui_impl_vulkan.cpp
 
 CMakeFiles/Glory.dir/extern/imgui/imgui_impl_vulkan.cpp.i: cmake_force
@@ -636,6 +678,9 @@ Glory_OBJECTS = \
 "CMakeFiles/Glory.dir/src/hud/HUD.cpp.o" \
 "CMakeFiles/Glory.dir/src/animation/AnimationPlayer.cpp.o" \
 "CMakeFiles/Glory.dir/src/animation/CPUSkinning.cpp.o" \
+"CMakeFiles/Glory.dir/src/vfx/ParticleSystem.cpp.o" \
+"CMakeFiles/Glory.dir/src/vfx/VFXRenderer.cpp.o" \
+"CMakeFiles/Glory.dir/src/ability/AbilitySystem.cpp.o" \
 "CMakeFiles/Glory.dir/extern/vma/vma_impl.cpp.o" \
 "CMakeFiles/Glory.dir/extern/imgui/imgui.cpp.o" \
 "CMakeFiles/Glory.dir/extern/imgui/imgui_draw.cpp.o" \
@@ -678,6 +723,9 @@ Glory: CMakeFiles/Glory.dir/src/nav/DebugRenderer.cpp.o
 Glory: CMakeFiles/Glory.dir/src/hud/HUD.cpp.o
 Glory: CMakeFiles/Glory.dir/src/animation/AnimationPlayer.cpp.o
 Glory: CMakeFiles/Glory.dir/src/animation/CPUSkinning.cpp.o
+Glory: CMakeFiles/Glory.dir/src/vfx/ParticleSystem.cpp.o
+Glory: CMakeFiles/Glory.dir/src/vfx/VFXRenderer.cpp.o
+Glory: CMakeFiles/Glory.dir/src/ability/AbilitySystem.cpp.o
 Glory: CMakeFiles/Glory.dir/extern/vma/vma_impl.cpp.o
 Glory: CMakeFiles/Glory.dir/extern/imgui/imgui.cpp.o
 Glory: CMakeFiles/Glory.dir/extern/imgui/imgui_draw.cpp.o
@@ -694,7 +742,7 @@ Glory: /opt/homebrew/lib/libspdlog.1.17.0.dylib
 Glory: libmeshoptimizer.a
 Glory: /opt/homebrew/lib/libfmt.12.1.0.dylib
 Glory: CMakeFiles/Glory.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_39) "Linking CXX executable Glory"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_42) "Linking CXX executable Glory"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/Glory.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.

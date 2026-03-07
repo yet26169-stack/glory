@@ -29,6 +29,9 @@ set(SHADER_SOURCES
     ${CMAKE_SOURCE_DIR}/shaders/skinned.vert
     ${CMAKE_SOURCE_DIR}/shaders/click_indicator.vert
     ${CMAKE_SOURCE_DIR}/shaders/click_indicator.frag
+    ${CMAKE_SOURCE_DIR}/shaders/particle_sim.comp
+    ${CMAKE_SOURCE_DIR}/shaders/particle.vert
+    ${CMAKE_SOURCE_DIR}/shaders/particle.frag
 )
 
 foreach(SHADER ${SHADER_SOURCES})
@@ -82,6 +85,9 @@ set(SOURCES
     src/hud/HUD.cpp
     src/animation/AnimationPlayer.cpp
     src/animation/CPUSkinning.cpp
+    src/vfx/ParticleSystem.cpp
+    src/vfx/VFXRenderer.cpp
+    src/ability/AbilitySystem.cpp
     extern/vma/vma_impl.cpp
     extern/imgui/imgui.cpp
     extern/imgui/imgui_draw.cpp

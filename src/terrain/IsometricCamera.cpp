@@ -9,7 +9,7 @@ IsometricCamera::IsometricCamera() { updatePosition(); }
 
 void IsometricCamera::update(float deltaTime, float windowW, float windowH,
                              double mouseX, double mouseY, bool middleMouseDown,
-                             float scrollDelta) {
+                             float scrollDelta, bool windowFocused) {
   float yawRad = glm::radians(m_yaw);
   glm::vec3 forward =
       glm::normalize(glm::vec3(-std::sin(yawRad), 0.0f, -std::cos(yawRad)));
@@ -26,16 +26,20 @@ void IsometricCamera::update(float deltaTime, float windowW, float windowH,
     m_currentVelocity = glm::vec2(0.0f); // reset pan velocity
   } else {
     // ── Detached: edge panning ────────────────────────────────────────
+    // Per spec: only pan when the window has OS focus, to avoid spurious
+    // movement in windowed/borderless mode when the cursor drifts to an edge.
     glm::vec2 panDirection(0.0f);
 
-    if (mouseX < m_edgeMargin)
-      panDirection.x -= 1.0f;
-    if (mouseX > windowW - m_edgeMargin)
-      panDirection.x += 1.0f;
-    if (mouseY < m_edgeMargin)
-      panDirection.y += 1.0f;
-    if (mouseY > windowH - m_edgeMargin)
-      panDirection.y -= 1.0f;
+    if (windowFocused) {
+      if (mouseX < m_edgeMargin)
+        panDirection.x -= 1.0f;
+      if (mouseX > windowW - m_edgeMargin)
+        panDirection.x += 1.0f;
+      if (mouseY < m_edgeMargin)
+        panDirection.y += 1.0f;
+      if (mouseY > windowH - m_edgeMargin)
+        panDirection.y -= 1.0f;
+    }
 
     if (glm::length(panDirection) > 0.0f)
       panDirection = glm::normalize(panDirection);

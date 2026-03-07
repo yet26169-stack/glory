@@ -24,10 +24,17 @@ public:
 
   bool wasF4Pressed();
   bool wasYPressed();
+  // Ability hotkeys – consume-once pattern, same as wasF4Pressed()
+  bool wasQPressed();
+  bool wasWPressed();
+  bool wasEPressed();
+  bool wasRPressed();
   bool wasRightClicked();
   glm::vec2 getLastClickPos() const { return m_rightClickPos; }
   bool wasLeftClicked();
   glm::vec2 getLastLeftClickPos() const { return m_leftClickPos; }
+  bool isLeftMouseDown() const { return glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS; }
+  bool isRightMouseDown() const { return glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS; }
   glm::vec2 getMousePos() const {
     double x, y;
     glfwGetCursorPos(m_window, &x, &y);
@@ -50,7 +57,11 @@ private:
   bool m_cursorCaptured = false;
   bool m_captureEnabled = true;
   bool m_f4Pressed = false;
-  bool m_yPressed = false;
+  bool m_yPressed  = false;
+  bool m_qPressed  = false;
+  bool m_wPressed  = false;
+  bool m_ePressed  = false;
+  bool m_rPressed  = false;
   bool m_rightClicked = false;
   glm::vec2 m_rightClickPos{0.0f};
   bool m_leftClicked = false;

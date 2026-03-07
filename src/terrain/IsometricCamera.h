@@ -10,7 +10,8 @@ public:
   IsometricCamera();
 
   void update(float deltaTime, float windowW, float windowH, double mouseX,
-              double mouseY, bool middleMouseDown, float scrollDelta);
+              double mouseY, bool middleMouseDown, float scrollDelta,
+              bool windowFocused = true);
 
   glm::mat4 getViewMatrix() const;
   glm::mat4 getProjectionMatrix(float aspect) const;

@@ -1,1 +1,1 @@
-/usr/bin/c++  -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/test_mirror.dir/tests/test_mirror.cpp.o -o test_mirror  -Wl,-rpath,/opt/homebrew/lib /opt/homebrew/lib/libglm.dylib
+/usr/bin/c++ -g -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/test_mirror.dir/tests/test_mirror.cpp.o -o test_mirror  -Wl,-rpath,/opt/homebrew/lib /opt/homebrew/lib/libglm.dylib

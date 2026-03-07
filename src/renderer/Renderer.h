@@ -16,6 +16,10 @@
 #include "input/InputManager.h"
 #include "scene/Scene.h"
 #include "terrain/IsometricCamera.h"
+#include "nav/DebugRenderer.h"
+#include "vfx/VFXRenderer.h"
+#include "vfx/VFXEventQueue.h"
+#include "ability/AbilitySystem.h"
 
 #include <glm/glm.hpp>
 #include <memory>
@@ -47,10 +51,16 @@ private:
     std::unique_ptr<Sync>        m_sync;
     std::unique_ptr<Descriptors> m_descriptors;
     std::unique_ptr<Pipeline>    m_pipeline;   // forward pass, owns renderpass + FBs
+    DebugRenderer                m_debugRenderer;
 
     // ── Rendering extras ──────────────────────────────────────────────────
     std::unique_ptr<ClickIndicatorRenderer> m_clickIndicatorRenderer;
     Texture m_dummyShadow; // 1×1 white — bound to shadow-map slot so calcShadow()=1
+
+    // ── VFX system ────────────────────────────────────────────────────────
+    std::unique_ptr<VFXEventQueue> m_vfxQueue;        // SPSC bridge game→render
+    std::unique_ptr<VFXRenderer>   m_vfxRenderer;     // GPU particle pipeline
+    std::unique_ptr<AbilitySystem> m_abilitySystem;   // ability state machine
 
     // ── Scene ─────────────────────────────────────────────────────────────
     Scene            m_scene;
@@ -62,6 +72,7 @@ private:
     uint32_t  m_currentFrame  = 0;
     float     m_lastFrameTime = 0.0f;
     float     m_gameTime      = 0.0f;
+    float     m_currentDt     = 0.0f;   // dt for the current frame (set in drawFrame)
     bool      m_showGrid      = false;
     bool      m_wireframe     = false;
     entt::entity m_playerEntity = entt::null;
@@ -72,6 +83,16 @@ private:
         float     maxLife  = 0.25f;
     };
     std::optional<ClickAnim> m_clickAnim;
+
+    // ── Unit System state ─────────────────────────────────────────────────
+    SelectionState m_selection;
+    uint32_t m_minionMeshIndex = 0;
+    uint32_t m_minionTexIndex = 0;
+    Skeleton m_minionSkeleton;
+    std::vector<std::vector<SkinVertex>> m_minionSkinVertices;
+    std::vector<std::vector<Vertex>> m_minionBindPoseVertices;
+    std::vector<AnimationClip> m_minionClips;
+    float m_spawnTimer = 0.0f;
 
     // ── Per-frame CPU→GPU instance buffer (InstanceData per draw call) ────
     static constexpr uint32_t MAX_INSTANCES = 256;
@@ -95,6 +116,7 @@ private:
     void createSkinnedPipeline();
     void destroySkinnedPipeline();
     glm::vec3 screenToWorld(float mx, float my) const; // unproject to Y=0 plane
+    glm::vec2 worldToScreen(const glm::vec3& worldPos) const; // project world to screen pixels
 };
 
 } // namespace glory

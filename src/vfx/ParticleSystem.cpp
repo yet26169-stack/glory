@@ -1,0 +1,250 @@
+#include "vfx/ParticleSystem.h"
+#include "renderer/Device.h"
+#include "renderer/VkCheck.h"
+
+#include <glm/gtc/constants.hpp>
+
+#include <cstring>
+#include <algorithm>
+
+namespace glory {
+
+// ── Constructor ──────────────────────────────────────────────────────────────
+ParticleSystem::ParticleSystem(const Device&          device,
+                               const EmitterDef&      def,
+                               VkDescriptorSetLayout  descLayout,
+                               VkDescriptorPool       sharedPool,
+                               Texture*               atlas,
+                               glm::vec3              worldPosition,
+                               glm::vec3              direction,
+                               float                  scale,
+                               float                  overrideLifetime,
+                               uint32_t               handle)
+    : m_device     (&device)
+    , m_def        (&def)
+    , m_position   (worldPosition)
+    , m_direction  (glm::length(direction) > 0.001f ? glm::normalize(direction) : glm::vec3(0,1,0))
+    , m_scale      (scale)
+    , m_duration   (overrideLifetime > 0.f ? overrideLifetime : def.duration)
+    , m_looping    (def.looping)
+    , m_handle     (handle)
+    , m_rng        (std::random_device{}())
+{
+    m_maxParticles = std::min(def.maxParticles, MAX_PARTICLES_PER_EMITTER);
+
+    const VkDeviceSize bufSize = sizeof(GpuParticle) * m_maxParticles;
+
+    // Allocate SSBO with CPU_TO_GPU so we can write new particles from CPU
+    // while the compute shader reads+writes the buffer on the GPU.
+    m_ssboBuffer = Buffer(device.getAllocator(),
+                          bufSize,
+                          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                          VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+    m_particles = reinterpret_cast<GpuParticle*>(m_ssboBuffer.map());
+
+    // Zero all particles (marks them as inactive via params.w = 0)
+    std::memset(m_particles, 0, bufSize);
+
+    // Allocate descriptor set from the shared pool
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool     = sharedPool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts        = &descLayout;
+    vkAllocateDescriptorSets(device.getDevice(), &allocInfo, &m_descSet);
+
+    writeToDescriptorSet(descLayout, atlas);
+}
+
+// ── Destructor ────────────────────────────────────────────────────────────────
+ParticleSystem::~ParticleSystem() {
+    destroy();
+}
+
+void ParticleSystem::destroy() {
+    if (m_particles && m_ssboBuffer.getBuffer() != VK_NULL_HANDLE) {
+        m_ssboBuffer.unmap();
+        m_particles = nullptr;
+    }
+    // Descriptor set is freed when the pool is reset; no individual free needed.
+    m_descSet = VK_NULL_HANDLE;
+}
+
+// ── Move semantics ────────────────────────────────────────────────────────────
+ParticleSystem::ParticleSystem(ParticleSystem&& o) noexcept
+    : m_device      (o.m_device)
+    , m_def         (o.m_def)
+    , m_ssboBuffer  (std::move(o.m_ssboBuffer))
+    , m_particles   (o.m_particles)
+    , m_maxParticles(o.m_maxParticles)
+    , m_descSet     (o.m_descSet)
+    , m_position    (o.m_position)
+    , m_direction   (o.m_direction)
+    , m_scale       (o.m_scale)
+    , m_timeAlive   (o.m_timeAlive)
+    , m_duration    (o.m_duration)
+    , m_emitAccum   (o.m_emitAccum)
+    , m_looping     (o.m_looping)
+    , m_stopped     (o.m_stopped)
+    , m_burst       (o.m_burst)
+    , m_handle      (o.m_handle)
+    , m_rng         (std::move(o.m_rng))
+{
+    o.m_particles = nullptr;
+    o.m_descSet   = VK_NULL_HANDLE;
+}
+
+ParticleSystem& ParticleSystem::operator=(ParticleSystem&& o) noexcept {
+    if (this != &o) {
+        destroy();
+        m_device       = o.m_device;
+        m_def          = o.m_def;
+        m_ssboBuffer   = std::move(o.m_ssboBuffer);
+        m_particles    = o.m_particles;
+        m_maxParticles = o.m_maxParticles;
+        m_descSet      = o.m_descSet;
+        m_position     = o.m_position;
+        m_direction    = o.m_direction;
+        m_scale        = o.m_scale;
+        m_timeAlive    = o.m_timeAlive;
+        m_duration     = o.m_duration;
+        m_emitAccum    = o.m_emitAccum;
+        m_looping      = o.m_looping;
+        m_stopped      = o.m_stopped;
+        m_burst        = o.m_burst;
+        m_handle       = o.m_handle;
+        m_rng          = std::move(o.m_rng);
+        o.m_particles  = nullptr;
+        o.m_descSet    = VK_NULL_HANDLE;
+    }
+    return *this;
+}
+
+// ── update ─────────────────────────────────────────────────────────────────
+void ParticleSystem::update(float dt) {
+    if (!m_particles || !m_def) return;
+
+    m_timeAlive += dt;
+
+    const bool expired = !m_looping && (m_timeAlive >= m_duration);
+
+    if (!m_stopped && !expired) {
+        // Burst on very first frame
+        if (!m_burst && m_def->burstCount > 0.0f) {
+            m_burst = true;
+            for (int b = 0; b < static_cast<int>(m_def->burstCount); ++b) {
+                spawnParticle();
+            }
+        }
+
+        // Continuous emission
+        m_emitAccum += m_def->emitRate * dt;
+        while (m_emitAccum >= 1.0f) {
+            m_emitAccum -= 1.0f;
+            spawnParticle();
+        }
+    }
+}
+
+// ── isAlive ───────────────────────────────────────────────────────────────
+bool ParticleSystem::isAlive() const {
+    if (!m_particles) return false;
+
+    // Emitter is alive if it's still emitting OR any particle is still active
+    const bool stillEmitting = m_looping ||
+                               (!m_stopped && m_timeAlive < m_duration);
+    if (stillEmitting) return true;
+
+    for (uint32_t i = 0; i < m_maxParticles; ++i) {
+        if (m_particles[i].params.w > 0.5f) return true;
+    }
+    return false;
+}
+
+// ── spawnParticle ─────────────────────────────────────────────────────────
+void ParticleSystem::spawnParticle() {
+    // Find a dead slot (simple linear scan; fast for small emitters)
+    for (uint32_t i = 0; i < m_maxParticles; ++i) {
+        if (m_particles[i].params.w < 0.5f) {
+            GpuParticle& p = m_particles[i];
+
+            auto frand = [&](float lo, float hi) -> float {
+                std::uniform_real_distribution<float> d(lo, hi);
+                return d(m_rng);
+            };
+
+            // Randomise velocity inside a cone around m_direction
+            const float angleRad = glm::radians(m_def->spreadAngle);
+            const float theta    = frand(0.0f, glm::two_pi<float>());
+            const float phi      = frand(0.0f, angleRad);
+            const float sinPhi   = std::sin(phi);
+            const float cosPhi   = std::cos(phi);
+
+            // Build orthonormal basis around m_direction
+            glm::vec3 up    = (std::abs(m_direction.x) < 0.9f) ?
+                              glm::vec3(1, 0, 0) : glm::vec3(0, 1, 0);
+            glm::vec3 right = glm::normalize(glm::cross(m_direction, up));
+            up              = glm::cross(right, m_direction);
+
+            glm::vec3 vel = (m_direction * cosPhi
+                           + right        * sinPhi * std::cos(theta)
+                           + up           * sinPhi * std::sin(theta))
+                           * frand(m_def->initialSpeedMin, m_def->initialSpeedMax)
+                           * m_scale;
+
+            const float life = frand(m_def->lifetimeMin, m_def->lifetimeMax);
+            const float size = frand(m_def->sizeMin, m_def->sizeMax) * m_scale;
+
+            // Choose spawn colour: first key or white if not defined
+            glm::vec4 col{1.0f};
+            if (!m_def->colorOverLifetime.empty()) {
+                col = m_def->colorOverLifetime.front().color;
+            }
+
+            p.posLife = {m_position.x, m_position.y, m_position.z, life};
+            p.velAge  = {vel.x, vel.y, vel.z, 0.0f};
+            p.color   = col;
+            p.params  = {size, 0.0f, 0.0f, 1.0f}; // active = 1.0
+
+            return; // only spawn one particle per call
+        }
+    }
+}
+
+// ── writeToDescriptorSet ─────────────────────────────────────────────────
+void ParticleSystem::writeToDescriptorSet(VkDescriptorSetLayout /*layout*/,
+                                          Texture* atlas) {
+    VkDevice dev = m_device->getDevice();
+
+    // Binding 0 — storage buffer (SSBO)
+    VkDescriptorBufferInfo bufInfo{};
+    bufInfo.buffer = m_ssboBuffer.getBuffer();
+    bufInfo.offset = 0;
+    bufInfo.range  = VK_WHOLE_SIZE;
+
+    VkWriteDescriptorSet writes[2]{};
+    writes[0].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[0].dstSet          = m_descSet;
+    writes[0].dstBinding      = 0;
+    writes[0].descriptorCount = 1;
+    writes[0].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    writes[0].pBufferInfo     = &bufInfo;
+
+    // Binding 1 — combined image sampler (atlas)
+    VkDescriptorImageInfo imgInfo{};
+    imgInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imgInfo.imageView   = atlas->getImageView();
+    imgInfo.sampler     = atlas->getSampler();
+
+    writes[1].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[1].dstSet          = m_descSet;
+    writes[1].dstBinding      = 1;
+    writes[1].descriptorCount = 1;
+    writes[1].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writes[1].pImageInfo      = &imgInfo;
+
+    vkUpdateDescriptorSets(dev, 2, writes, 0, nullptr);
+}
+
+} // namespace glory

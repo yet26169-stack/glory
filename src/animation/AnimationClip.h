@@ -36,6 +36,10 @@ struct AnimationClip {
   std::string name;
   float duration = 0.0f;
   bool looping = true;
+  // Physical distance (engine units) the character covers in one full animation
+  // cycle, used for stride-length-based speed synchronization to eliminate foot
+  // sliding.  Set to 0 to fall back to moveSpeed-ratio scaling.
+  float strideLength = 0.0f;
   std::vector<AnimationChannel> channels;
 
   // Optional: the rest pose this clip was authored against.
