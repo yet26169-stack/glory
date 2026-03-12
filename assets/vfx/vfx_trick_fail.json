@@ -1,0 +1,21 @@
+{
+    "id":              "vfx_trick_fail",
+    "maxParticles":    32,
+    "emitRate":        0.0,
+    "burstCount":      24.0,
+    "looping":         false,
+    "duration":        0.4,
+    "lifetimeMin":     0.15,
+    "lifetimeMax":     0.35,
+    "initialSpeedMin": 1.0,
+    "initialSpeedMax": 3.0,
+    "sizeMin":         0.05,
+    "sizeMax":         0.15,
+    "spreadAngle":     180.0,
+    "gravity":         1.0,
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [1.0, 0.0, 0.0, 0.9]},
+        {"time": 0.5, "color": [0.5, 0.0, 0.0, 0.5]},
+        {"time": 1.0, "color": [0.2, 0.0, 0.0, 0.0]}
+    ]
+}

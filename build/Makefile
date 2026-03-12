@@ -842,6 +842,30 @@ src/ability/AbilitySystem.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/ability/AbilitySystem.cpp.s
 .PHONY : src/ability/AbilitySystem.cpp.s
 
+src/ability/ProjectileSystem.o: src/ability/ProjectileSystem.cpp.o
+.PHONY : src/ability/ProjectileSystem.o
+
+# target to build an object file
+src/ability/ProjectileSystem.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/ability/ProjectileSystem.cpp.o
+.PHONY : src/ability/ProjectileSystem.cpp.o
+
+src/ability/ProjectileSystem.i: src/ability/ProjectileSystem.cpp.i
+.PHONY : src/ability/ProjectileSystem.i
+
+# target to preprocess a source file
+src/ability/ProjectileSystem.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/ability/ProjectileSystem.cpp.i
+.PHONY : src/ability/ProjectileSystem.cpp.i
+
+src/ability/ProjectileSystem.s: src/ability/ProjectileSystem.cpp.s
+.PHONY : src/ability/ProjectileSystem.s
+
+# target to generate assembly for a file
+src/ability/ProjectileSystem.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/ability/ProjectileSystem.cpp.s
+.PHONY : src/ability/ProjectileSystem.cpp.s
+
 src/animation/AnimationPlayer.o: src/animation/AnimationPlayer.cpp.o
 .PHONY : src/animation/AnimationPlayer.o
 
@@ -913,6 +937,30 @@ src/camera/Camera.s: src/camera/Camera.cpp.s
 src/camera/Camera.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/camera/Camera.cpp.s
 .PHONY : src/camera/Camera.cpp.s
+
+src/combat/CombatSystem.o: src/combat/CombatSystem.cpp.o
+.PHONY : src/combat/CombatSystem.o
+
+# target to build an object file
+src/combat/CombatSystem.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/combat/CombatSystem.cpp.o
+.PHONY : src/combat/CombatSystem.cpp.o
+
+src/combat/CombatSystem.i: src/combat/CombatSystem.cpp.i
+.PHONY : src/combat/CombatSystem.i
+
+# target to preprocess a source file
+src/combat/CombatSystem.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/combat/CombatSystem.cpp.i
+.PHONY : src/combat/CombatSystem.cpp.i
+
+src/combat/CombatSystem.s: src/combat/CombatSystem.cpp.s
+.PHONY : src/combat/CombatSystem.s
+
+# target to generate assembly for a file
+src/combat/CombatSystem.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/combat/CombatSystem.cpp.s
+.PHONY : src/combat/CombatSystem.cpp.s
 
 src/core/Application.o: src/core/Application.cpp.o
 .PHONY : src/core/Application.o
@@ -1133,6 +1181,30 @@ src/renderer/ClickIndicatorRenderer.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/ClickIndicatorRenderer.cpp.s
 .PHONY : src/renderer/ClickIndicatorRenderer.cpp.s
 
+src/renderer/ConeAbilityRenderer.o: src/renderer/ConeAbilityRenderer.cpp.o
+.PHONY : src/renderer/ConeAbilityRenderer.o
+
+# target to build an object file
+src/renderer/ConeAbilityRenderer.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/ConeAbilityRenderer.cpp.o
+.PHONY : src/renderer/ConeAbilityRenderer.cpp.o
+
+src/renderer/ConeAbilityRenderer.i: src/renderer/ConeAbilityRenderer.cpp.i
+.PHONY : src/renderer/ConeAbilityRenderer.i
+
+# target to preprocess a source file
+src/renderer/ConeAbilityRenderer.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/ConeAbilityRenderer.cpp.i
+.PHONY : src/renderer/ConeAbilityRenderer.cpp.i
+
+src/renderer/ConeAbilityRenderer.s: src/renderer/ConeAbilityRenderer.cpp.s
+.PHONY : src/renderer/ConeAbilityRenderer.s
+
+# target to generate assembly for a file
+src/renderer/ConeAbilityRenderer.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/ConeAbilityRenderer.cpp.s
+.PHONY : src/renderer/ConeAbilityRenderer.cpp.s
+
 src/renderer/Context.o: src/renderer/Context.cpp.o
 .PHONY : src/renderer/Context.o
 
@@ -1228,6 +1300,30 @@ src/renderer/DynamicMesh.s: src/renderer/DynamicMesh.cpp.s
 src/renderer/DynamicMesh.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/DynamicMesh.cpp.s
 .PHONY : src/renderer/DynamicMesh.cpp.s
+
+src/renderer/ExplosionRenderer.o: src/renderer/ExplosionRenderer.cpp.o
+.PHONY : src/renderer/ExplosionRenderer.o
+
+# target to build an object file
+src/renderer/ExplosionRenderer.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/ExplosionRenderer.cpp.o
+.PHONY : src/renderer/ExplosionRenderer.cpp.o
+
+src/renderer/ExplosionRenderer.i: src/renderer/ExplosionRenderer.cpp.i
+.PHONY : src/renderer/ExplosionRenderer.i
+
+# target to preprocess a source file
+src/renderer/ExplosionRenderer.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/ExplosionRenderer.cpp.i
+.PHONY : src/renderer/ExplosionRenderer.cpp.i
+
+src/renderer/ExplosionRenderer.s: src/renderer/ExplosionRenderer.cpp.s
+.PHONY : src/renderer/ExplosionRenderer.s
+
+# target to generate assembly for a file
+src/renderer/ExplosionRenderer.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/ExplosionRenderer.cpp.s
+.PHONY : src/renderer/ExplosionRenderer.cpp.s
 
 src/renderer/GLBLoader.o: src/renderer/GLBLoader.cpp.o
 .PHONY : src/renderer/GLBLoader.o
@@ -1396,6 +1492,54 @@ src/renderer/Renderer.s: src/renderer/Renderer.cpp.s
 src/renderer/Renderer.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/Renderer.cpp.s
 .PHONY : src/renderer/Renderer.cpp.s
+
+src/renderer/ShieldBubbleRenderer.o: src/renderer/ShieldBubbleRenderer.cpp.o
+.PHONY : src/renderer/ShieldBubbleRenderer.o
+
+# target to build an object file
+src/renderer/ShieldBubbleRenderer.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/ShieldBubbleRenderer.cpp.o
+.PHONY : src/renderer/ShieldBubbleRenderer.cpp.o
+
+src/renderer/ShieldBubbleRenderer.i: src/renderer/ShieldBubbleRenderer.cpp.i
+.PHONY : src/renderer/ShieldBubbleRenderer.i
+
+# target to preprocess a source file
+src/renderer/ShieldBubbleRenderer.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/ShieldBubbleRenderer.cpp.i
+.PHONY : src/renderer/ShieldBubbleRenderer.cpp.i
+
+src/renderer/ShieldBubbleRenderer.s: src/renderer/ShieldBubbleRenderer.cpp.s
+.PHONY : src/renderer/ShieldBubbleRenderer.s
+
+# target to generate assembly for a file
+src/renderer/ShieldBubbleRenderer.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/ShieldBubbleRenderer.cpp.s
+.PHONY : src/renderer/ShieldBubbleRenderer.cpp.s
+
+src/renderer/SpriteEffectRenderer.o: src/renderer/SpriteEffectRenderer.cpp.o
+.PHONY : src/renderer/SpriteEffectRenderer.o
+
+# target to build an object file
+src/renderer/SpriteEffectRenderer.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/SpriteEffectRenderer.cpp.o
+.PHONY : src/renderer/SpriteEffectRenderer.cpp.o
+
+src/renderer/SpriteEffectRenderer.i: src/renderer/SpriteEffectRenderer.cpp.i
+.PHONY : src/renderer/SpriteEffectRenderer.i
+
+# target to preprocess a source file
+src/renderer/SpriteEffectRenderer.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/SpriteEffectRenderer.cpp.i
+.PHONY : src/renderer/SpriteEffectRenderer.cpp.i
+
+src/renderer/SpriteEffectRenderer.s: src/renderer/SpriteEffectRenderer.cpp.s
+.PHONY : src/renderer/SpriteEffectRenderer.s
+
+# target to generate assembly for a file
+src/renderer/SpriteEffectRenderer.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Glory.dir/build.make CMakeFiles/Glory.dir/src/renderer/SpriteEffectRenderer.cpp.s
+.PHONY : src/renderer/SpriteEffectRenderer.cpp.s
 
 src/renderer/StaticSkinnedMesh.o: src/renderer/StaticSkinnedMesh.cpp.o
 .PHONY : src/renderer/StaticSkinnedMesh.o
@@ -1783,6 +1927,9 @@ help:
 	@echo "... src/ability/AbilitySystem.o"
 	@echo "... src/ability/AbilitySystem.i"
 	@echo "... src/ability/AbilitySystem.s"
+	@echo "... src/ability/ProjectileSystem.o"
+	@echo "... src/ability/ProjectileSystem.i"
+	@echo "... src/ability/ProjectileSystem.s"
 	@echo "... src/animation/AnimationPlayer.o"
 	@echo "... src/animation/AnimationPlayer.i"
 	@echo "... src/animation/AnimationPlayer.s"
@@ -1792,6 +1939,9 @@ help:
 	@echo "... src/camera/Camera.o"
 	@echo "... src/camera/Camera.i"
 	@echo "... src/camera/Camera.s"
+	@echo "... src/combat/CombatSystem.o"
+	@echo "... src/combat/CombatSystem.i"
+	@echo "... src/combat/CombatSystem.s"
 	@echo "... src/core/Application.o"
 	@echo "... src/core/Application.i"
 	@echo "... src/core/Application.s"
@@ -1819,6 +1969,9 @@ help:
 	@echo "... src/renderer/ClickIndicatorRenderer.o"
 	@echo "... src/renderer/ClickIndicatorRenderer.i"
 	@echo "... src/renderer/ClickIndicatorRenderer.s"
+	@echo "... src/renderer/ConeAbilityRenderer.o"
+	@echo "... src/renderer/ConeAbilityRenderer.i"
+	@echo "... src/renderer/ConeAbilityRenderer.s"
 	@echo "... src/renderer/Context.o"
 	@echo "... src/renderer/Context.i"
 	@echo "... src/renderer/Context.s"
@@ -1831,6 +1984,9 @@ help:
 	@echo "... src/renderer/DynamicMesh.o"
 	@echo "... src/renderer/DynamicMesh.i"
 	@echo "... src/renderer/DynamicMesh.s"
+	@echo "... src/renderer/ExplosionRenderer.o"
+	@echo "... src/renderer/ExplosionRenderer.i"
+	@echo "... src/renderer/ExplosionRenderer.s"
 	@echo "... src/renderer/GLBLoader.o"
 	@echo "... src/renderer/GLBLoader.i"
 	@echo "... src/renderer/GLBLoader.s"
@@ -1852,6 +2008,12 @@ help:
 	@echo "... src/renderer/Renderer.o"
 	@echo "... src/renderer/Renderer.i"
 	@echo "... src/renderer/Renderer.s"
+	@echo "... src/renderer/ShieldBubbleRenderer.o"
+	@echo "... src/renderer/ShieldBubbleRenderer.i"
+	@echo "... src/renderer/ShieldBubbleRenderer.s"
+	@echo "... src/renderer/SpriteEffectRenderer.o"
+	@echo "... src/renderer/SpriteEffectRenderer.i"
+	@echo "... src/renderer/SpriteEffectRenderer.s"
 	@echo "... src/renderer/StaticSkinnedMesh.o"
 	@echo "... src/renderer/StaticSkinnedMesh.i"
 	@echo "... src/renderer/StaticSkinnedMesh.s"

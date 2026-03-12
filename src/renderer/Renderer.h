@@ -6,6 +6,10 @@
 #include "camera/Camera.h"
 #include "renderer/Buffer.h"
 #include "renderer/ClickIndicatorRenderer.h"
+#include "renderer/ShieldBubbleRenderer.h"
+#include "renderer/ConeAbilityRenderer.h"
+#include "renderer/ExplosionRenderer.h"
+#include "renderer/SpriteEffectRenderer.h"
 #include "renderer/Context.h"
 #include "renderer/Descriptors.h"
 #include "renderer/Device.h"
@@ -20,6 +24,9 @@
 #include "vfx/VFXRenderer.h"
 #include "vfx/VFXEventQueue.h"
 #include "ability/AbilitySystem.h"
+#include "ability/ProjectileSystem.h"
+#include "combat/CombatComponents.h"
+#include "combat/CombatSystem.h"
 
 #include <glm/glm.hpp>
 #include <memory>
@@ -55,12 +62,29 @@ private:
 
     // ── Rendering extras ──────────────────────────────────────────────────
     std::unique_ptr<ClickIndicatorRenderer> m_clickIndicatorRenderer;
+    std::unique_ptr<ShieldBubbleRenderer>   m_shieldBubble;
+    std::unique_ptr<ConeAbilityRenderer>    m_coneEffect;
+    std::unique_ptr<ExplosionRenderer>      m_explosionRenderer;
+    std::unique_ptr<SpriteEffectRenderer>   m_spriteEffectRenderer;
+    uint32_t m_spriteEffectConeW      = 0;
+    uint32_t m_spriteEffectExplosionE = 0;
+
+    // ── W-ability cone effect state ───────────────────────────────────────
+    static constexpr float CONE_DURATION   = 0.9f;   // 0.6s wave + 0.3s fade
+    static constexpr float CONE_HALF_ANGLE = 0.698f;  // ~40 degrees in radians
+    static constexpr float CONE_RANGE      = 15.0f;
+    float     m_coneEffectTimer = 0.0f;
+    glm::vec3 m_coneDirection   = {0.0f, 0.0f, 1.0f};
+    glm::vec3 m_coneApex        = {0.0f, 0.0f, 0.0f};  // latched at cast time
     Texture m_dummyShadow; // 1×1 white — bound to shadow-map slot so calcShadow()=1
 
     // ── VFX system ────────────────────────────────────────────────────────
-    std::unique_ptr<VFXEventQueue> m_vfxQueue;        // SPSC bridge game→render
+    std::unique_ptr<VFXEventQueue> m_vfxQueue;        // SPSC bridge game→render (AbilitySystem)
+    std::unique_ptr<VFXEventQueue> m_combatVfxQueue;  // SPSC bridge CombatSystem→render
     std::unique_ptr<VFXRenderer>   m_vfxRenderer;     // GPU particle pipeline
     std::unique_ptr<AbilitySystem> m_abilitySystem;   // ability state machine
+    std::unique_ptr<ProjectileSystem> m_projectileSystem; // moves projectile entities
+    std::unique_ptr<CombatSystem>  m_combatSystem;    // auto-attack / shield / trick
 
     // ── Scene ─────────────────────────────────────────────────────────────
     Scene            m_scene;
@@ -75,7 +99,10 @@ private:
     float     m_currentDt     = 0.0f;   // dt for the current frame (set in drawFrame)
     bool      m_showGrid      = false;
     bool      m_wireframe     = false;
-    entt::entity m_playerEntity = entt::null;
+    bool      m_showDebugUI   = false;   // Tab-toggled ImGui debug overlay
+    bool      m_fogEnabled    = true;    // Fog on/off (toggle from debug UI)
+    entt::entity m_playerEntity  = entt::null;
+    entt::entity m_hoveredEntity = entt::null;
 
     struct ClickAnim {
         glm::vec3 position{};
@@ -88,6 +115,7 @@ private:
     SelectionState m_selection;
     uint32_t m_minionMeshIndex = 0;
     uint32_t m_minionTexIndex = 0;
+    uint32_t m_flatNormIndex  = 0;   // shared flat normal map texture index
     Skeleton m_minionSkeleton;
     std::vector<std::vector<SkinVertex>> m_minionSkinVertices;
     std::vector<std::vector<Vertex>> m_minionBindPoseVertices;
@@ -105,6 +133,9 @@ private:
     VkPipelineLayout m_skinnedPipelineLayout = VK_NULL_HANDLE;
     VkPipeline       m_skinnedPipeline       = VK_NULL_HANDLE;
 
+    // ── ImGui ─────────────────────────────────────────────────────────────
+    VkDescriptorPool m_imguiPool = VK_NULL_HANDLE;
+
     // ── Helpers ───────────────────────────────────────────────────────────
     void buildScene();
     void recreateSwapchain();
@@ -117,6 +148,9 @@ private:
     void destroySkinnedPipeline();
     glm::vec3 screenToWorld(float mx, float my) const; // unproject to Y=0 plane
     glm::vec2 worldToScreen(const glm::vec3& worldPos) const; // project world to screen pixels
+
+    void spawnTestEnemy();
+    entt::entity pickEntityUnderCursor();
 };
 
 } // namespace glory

@@ -1,0 +1,44 @@
+{
+    "id": "fire_mage_bomb",
+    "displayName": "Incendiary Bomb",
+    "slot": "E",
+    "targeting": "POINT",
+    "resourceType": "MANA",
+    "costPerLevel": [70, 75, 80, 85, 90],
+    "cooldownPerLevel": [12.0, 11.0, 10.0, 9.0, 8.0],
+    "castTime": 0.2,
+    "channelDuration": 0.0,
+    "canMoveWhileCasting": true,
+    "canBeInterrupted": true,
+    "castRange": 40.0,
+    "areaShape": "CIRCLE",
+    "areaRadius": 4.0,
+    "projectile": {
+        "isLob": true,
+        "lobFlightTime": 1.0,
+        "lobApexHeight": 9.0,
+        "speed": 0.0,
+        "maxRange": 40.0,
+        "width": 0.6,
+        "piercing": false,
+        "maxTargets": -1,
+        "destroyOnWall": false
+    },
+    "onHitEffects": [
+        {
+            "type": "DAMAGE",
+            "damageType": "MAGICAL",
+            "scaling": {
+                "basePerLevel": [90, 145, 200, 255, 310],
+                "apRatio": 0.65
+            }
+        }
+    ],
+    "onSelfEffects": [],
+    "castVFX": "",
+    "projectileVFX": "vfx_bomb_trail",
+    "impactVFX": "vfx_bomb_impact",
+    "castSFX": "",
+    "impactSFX": "",
+    "tags": ["damage", "aoe", "magical", "lob"]
+}

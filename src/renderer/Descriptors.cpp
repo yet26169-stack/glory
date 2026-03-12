@@ -62,12 +62,16 @@ uint32_t Descriptors::writeBoneSlot(uint32_t frameIndex, uint32_t slotIndex,
     size_t offsetBytes = static_cast<size_t>(slot) * MAX_BONES * sizeof(glm::mat4);
     std::memcpy(static_cast<char*>(m_boneBuffers[frameIndex].map()) + offsetBytes,
                 matrices.data(), sizeof(glm::mat4) * count);
-    
-    m_boneBuffers[frameIndex].flush(); // Crucial for non-coherent memory
+    // Flush is intentionally deferred — call flushBones() once after all
+    // slots are written to avoid N redundant VK_WHOLE_SIZE flushes per frame.
 
     // Return the index of the first bone for this slot (used as push constant
     // boneBaseIndex in the vertex shader)
     return slot * MAX_BONES;
+}
+
+void Descriptors::flushBones(uint32_t frameIndex) {
+    m_boneBuffers[frameIndex].flush();
 }
 
 void Descriptors::writeBindlessTexture(uint32_t arrayIndex, VkImageView imageView, VkSampler sampler) {

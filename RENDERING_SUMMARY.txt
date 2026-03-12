@@ -1,0 +1,357 @@
+================================================================================
+  GLORY ENGINE - RENDERING & VFX SYSTEM EXPLORATION COMPLETE
+================================================================================
+
+DOCUMENTS CREATED:
+  1. RENDERING_VFX_SYSTEM_DEEP_DIVE.md (1102 lines, 35KB)
+     → Complete technical reference
+     → Every file, function, and pipeline explained
+     → Performance considerations & troubleshooting
+  
+  2. VFX_QUICK_START.md (300+ lines)
+     → Get started in 5 minutes
+     → Common recipes (fireball, shield, explosion, etc.)
+     → Easy reference for parameters
+
+================================================================================
+  SHADER FILES INVENTORY (12 files)
+================================================================================
+
+PARTICLE SYSTEM SHADERS:
+  ✓ particle.vert           - Billboard expansion (SSBO-driven, no vertex buffer)
+  ✓ particle.frag           - Atlas sampling + alpha blend
+  ✓ particle_sim.comp       - GPU simulation (Euler integration, gravity, fade)
+
+MODEL RENDERING SHADERS:
+  ✓ triangle.vert           - Standard model vertex (skinning support)
+  ✓ triangle.frag           - PBR + fog + shadow mapping
+  ✓ skinned.vert            - GPU skeletal animation (up to 4 bones/vertex)
+
+DEBUG & UI SHADERS:
+  ✓ debug.vert/frag         - Immediate-mode line renderer
+  ✓ grid.vert/frag          - Infinite ground grid (anti-aliased)
+  ✓ click_indicator.vert/frag - Click animation UI (sprite atlas)
+
+================================================================================
+  VFX SYSTEM ARCHITECTURE
+================================================================================
+
+LOCK-FREE COMMUNICATION:
+  Game Thread (AbilitySystem)
+    → VFXEventQueue (SPSC ring buffer, 256 slots)
+       → Render Thread (VFXRenderer)
+          → GPU (particle compute shader)
+
+KEY COMPONENTS:
+  1. VFXEventQueue       - Lock-free SPSC (Single Producer, Single Consumer)
+  2. VFXRenderer         - Master orchestrator (compute + graphics pipelines)
+  3. ParticleSystem      - Single active emitter (SSBO + CPU emission)
+  4. GpuParticle         - 64-byte particle struct (cache-line aligned)
+  5. EmitterDef          - JSON-driven configuration
+
+PER-FRAME EXECUTION:
+  1. processQueue()      - Drain game events (Spawn/Destroy/Move)
+  2. update(dt)          - CPU emission bookkeeping
+  3. dispatchCompute()   - GPU simulation (outside render pass)
+  4. barrier()           - Synchronize SSBO writes
+  5. render()            - Draw billboards (inside render pass)
+
+================================================================================
+  RENDERING PIPELINE FEATURES
+================================================================================
+
+PBR (Physically-Based Rendering):
+  ✓ Cook-Torrance BRDF
+  ✓ Fresnel-Schlick approximation
+  ✓ GGX normal distribution
+  ✓ Schlick-GGX geometry (Smith method)
+  ✓ Normal mapping (cotangent-frame TBN)
+  ✓ Subsurface scattering (wrap lighting)
+  ✓ Fresnel rim lighting
+  ✓ Thin-film iridescence
+  ✓ Clearcoat layer
+
+ADVANCED FEATURES:
+  ✓ Bindless texture array (64 textures via nonuniformEXT)
+  ✓ Shadow mapping (16-sample Poisson disc)
+  ✓ Distance fog (exponential decay)
+  ✓ Micro AO (curvature-based)
+  ✓ Emissive glow
+  ✓ Per-instance material properties (metallic, roughness, emissive)
+
+GPU SKINNING:
+  ✓ Up to 4 bone influences per vertex
+  ✓ Shared bone SSBO (ring-buffer for multiple characters)
+  ✓ Normal transformation via normal matrix
+
+================================================================================
+  DEBUG UI & OVERLAYS
+================================================================================
+
+DebugRenderer:
+  • Immediate-mode line/shape rendering
+  • Supports: lines, circles, AABBs, spheres
+  • Used for: pathfinding viz, collision volumes, navigation grid
+  • Auto-growing vertex buffer (CPU_TO_GPU)
+
+ClickIndicatorRenderer:
+  • Sprite-based UI animations
+  • Atlas texture with frame indexing
+  • Per-frame animation control
+  • Tinting support
+
+Grid Renderer:
+  • Infinite world-space grid at Y=gridY
+  • Fine (1 unit) and coarse (5 unit) grid lines
+  • Anti-aliased via fwidth()
+  • Distance fade and axis highlighting
+
+================================================================================
+  FOG SYSTEM
+================================================================================
+
+PARAMETERS (in LightUBO, src/renderer/Descriptors.h):
+  fogColor:   glm::vec3 (default: 0.6, 0.65, 0.75) - Blueish-gray
+  fogDensity: float     (default: 0.03)             - Exponential strength
+  fogStart:   float     (default: 5.0)              - Near edge (meters)
+  fogEnd:     float     (default: 50.0)             - Far edge (meters)
+
+FORMULA (in triangle.frag):
+  fogFactor = exp(-fogDensity * max(distance - fogStart, 0.0))
+  result = mix(fogColor, result, fogFactor)
+
+HOW IT WORKS:
+  • Exponential decay from fogStart to fogEnd
+  • Completely transparent fog at fogStart
+  • Exponential falloff controlled by fogDensity
+  • Linear lerp between fog color and rendered pixel
+
+================================================================================
+  DATA-DRIVEN SYSTEMS (JSON)
+================================================================================
+
+EMITTER DEFINITIONS (assets/vfx/*.json):
+  id                      - Unique emitter identifier
+  textureAtlas            - Particle atlas texture path
+  maxParticles            - Budget (1-2048)
+  emitRate                - Continuous emission (particles/sec)
+  burstCount              - Instant spawn on creation
+  looping                 - Repeat emission or one-shot
+  duration                - Emitter lifetime (seconds)
+  lifetimeMin/Max         - Individual particle duration
+  initialSpeedMin/Max     - Velocity magnitude (m/s)
+  sizeMin/Max             - Billboard size (world units)
+  spreadAngle             - Cone spread (0-180 degrees)
+  gravity                 - Downward acceleration (m/s²)
+  colorOverLifetime       - Color gradient keys [time, rgba]
+
+ABILITY DEFINITIONS (assets/abilities/*.json):
+  castVFX                 - Emitter ID at cast start
+  projectileVFX           - Follows projectile (if applicable)
+  impactVFX               - Spawned on hit/expiration
+
+EXAMPLE VFX RECIPES:
+  Fireball Projectile:    spreadAngle=80, emitRate=80, gravity=0
+  Shield Burst:           burstCount=30, spreadAngle=180, gravity=0
+  Impact Explosion:       burstCount=120, gravity=5, spreadAngle=180
+  Healing Aura:           looping=true, emitRate=20, gravity=0
+
+================================================================================
+  ADDING NEW VFX - QUICK REFERENCE
+================================================================================
+
+1. CREATE JSON (assets/vfx/vfx_my_effect.json)
+   ```
+   {
+     "id": "vfx_my_effect",
+     "maxParticles": 128,
+     "emitRate": 50.0,
+     "spreadAngle": 30.0,
+     "gravity": 3.0,
+     "colorOverLifetime": [...]
+   }
+   ```
+
+2. REFERENCE IN ABILITY (assets/abilities/my_ability.json)
+   ```
+   {
+     "castVFX": "vfx_my_effect",
+     "impactVFX": "vfx_my_effect"
+   }
+   ```
+
+3. THAT'S IT!
+   System auto-loads JSONs and fires events through SPSC queue
+
+================================================================================
+  KEY SOURCE FILES
+================================================================================
+
+VFX CORE:
+  src/vfx/VFXTypes.h            - Data structures (GpuParticle, EmitterDef)
+  src/vfx/VFXEventQueue.h       - Lock-free SPSC ring buffer
+  src/vfx/ParticleSystem.h/cpp  - Single active emitter (SSBO + CPU spawn)
+  src/vfx/VFXRenderer.h/cpp     - Master orchestrator (pipelines, pool)
+
+RENDERING:
+  src/renderer/Renderer.h/cpp   - Main render loop orchestration
+  src/renderer/Pipeline.h/cpp   - Forward render pass + framebuffers
+  src/renderer/Descriptors.h    - Uniform buffers (fog, lights, bones)
+  src/renderer/ClickIndicatorRenderer.h/cpp - Click UI
+
+DEBUG:
+  src/nav/DebugRenderer.h/cpp   - Immediate-mode shape renderer
+
+ABILITY SYSTEM:
+  src/ability/AbilitySystem.h/cpp - Game logic → VFX event emission
+
+SHADERS (all in shaders/):
+  particle*.{vert,frag,comp}    - GPU particle pipeline
+  triangle.{vert,frag}          - PBR model rendering
+  skinned.vert                  - GPU skeletal animation
+  debug.{vert,frag}             - Debug line rendering
+  grid.{vert,frag}              - Infinite grid
+  click_indicator.{vert,frag}   - Click animation
+
+================================================================================
+  PERFORMANCE STATS
+================================================================================
+
+LIMITS:
+  Max particles per emitter:    2048
+  Max concurrent emitters:      32
+  Total max particles:          65,536
+  VFX event queue capacity:     256
+
+MEMORY:
+  GpuParticle size:             64 bytes (4 × vec4)
+  Per-emitter SSBO:             ~128 KB (2048 particles)
+  All emitter SSBOs:            ~4 MB
+  Event queue:                  ~64 KB (256 slots)
+
+OPTIMIZATION TECHNIQUES:
+  ✓ GPU-side simulation (no GPU→CPU round-trip)
+  ✓ Lock-free queue (no mutex overhead)
+  ✓ Cache-line padding (no false sharing)
+  ✓ Persistent mapping (CPU_TO_GPU memory)
+  ✓ Shared descriptor pool (no fragmentation)
+  ✓ Single compute pipeline (batched dispatch)
+
+================================================================================
+  TROUBLESHOOTING CHECKLIST
+================================================================================
+
+Particles not rendering?
+  □ Check ParticleSystem::isAlive() logic
+  □ Verify descriptor binding 1 (atlas texture)
+  □ Check pipeline has depth test ON, depth write OFF
+  □ Ensure compute shader fired before render
+  □ Check memory barrier between compute & graphics
+
+Fog not visible?
+  □ Increase fogDensity (default 0.03 might be too subtle)
+  □ Verify fogColor doesn't match sky
+  □ Check fogStart/fogEnd range (5-50m default)
+  □ Ensure LightUBO updates each frame
+
+VFX events dropped?
+  □ Queue capacity is 256 (check game frame rate)
+  □ Verify render thread drains queue
+  □ Check AbilitySystem calls update() each frame
+  □ Ensure SPSC queue memory ordering is correct
+
+Debug overlay not showing?
+  □ Enable m_debugRenderer.setEnabled(true)
+  □ Check pipeline has correct render pass
+  □ Verify vertices are being accumulated (clear() each frame)
+  □ Check dynamic viewport/scissor are set
+
+================================================================================
+  NEXT STEPS
+================================================================================
+
+To extend the rendering system:
+
+1. ADD VFX EFFECT (5 min)
+   - Create EmitterDef JSON
+   - Reference in ability JSON
+   - Done!
+
+2. CUSTOMIZE PARTICLE SHADER (30 min)
+   - Modify particle.vert/frag
+   - Add rotation, distortion, emission, etc.
+   - Recompile SPIR-V and restart
+
+3. ADD FOG CONTROL UI (15 min)
+   - Hook up keyboard input to update LightUBO
+   - Live fog parameter adjustment
+
+4. IMPLEMENT IMGUI (2-3 hours)
+   - Add ImGui Vulkan backend
+   - Create debug stats overlay
+   - Ability/effect parameter tweaking
+
+5. EXTEND COMPUTE SHADER (1 hour)
+   - Add wind forces, air resistance
+   - Color animation over lifetime
+   - Custom particle behaviors
+
+================================================================================
+  DOCUMENTATION STRUCTURE
+================================================================================
+
+This folder now contains:
+
+RENDERING_VFX_SYSTEM_DEEP_DIVE.md
+  → Comprehensive 1100+ line technical reference
+  → Every component, pipeline, and shader explained
+  → Data flow diagrams, code examples
+  → Performance and optimization details
+
+VFX_QUICK_START.md
+  → 300+ line practical guide
+  → JSON examples and recipes
+  → Parameter explanations
+  → Common use cases
+
+Vulkan_VFX_TDD_for_MOBA.md (existing)
+  → Original design document
+  → Architecture overview
+  → Roadmap and future extensions
+
+RENDERING_SUMMARY.txt (this file)
+  → Quick reference checkpoint
+  → File inventory and locations
+  → Key metrics and limits
+  → Troubleshooting checklist
+
+================================================================================
+  QUESTIONS? CHECK:
+================================================================================
+
+"How do I add a new VFX?"
+  → VFX_QUICK_START.md, Section "TL;DR"
+
+"How does the rendering pipeline work?"
+  → RENDERING_VFX_SYSTEM_DEEP_DIVE.md, Section 2 + 4
+
+"Where's the fog code?"
+  → RENDERING_VFX_SYSTEM_DEEP_DIVE.md, Section 6
+  → or src/renderer/Descriptors.h, lines 36-39
+
+"What shaders exist?"
+  → RENDERING_SUMMARY.txt, Section "SHADER FILES INVENTORY"
+  → or RENDERING_VFX_SYSTEM_DEEP_DIVE.md, Section 1
+
+"How do I debug particles?"
+  → RENDERING_SUMMARY.txt, Section "TROUBLESHOOTING CHECKLIST"
+  → or RENDERING_VFX_SYSTEM_DEEP_DIVE.md, Section 12
+
+"How do I draw debug UI?"
+  → RENDERING_VFX_SYSTEM_DEEP_DIVE.md, Section 9
+
+"How do I add attack slashes/shields/projectiles?"
+  → VFX_QUICK_START.md, Sections "Attack Slashes", "Shields", "Projectiles"
+  → or RENDERING_VFX_SYSTEM_DEEP_DIVE.md, Section 8
+
+================================================================================

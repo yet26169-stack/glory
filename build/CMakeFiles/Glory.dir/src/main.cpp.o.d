@@ -1018,7 +1018,6 @@ CMakeFiles/Glory.dir/src/main.cpp.o: \
   /opt/homebrew/include/spdlog/details/circular_q.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/cassert \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/assert.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/_assert.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/_static_assert.h \
   /opt/homebrew/include/spdlog/details/log_msg_buffer.h \
   /opt/homebrew/include/spdlog/details/log_msg.h \
@@ -1334,33 +1333,8 @@ CMakeFiles/Glory.dir/src/main.cpp.o: \
   /Users/donkey/Development/1/Glory/src/renderer/ClickIndicatorRenderer.h \
   /Users/donkey/Development/1/Glory/src/renderer/Texture.h \
   /Users/donkey/Development/1/Glory/src/renderer/Image.h \
-  /Users/donkey/Development/1/Glory/src/renderer/Context.h \
-  /Users/donkey/Development/1/Glory/src/renderer/Descriptors.h \
-  /Users/donkey/Development/1/Glory/src/renderer/Device.h \
-  /Users/donkey/Development/1/Glory/src/renderer/Pipeline.h \
-  /Users/donkey/Development/1/Glory/src/renderer/Swapchain.h \
-  /Users/donkey/Development/1/Glory/src/renderer/Sync.h \
-  /Users/donkey/Development/1/Glory/src/input/InputManager.h \
-  /Users/donkey/Development/1/Glory/src/scene/Scene.h \
-  /Users/donkey/Development/1/Glory/src/scene/Components.h \
-  /Users/donkey/Development/1/Glory/src/renderer/Frustum.h \
-  /Users/donkey/Development/1/Glory/extern/entt/entt.hpp \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/list \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/map \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__tree \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/set \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/unordered_set \
-  /Users/donkey/Development/1/Glory/src/renderer/DynamicMesh.h \
-  /Users/donkey/Development/1/Glory/src/renderer/Model.h \
-  /Users/donkey/Development/1/Glory/src/renderer/Mesh.h \
-  /Users/donkey/Development/1/Glory/src/renderer/StaticSkinnedMesh.h \
-  /Users/donkey/Development/1/Glory/src/renderer/Material.h \
-  /Users/donkey/Development/1/Glory/src/terrain/IsometricCamera.h \
-  /Users/donkey/Development/1/Glory/src/nav/DebugRenderer.h \
-  /Users/donkey/Development/1/Glory/src/vfx/VFXRenderer.h \
-  /Users/donkey/Development/1/Glory/src/vfx/VFXTypes.h \
-  /Users/donkey/Development/1/Glory/src/vfx/VFXEventQueue.h \
-  /Users/donkey/Development/1/Glory/src/vfx/ParticleSystem.h \
+  /Users/donkey/Development/1/Glory/src/renderer/ShieldBubbleRenderer.h \
+  /Users/donkey/Development/1/Glory/src/renderer/ConeAbilityRenderer.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/random \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/bernoulli_distribution.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/uniform_real_distribution.h \
@@ -1412,6 +1386,35 @@ CMakeFiles/Glory.dir/src/main.cpp.o: \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/seed_seq.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/student_t_distribution.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/weibull_distribution.h \
+  /Users/donkey/Development/1/Glory/src/renderer/ExplosionRenderer.h \
+  /Users/donkey/Development/1/Glory/src/renderer/SpriteEffectRenderer.h \
+  /Users/donkey/Development/1/Glory/src/renderer/Context.h \
+  /Users/donkey/Development/1/Glory/src/renderer/Descriptors.h \
+  /Users/donkey/Development/1/Glory/src/renderer/Device.h \
+  /Users/donkey/Development/1/Glory/src/renderer/Pipeline.h \
+  /Users/donkey/Development/1/Glory/src/renderer/Swapchain.h \
+  /Users/donkey/Development/1/Glory/src/renderer/Sync.h \
+  /Users/donkey/Development/1/Glory/src/input/InputManager.h \
+  /Users/donkey/Development/1/Glory/src/scene/Scene.h \
+  /Users/donkey/Development/1/Glory/src/scene/Components.h \
+  /Users/donkey/Development/1/Glory/src/renderer/Frustum.h \
+  /Users/donkey/Development/1/Glory/extern/entt/entt.hpp \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/list \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/map \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__tree \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/set \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/unordered_set \
+  /Users/donkey/Development/1/Glory/src/renderer/DynamicMesh.h \
+  /Users/donkey/Development/1/Glory/src/renderer/Model.h \
+  /Users/donkey/Development/1/Glory/src/renderer/Mesh.h \
+  /Users/donkey/Development/1/Glory/src/renderer/StaticSkinnedMesh.h \
+  /Users/donkey/Development/1/Glory/src/renderer/Material.h \
+  /Users/donkey/Development/1/Glory/src/terrain/IsometricCamera.h \
+  /Users/donkey/Development/1/Glory/src/nav/DebugRenderer.h \
+  /Users/donkey/Development/1/Glory/src/vfx/VFXRenderer.h \
+  /Users/donkey/Development/1/Glory/src/vfx/VFXTypes.h \
+  /Users/donkey/Development/1/Glory/src/vfx/VFXEventQueue.h \
+  /Users/donkey/Development/1/Glory/src/vfx/ParticleSystem.h \
   /Users/donkey/Development/1/Glory/src/ability/AbilitySystem.h \
   /Users/donkey/Development/1/Glory/src/ability/AbilityTypes.h \
   /Users/donkey/Development/1/Glory/src/ability/AbilityComponents.h \
@@ -1468,4 +1471,7 @@ CMakeFiles/Glory.dir/src/main.cpp.o: \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__ranges/transform_view.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__ranges/views.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__ranges/istream_view.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/any
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/any \
+  /Users/donkey/Development/1/Glory/src/ability/ProjectileSystem.h \
+  /Users/donkey/Development/1/Glory/src/combat/CombatComponents.h \
+  /Users/donkey/Development/1/Glory/src/combat/CombatSystem.h

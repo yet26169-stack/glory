@@ -11,6 +11,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace glory {
@@ -108,6 +109,17 @@ private:
     // ── Active effects ─────────────────────────────────────────────────────
     std::vector<ParticleSystem> m_effects;
     uint32_t                    m_nextHandle = 1;
+
+    // ── Deferred deletion graveyard ────────────────────────────────────────
+    // ParticleSystems moved here when dead; destroyed only after GPU is done.
+    // Each entry holds the frame threshold after which destruction is safe.
+    static constexpr int GRAVEYARD_DELAY = 3; // MAX_FRAMES_IN_FLIGHT(2) + 1
+    struct GraveyardEntry {
+        int            killFrame;
+        ParticleSystem ps;
+    };
+    std::vector<GraveyardEntry> m_graveyard;
+    int                         m_frameCount = 0;
 
     // ── Initialisation helpers ─────────────────────────────────────────────
     void createDescriptorLayoutAndPool();

@@ -54,6 +54,18 @@ public:
 
     void update(entt::registry& registry, float dt);
 
+    // Public hit resolver called by ProjectileSystem when a projectile lands
+    void resolveHit(entt::registry& reg, entt::entity caster,
+                    const AbilityDefinition& def, const TargetInfo& target);
+
+    // Public VFX emitter so ProjectileSystem can fire impact/destroy events
+    uint32_t emitVFXPublic(const std::string& effectID,
+                           const glm::vec3& position,
+                           const glm::vec3& direction = {0,1,0},
+                           float scale = 1.0f,
+                           float lifetime = -1.0f,
+                           uint32_t preHandle = 0);
+
 private:
     VFXEventQueue& m_vfxQueue;
 
@@ -75,6 +87,9 @@ private:
     void spawnProjectile(entt::registry& reg, entt::entity caster,
                          const AbilityDefinition& def,
                          const TargetInfo& target);
+    void spawnLobProjectile(entt::registry& reg, entt::entity caster,
+                            const AbilityDefinition& def,
+                            const TargetInfo& target);
     void resolveInstantEffects(entt::registry& reg, entt::entity caster,
                                const AbilityDefinition& def,
                                const TargetInfo& target);
@@ -83,11 +98,12 @@ private:
                              const AbilityDefinition& def, int level);
 
     // ── VFX helpers ───────────────────────────────────────────────────────
-    void emitVFX(const std::string& effectID,
-                 const glm::vec3& position,
-                 const glm::vec3& direction = {0,1,0},
-                 float scale = 1.0f,
-                 float lifetime = -1.0f);
+    uint32_t emitVFX(const std::string& effectID,
+                     const glm::vec3& position,
+                     const glm::vec3& direction = {0,1,0},
+                     float scale = 1.0f,
+                     float lifetime = -1.0f,
+                     uint32_t preHandle = 0);
 
     // ── JSON loader ────────────────────────────────────────────────────────
     AbilityDefinition parseJSON(const nlohmann::json& j,

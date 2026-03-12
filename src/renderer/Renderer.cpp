@@ -4,7 +4,12 @@
 #include "renderer/StaticSkinnedMesh.h"
 #include "renderer/Frustum.h"
 #include "scene/Components.h"
+#include "ability/AbilityComponents.h"
 #include "window/Window.h"
+
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_vulkan.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -42,6 +47,23 @@ Renderer::Renderer(Window& window) : m_window(window) {
 
     m_clickIndicatorRenderer = std::make_unique<ClickIndicatorRenderer>(
         *m_device, m_pipeline->getRenderPass());
+    m_shieldBubble = std::make_unique<ShieldBubbleRenderer>();
+    m_shieldBubble->init(*m_device, m_pipeline->getRenderPass());
+    m_coneEffect = std::make_unique<ConeAbilityRenderer>();
+    m_coneEffect->init(*m_device, m_pipeline->getRenderPass());
+    m_explosionRenderer = std::make_unique<ExplosionRenderer>();
+    m_explosionRenderer->init(*m_device, m_pipeline->getRenderPass());
+
+    // Sprite-atlas-based VFX renderer
+    m_spriteEffectRenderer = std::make_unique<SpriteEffectRenderer>();
+    m_spriteEffectRenderer->init(*m_device, m_pipeline->getRenderPass());
+    m_spriteEffectConeW = m_spriteEffectRenderer->registerEffect(
+        "cone_w", std::string(ASSET_DIR) + "textures/cone_w_atlas.png",
+        8, 56, 3.5f, true);
+    m_spriteEffectExplosionE = m_spriteEffectRenderer->registerEffect(
+        "explosion_e", std::string(ASSET_DIR) + "textures/explosion_e_atlas.png",
+        8, 56, 4.2f, true);
+
     m_debugRenderer.init(*m_device, m_pipeline->getRenderPass());
 
     createInstanceBuffers();
@@ -50,18 +72,57 @@ Renderer::Renderer(Window& window) : m_window(window) {
 
     // ── VFX & Ability systems ─────────────────────────────────────────────
     m_vfxQueue      = std::make_unique<VFXEventQueue>();
+    m_combatVfxQueue = std::make_unique<VFXEventQueue>(); // separate SPSC for CombatSystem
     m_vfxRenderer   = std::make_unique<VFXRenderer>(*m_device, m_pipeline->getRenderPass());
     m_vfxRenderer->loadEmitterDirectory(std::string(ASSET_DIR) + "vfx/");
     m_abilitySystem = std::make_unique<AbilitySystem>(*m_vfxQueue);
     m_abilitySystem->loadDirectory(std::string(ASSET_DIR) + "abilities/");
+    m_projectileSystem = std::make_unique<ProjectileSystem>();
+    m_combatSystem  = std::make_unique<CombatSystem>(*m_combatVfxQueue);
 
     m_isoCam.setBounds(glm::vec3(0, 0, 0), glm::vec3(200, 0, 200));
     m_isoCam.setTarget(glm::vec3(100, 0, 100));
 
     buildScene();
 
+    // ── InputManager — MUST be created before ImGui so ImGui chains on top ──
     m_input = std::make_unique<InputManager>(m_window.getHandle(), m_camera);
     m_input->setCaptureEnabled(false); // MOBA mode: IsometricCamera drives view
+
+    // ── ImGui initialisation ──────────────────────────────────────────────
+    {
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGui::StyleColorsDark();
+
+        // install_callbacks=false: we forward events manually from InputManager
+        ImGui_ImplGlfw_InitForVulkan(m_window.getHandle(), false);
+
+        // Dedicated descriptor pool for ImGui
+        VkDescriptorPoolSize poolSizes[] = {
+            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 }
+        };
+        VkDescriptorPoolCreateInfo poolCI{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+        poolCI.flags         = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+        poolCI.maxSets       = 1;
+        poolCI.poolSizeCount = 1;
+        poolCI.pPoolSizes    = poolSizes;
+        VK_CHECK(vkCreateDescriptorPool(m_device->getDevice(), &poolCI, nullptr, &m_imguiPool),
+                 "Create ImGui descriptor pool");
+
+        ImGui_ImplVulkan_InitInfo initInfo{};
+        initInfo.Instance       = m_context->getInstance();
+        initInfo.PhysicalDevice = m_device->getPhysicalDevice();
+        initInfo.Device         = m_device->getDevice();
+        initInfo.QueueFamily    = m_device->getQueueFamilies().graphicsFamily.value();
+        initInfo.Queue          = m_device->getGraphicsQueue();
+        initInfo.DescriptorPool = m_imguiPool;
+        initInfo.MinImageCount  = 2;
+        initInfo.ImageCount     = m_swapchain->getImageCount();
+        initInfo.RenderPass     = m_pipeline->getRenderPass();
+        ImGui_ImplVulkan_Init(&initInfo);
+        // ImGui 1.91.8 auto-uploads fonts on first render — no one-shot buffer needed
+    }
 
     m_lastFrameTime = static_cast<float>(glfwGetTime());
     spdlog::info("Renderer initialized");
@@ -71,10 +132,23 @@ Renderer::Renderer(Window& window) : m_window(window) {
 Renderer::~Renderer() {
     if (m_device) vkDeviceWaitIdle(m_device->getDevice());
 
+    // ── ImGui shutdown ────────────────────────────────────────────────────
+    ImGui_ImplVulkan_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+    if (m_imguiPool != VK_NULL_HANDLE)
+        vkDestroyDescriptorPool(m_device->getDevice(), m_imguiPool, nullptr);
+
+    m_combatSystem.reset();
     m_input.reset();
     m_clickIndicatorRenderer.reset();
+    m_shieldBubble.reset();
+    m_coneEffect.reset();
+    m_explosionRenderer.reset();
+    m_spriteEffectRenderer.reset();
     m_vfxRenderer.reset();
     m_vfxQueue.reset();
+    m_combatVfxQueue.reset();
     m_abilitySystem.reset();
     m_debugRenderer.cleanup();
     destroyInstanceBuffers();
@@ -106,19 +180,53 @@ void Renderer::waitIdle() { vkDeviceWaitIdle(m_device->getDevice()); }
 // ── drawFrame ────────────────────────────────────────────────────────────────
 void Renderer::drawFrame() {
     float currentTime = static_cast<float>(glfwGetTime());
-    float dt = currentTime - m_lastFrameTime;
+    // Cap dt to 50 ms (20 fps floor) so CPU stall spikes don't cause the
+    // animation system to jump forward a large fraction of the cycle in a
+    // single frame, which manifests as a visible stagger/skip.
+    float dt = std::min(currentTime - m_lastFrameTime, 0.05f);
     m_lastFrameTime = currentTime;
     m_gameTime += dt;
     m_currentDt = dt;
 
-    // ── VFX: flush event queue and update CPU emitters ────────────────────
-    if (m_vfxRenderer && m_vfxQueue) {
-        m_vfxRenderer->processQueue(*m_vfxQueue);
+    // ── VFX: flush event queues and update CPU emitters ─────────────────
+    if (m_vfxRenderer) {
+        if (m_vfxQueue)      m_vfxRenderer->processQueue(*m_vfxQueue);
+        if (m_combatVfxQueue) m_vfxRenderer->processQueue(*m_combatVfxQueue);
         m_vfxRenderer->update(dt);
     }
     if (m_abilitySystem) {
         m_abilitySystem->update(m_scene.getRegistry(), dt);
     }
+    if (m_projectileSystem && m_abilitySystem && m_vfxQueue) {
+        m_projectileSystem->update(m_scene.getRegistry(), dt,
+                                   *m_vfxQueue, *m_abilitySystem);
+        // Collect landing positions from lob projectiles → trigger explosion visuals
+        if (m_explosionRenderer) {
+            for (const auto& pos : m_projectileSystem->getLandedPositions()) {
+                m_explosionRenderer->addExplosion(pos);
+            }
+            m_projectileSystem->clearLandedPositions();
+        }
+    }
+    if (m_explosionRenderer)
+        m_explosionRenderer->update(dt);
+    if (m_spriteEffectRenderer)
+        m_spriteEffectRenderer->update(dt);
+    // Tick cone effect if active
+    if (m_coneEffectTimer > 0.0f && m_coneEffect) {
+        m_coneEffectTimer -= dt;
+        float coneElapsed = CONE_DURATION - m_coneEffectTimer;
+        m_coneEffect->update(dt, m_coneApex, m_coneDirection,
+                             CONE_HALF_ANGLE, CONE_RANGE, coneElapsed);
+    }
+    if (m_combatSystem) {
+        m_combatSystem->update(m_scene.getRegistry(), dt);
+    }
+
+    // ── ImGui new frame (before any UI building) ─────────────────────────
+    ImGui_ImplVulkan_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
     
     // ── Standard frame loop: Wait for GPU ─────────────────────────────────
     VkDevice dev = m_device->getDevice();
@@ -162,14 +270,43 @@ void Renderer::drawFrame() {
     // F4 toggles debug grid
     if (m_input->wasF4Pressed()) m_showGrid = !m_showGrid;
 
-    // Right-click: move player to world position
+    // Y toggles camera attach/detach (LoL-style)
+    if (m_input->wasYPressed()) {
+        m_isoCam.toggleAttached();
+        spdlog::info("Camera {}", m_isoCam.isAttached() ? "attached" : "detached");
+    }
+
+    // Tab toggles debug UI overlay
+    if (m_input->wasTabPressed()) m_showDebugUI = !m_showDebugUI;
+
+    // Pick entity under cursor for highlighting and combat targeting
+    m_hoveredEntity = pickEntityUnderCursor();
+
+    // Right-click: move player to world position OR target enemy for auto-attack
     if (m_input->wasRightClicked() && m_playerEntity != entt::null) {
         glm::vec2 clickPos = m_input->getLastClickPos();
         glm::vec3 worldPos = screenToWorld(clickPos.x, clickPos.y);
-        auto& c = m_scene.getRegistry().get<CharacterComponent>(m_playerEntity);
-        c.targetPosition = worldPos;
-        c.hasTarget = true;
-        m_clickAnim = ClickAnim{ worldPos, 0.0f, 0.25f };
+
+        // Try to pick an enemy entity under cursor
+        entt::entity target = pickEntityUnderCursor();
+        if (target != entt::null && m_combatSystem) {
+            // Auto-attack the targeted enemy
+            auto& reg = m_scene.getRegistry();
+            if (reg.all_of<CombatComponent>(m_playerEntity)) {
+                auto& combat = reg.get<CombatComponent>(m_playerEntity);
+                if (combat.state == CombatState::IDLE && combat.attackCooldown <= 0.0f) {
+                    combat.state = CombatState::AUTO_ATTACKING;
+                    combat.stateTimer = combat.attackWindup;
+                    combat.targetEntity = target;
+                }
+            }
+        } else {
+            // No enemy under cursor — move to position
+            auto& c = m_scene.getRegistry().get<CharacterComponent>(m_playerEntity);
+            c.targetPosition = worldPos;
+            c.hasTarget = true;
+            m_clickAnim = ClickAnim{ worldPos, 0.0f, 0.25f };
+        }
     }
 
     // ── Ability keys: Q / W / E / R ───────────────────────────────────────
@@ -182,14 +319,67 @@ void Renderer::drawFrame() {
         groundTarget.type           = TargetingType::POINT;
         groundTarget.targetPosition = worldPos;
 
+        // Compute the fire direction from the player toward the mouse cursor.
+        // Skillshot abilities (Q) read target.direction for their velocity;
+        // without this, every projectile would fly in the default (0,0,1) direction.
+        if (m_scene.getRegistry().all_of<TransformComponent>(m_playerEntity)) {
+            const auto& pt  = m_scene.getRegistry().get<TransformComponent>(m_playerEntity);
+            glm::vec3 toMouse = worldPos - pt.position;
+            toMouse.y = 0.0f;   // project onto ground plane
+            groundTarget.direction = glm::length(toMouse) > 0.001f
+                                     ? glm::normalize(toMouse)
+                                     : glm::vec3(0.f, 0.f, 1.f);
+        }
+
         auto tryAbility = [&](bool pressed, AbilitySlot slot) {
             if (!pressed) return;
             m_abilitySystem->enqueueRequest(m_playerEntity, slot, groundTarget);
         };
         tryAbility(m_input->wasQPressed(), AbilitySlot::Q);
-        tryAbility(m_input->wasWPressed(), AbilitySlot::W);
+
+        // W: fire ability AND start cone visual effect
+        if (m_input->wasWPressed()) {
+            m_abilitySystem->enqueueRequest(m_playerEntity, AbilitySlot::W, groundTarget);
+            m_coneDirection   = groundTarget.direction;
+            m_coneEffectTimer = CONE_DURATION;
+            // Latch apex at cast position — effect stays on the ground even if
+            // the character moves away after casting.
+            if (m_scene.getRegistry().all_of<TransformComponent>(m_playerEntity)) {
+                const auto& pt = m_scene.getRegistry().get<TransformComponent>(m_playerEntity);
+                m_coneApex = pt.position + glm::vec3(0.0f, 0.05f, 0.0f);
+            }
+        }
+
         tryAbility(m_input->wasEPressed(), AbilitySlot::E);
         tryAbility(m_input->wasRPressed(), AbilitySlot::R);
+
+        // D — purple trick skillshot (uses SUMMONER slot in AbilityBook)
+        tryAbility(m_input->wasDPressed(), AbilitySlot::SUMMONER);
+    }
+
+    // ── Combat keys: A (auto-attack), S (shield), D (trick) ──────────────
+    if (m_combatSystem && m_playerEntity != entt::null &&
+        m_scene.getRegistry().all_of<CombatComponent>(m_playerEntity)) {
+        auto& reg = m_scene.getRegistry();
+        auto& combat = reg.get<CombatComponent>(m_playerEntity);
+
+        // A — auto-attack nearest enemy
+        if (m_input->wasAPressed() && combat.state == CombatState::IDLE
+            && combat.attackCooldown <= 0.0f) {
+            entt::entity target = m_combatSystem->findNearestEnemy(
+                reg, m_playerEntity, combat.attackRange);
+            if (target != entt::null) {
+                combat.state = CombatState::AUTO_ATTACKING;
+                combat.stateTimer = combat.attackWindup;
+                combat.targetEntity = target;
+            }
+        }
+
+        // S — shield (duration 3.5s)
+        if (m_input->wasSPressed() && combat.state == CombatState::IDLE
+            && combat.shieldCooldown <= 0.0f) {
+            m_combatSystem->requestShield(m_playerEntity, reg);
+        }
     }
 
     // ── Unit System: Spawning (X) ──────────────────────────────────────────
@@ -210,9 +400,8 @@ void Renderer::drawFrame() {
         m_scene.getRegistry().emplace<GPUSkinnedMeshComponent>(minion, GPUSkinnedMeshComponent{ m_minionMeshIndex });
 
         // Setup simple Material
-        uint32_t flatNorm = 0; // assuming 0 is flatNorm from buildScene
         m_scene.getRegistry().emplace<MaterialComponent>(minion,
-            MaterialComponent{ m_minionTexIndex, flatNorm, 0.0f, 0.0f, 0.5f, 0.2f });
+            MaterialComponent{ m_minionTexIndex, m_flatNormIndex, 0.0f, 0.0f, 0.5f, 0.2f });
         // Setup Animation (Melee minion)
         SkeletonComponent skelComp;
         skelComp.skeleton         = m_minionSkeleton;
@@ -346,6 +535,17 @@ void Renderer::drawFrame() {
     auto minionView = m_scene.getRegistry().view<UnitComponent, CharacterComponent, TransformComponent>();
     for (auto e : minionView) {
         if (e == m_playerEntity) continue;
+
+        // Stunned entities cannot move
+        if (m_scene.getRegistry().all_of<CombatComponent>(e)) {
+            auto& combat = m_scene.getRegistry().get<CombatComponent>(e);
+            if (combat.state == CombatState::STUNNED) {
+                auto& c2 = minionView.get<CharacterComponent>(e);
+                c2.hasTarget = false;
+                continue;
+            }
+        }
+
         auto& c = minionView.get<CharacterComponent>(e);
         auto& t = minionView.get<TransformComponent>(e);
         auto& u = minionView.get<UnitComponent>(e);
@@ -391,6 +591,18 @@ void Renderer::drawFrame() {
         m_scene.getRegistry().valid(m_playerEntity) &&
         m_scene.getRegistry().all_of<CharacterComponent, TransformComponent>(m_playerEntity)) {
 
+        // Stunned player cannot move
+        bool playerStunned = false;
+        if (m_scene.getRegistry().all_of<CombatComponent>(m_playerEntity)) {
+            auto& combat = m_scene.getRegistry().get<CombatComponent>(m_playerEntity);
+            if (combat.state == CombatState::STUNNED) {
+                auto& c2 = m_scene.getRegistry().get<CharacterComponent>(m_playerEntity);
+                c2.hasTarget = false;
+                playerStunned = true;
+            }
+        }
+
+        if (!playerStunned) {
         const float accelRate = 30.0f;
 
         auto& c = m_scene.getRegistry().get<CharacterComponent>(m_playerEntity);
@@ -426,6 +638,8 @@ void Renderer::drawFrame() {
             // Decelerate to stop
             c.currentSpeed *= std::max(1.0f - 30.0f * dt, 0.0f);
         }
+        } // end if (!playerStunned)
+        auto& t = m_scene.getRegistry().get<TransformComponent>(m_playerEntity);
         m_isoCam.setFollowTarget(t.position);
     }
 
@@ -434,31 +648,68 @@ void Renderer::drawFrame() {
         .view<SkeletonComponent, AnimationComponent, GPUSkinnedMeshComponent, TransformComponent>();
     uint32_t currentBoneSlot = 0;
     for (auto&& [e, skel, anim, ssm, t] : animView.each()) {
-        // Switch clip based on movement state (0=idle, 1=walk) with crossfade
+        // Switch clip based on movement/combat state
+        // (0=idle, 1=walk, 2=attack)
         if (m_scene.getRegistry().all_of<CharacterComponent>(e)) {
             auto& c = m_scene.getRegistry().get<CharacterComponent>(e);
-            int targetClip = c.hasTarget ? 1 : 0;
+            int targetClip = 0; // default idle
+
+            if (m_scene.getRegistry().all_of<CombatComponent>(e)) {
+                auto& combat = m_scene.getRegistry().get<CombatComponent>(e);
+                if (combat.state == CombatState::AUTO_ATTACKING) {
+                    targetClip = 2; // attack
+                    
+                    // Face the target while attacking
+                    if (m_scene.getRegistry().valid(combat.targetEntity) &&
+                        m_scene.getRegistry().all_of<TransformComponent>(combat.targetEntity)) {
+                        auto& targetTrans = m_scene.getRegistry().get<TransformComponent>(combat.targetEntity);
+                        glm::vec3 dir = targetTrans.position - t.position;
+                        dir.y = 0.0f;
+                        if (glm::length(dir) > 0.001f) {
+                            c.currentYaw = std::atan2(dir.x, dir.z);
+                            t.rotation.y = c.currentYaw;
+                        }
+                    }
+                }
+                else if (combat.state == CombatState::SHIELDING || combat.state == CombatState::STUNNED) {
+                    targetClip = 0; // idle/stunned
+                }
+                else if (c.hasTarget) {
+                    targetClip = 1; // walk
+                }
+            } else if (c.hasTarget) {
+                targetClip = 1; // walk fallback
+            }
+
             if (anim.activeClipIndex != targetClip && targetClip < (int)anim.clips.size()) {
                 anim.activeClipIndex = targetClip;
-                anim.player.crossfadeTo(&anim.clips[targetClip], 0.15f);
+                anim.player.crossfadeTo(&anim.clips[targetClip], 0.1f);
             }
+
             // Scale walk animation speed to match movement (eliminates foot-slide).
-            // If the clip has a strideLength calibrated, use the biomechanically
-            // correct ratio: R = V_phys / (L_s / T_cycle).  Otherwise fall back to
-            // the simpler currentSpeed/moveSpeed ratio which works when moveSpeed
-            // already matches the animation's natural pace.
-            if (anim.activeClipIndex == 1 && !anim.player.isBlending() &&
-                anim.activeClipIndex < (int)anim.clips.size()) {
+            // Apply this EVEN during the crossfade blend so there is no abrupt
+            // timeScale discontinuity the moment blending finishes.
+            // Then exponentially smooth the scale (~15 Hz lag) to prevent the
+            // aggressive 30×/s deceleration from causing a visible stutter as
+            // the character slows to a stop.
+            if (anim.activeClipIndex == 1 && anim.activeClipIndex < (int)anim.clips.size()) {
                 const auto& walkClip = anim.clips[anim.activeClipIndex];
-                float timeScale = 1.0f;
+                float rawTimeScale = 1.0f;
                 if (walkClip.strideLength > 0.0f && walkClip.duration > 0.0f) {
                     float animNaturalSpeed = walkClip.strideLength / walkClip.duration;
-                    timeScale = (animNaturalSpeed > 0.0f) ? (c.currentSpeed / animNaturalSpeed) : 1.0f;
+                    rawTimeScale = (animNaturalSpeed > 0.0f) ? (c.currentSpeed / animNaturalSpeed) : 1.0f;
                 } else if (c.moveSpeed > 0.0f) {
-                    timeScale = c.currentSpeed / c.moveSpeed;
+                    rawTimeScale = c.currentSpeed / c.moveSpeed;
                 }
-                anim.player.setTimeScale(timeScale);
+                // Smooth toward the raw target; lag constant ~15 Hz keeps the
+                // walk cycle visually continuous across rapid speed changes.
+                const float kSmooth = 15.0f;
+                anim.smoothedTimeScale += (rawTimeScale - anim.smoothedTimeScale)
+                                         * std::min(kSmooth * dt, 1.0f);
+                anim.player.setTimeScale(anim.smoothedTimeScale);
             } else {
+                // Idle: reset smoothed scale so next walk starts clean.
+                anim.smoothedTimeScale = 1.0f;
                 anim.player.setTimeScale(1.0f);
             }
         }
@@ -468,6 +719,46 @@ void Renderer::drawFrame() {
         m_descriptors->writeBoneSlot(m_currentFrame, currentBoneSlot, matrices);
         ssm.boneSlot = currentBoneSlot++;
     }
+    // Flush the bone SSBO once after all slots are written instead of once
+    // per character.  writeBoneSlot no longer flushes internally; this single
+    // call makes all per-frame bone data visible to the GPU in one coherency
+    // operation, avoiding N redundant VK_WHOLE_SIZE flushes per frame.
+    if (currentBoneSlot > 0)
+        m_descriptors->flushBones(m_currentFrame);
+
+    // ── Debug UI (ImGui) ─────────────────────────────────────────────────
+    if (m_showDebugUI) {
+        ImGui::Begin("Debug Tools", &m_showDebugUI);
+
+        if (ImGui::Button("Spawn Test Enemy")) {
+            spawnTestEnemy();
+        }
+        ImGui::SameLine();
+        ImGui::Text("Entities: %d", (int)m_scene.getRegistry().storage<entt::entity>().size());
+
+        ImGui::Checkbox("Fog Enabled", &m_fogEnabled);
+
+        ImGui::Separator();
+        ImGui::Text("FPS: %.1f", dt > 0.0f ? 1.0f / dt : 0.0f);
+        ImGui::Text("Game Time: %.1f", m_gameTime);
+
+        if (m_playerEntity != entt::null && m_scene.getRegistry().all_of<CombatComponent>(m_playerEntity)) {
+            auto& combat = m_scene.getRegistry().get<CombatComponent>(m_playerEntity);
+            ImGui::Separator();
+            ImGui::Text("Combat State: %s",
+                combat.state == CombatState::IDLE           ? "IDLE" :
+                combat.state == CombatState::AUTO_ATTACKING ? "AUTO_ATTACKING" :
+                combat.state == CombatState::SHIELDING      ? "SHIELDING" :
+                combat.state == CombatState::TRICKING       ? "TRICKING" :
+                combat.state == CombatState::STUNNED        ? "STUNNED" : "???");
+            ImGui::Text("Attack CD: %.2f", combat.attackCooldown);
+            ImGui::Text("Shield CD: %.2f", combat.shieldCooldown);
+            ImGui::Text("Trick CD:  %.2f", combat.trickCooldown);
+        }
+
+        ImGui::End();
+    }
+    ImGui::Render(); // always call Render() even if no windows built
 
     // ── Click animation ───────────────────────────────────────────────────
     if (m_clickAnim) {
@@ -543,6 +834,11 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
         light.ambientStrength = 0.5f;
         light.lights[0].position = glm::vec3(100.0f, 60.0f, 100.0f);
         light.lights[0].color    = glm::vec3(1.0f, 0.95f, 0.85f);
+        // Fog toggle: set density to 0 to disable (exp(0)=1 → no fog mixing)
+        light.fogDensity = m_fogEnabled ? 0.03f : 0.0f;
+        light.fogColor   = glm::vec3(0.6f, 0.65f, 0.75f);
+        light.fogStart   = 5.0f;
+        light.fogEnd     = 50.0f;
         m_descriptors->updateLightBuffer(m_currentFrame, light);
     }
 
@@ -583,7 +879,14 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
         glm::mat4 model = t.getModelMatrix();
         instances[instanceIndex].model        = model;
         instances[instanceIndex].normalMatrix = glm::transpose(glm::inverse(model));
-        instances[instanceIndex].tint         = glm::vec4(1.0f);
+
+        // Highlight hovered static entities in red
+        glm::vec4 tint(1.0f);
+        if (e == m_hoveredEntity) {
+            tint = glm::vec4(1.0f, 0.4f, 0.4f, 1.0f);
+        }
+        instances[instanceIndex].tint = tint;
+
         instances[instanceIndex].params       = glm::vec4(mat.shininess, mat.metallic, mat.roughness, mat.emissive);
         instances[instanceIndex].texIndices   = glm::vec4(
             static_cast<float>(mat.materialIndex), static_cast<float>(mat.normalMapIndex), 0.0f, 0.0f);
@@ -609,11 +912,13 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
             instances[instanceIndex].model        = model;
             instances[instanceIndex].normalMatrix = glm::transpose(glm::inverse(model));
             
-            // Highlight selected units with a green tint
+            // Highlight logic: Red for hovered, Green for selected
             glm::vec4 tint(1.0f);
-            if (m_scene.getRegistry().all_of<SelectableComponent>(e)) {
+            if (e == m_hoveredEntity) {
+                tint = glm::vec4(1.0f, 0.4f, 0.4f, 1.0f); // Hover red
+            } else if (m_scene.getRegistry().all_of<SelectableComponent>(e)) {
                 if (m_scene.getRegistry().get<SelectableComponent>(e).isSelected) {
-                    tint = glm::vec4(0.5f, 1.0f, 0.5f, 1.0f);
+                    tint = glm::vec4(0.5f, 1.0f, 0.5f, 1.0f); // Selected green
                 }
             }
             instances[instanceIndex].tint = tint;
@@ -669,6 +974,53 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
         m_vfxRenderer->render(cmd, viewProj, camRight, camUp);
     }
 
+    // ── Glass shield bubble ───────────────────────────────────────────────
+    if (m_shieldBubble) {
+        auto& reg = m_scene.getRegistry();
+        if (reg.all_of<CombatComponent, TransformComponent>(m_playerEntity)) {
+            const auto& combat = reg.get<CombatComponent>(m_playerEntity);
+            if (combat.state == CombatState::SHIELDING) {
+                const auto& t = reg.get<TransformComponent>(m_playerEntity);
+                float elapsed  = combat.shieldDuration - combat.stateTimer;
+                float fadeIn   = std::min(elapsed / 0.25f, 1.0f);
+                float fadeOut  = std::min(combat.stateTimer / 0.25f, 1.0f);
+                float alpha    = fadeIn * fadeOut;
+                // Center at half character world-height (~5 units at scale 0.05 with armature transform)
+                glm::vec3 center    = t.position + glm::vec3(0.0f, 2.5f, 0.0f);
+                glm::vec3 cameraPos = m_isoCam.getPosition();
+                float appTime = static_cast<float>(glfwGetTime());
+                m_shieldBubble->render(cmd, viewProj, center, cameraPos,
+                                       3.2f, appTime, alpha);
+            }
+        }
+    }
+
+    // ── W-ability cone effect ─────────────────────────────────────────────
+    if (m_coneEffectTimer > 0.0f && m_coneEffect) {
+        float elapsed    = CONE_DURATION - m_coneEffectTimer;
+        glm::vec3 camPos = m_isoCam.getPosition();
+        float     t      = static_cast<float>(glfwGetTime());
+        m_coneEffect->render(cmd, viewProj, m_coneApex, m_coneDirection,
+                             CONE_HALF_ANGLE, CONE_RANGE,
+                             camPos, t, elapsed, 1.0f);
+    }
+
+    // ── E-ability explosion effects ───────────────────────────────────────
+    if (m_explosionRenderer) {
+        glm::vec3 camPos = m_isoCam.getPosition();
+        float appTime    = static_cast<float>(glfwGetTime());
+        m_explosionRenderer->render(cmd, viewProj, camPos, appTime);
+    }
+
+    // ── Sprite-atlas VFX effects (W cone, E explosion) ────────────────────
+    if (m_spriteEffectRenderer) {
+        glm::vec3 camPos = m_isoCam.getPosition();
+        m_spriteEffectRenderer->render(cmd, viewProj, camPos);
+    }
+
+    // ── ImGui render draw data (last thing inside render pass) ────────────
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
+
     vkCmdEndRenderPass(cmd);
     VK_CHECK(vkEndCommandBuffer(cmd), "End command buffer");
 }
@@ -679,6 +1031,7 @@ void Renderer::buildScene() {
     uint32_t defaultTex  = m_scene.addTexture(Texture::createDefault(*m_device));
     uint32_t checkerTex  = m_scene.addTexture(Texture::createCheckerboard(*m_device));
     uint32_t flatNorm    = m_scene.addTexture(Texture::createFlatNormal(*m_device));
+    m_flatNormIndex      = flatNorm;
 
     // Bind to bindless descriptor array
     for (uint32_t i = 0; i < static_cast<uint32_t>(m_scene.getTextures().size()); ++i) {
@@ -800,6 +1153,30 @@ void Renderer::buildScene() {
 
     m_scene.getRegistry().emplace<CharacterComponent>(character,
         CharacterComponent{ glm::vec3(100.0f, 0.0f, 100.0f), 8.0f });
+    m_scene.getRegistry().emplace<TeamComponent>(character, TeamComponent{ Team::PLAYER });
+    m_scene.getRegistry().emplace<CombatComponent>(character);
+    m_scene.getRegistry().emplace<ResourceComponent>(character);
+    m_scene.getRegistry().emplace<StatsComponent>(character);
+    m_scene.getRegistry().emplace<StatusEffectsComponent>(character);
+    
+    if (m_abilitySystem) {
+        m_abilitySystem->initEntity(m_scene.getRegistry(), character,
+                                    {"fire_mage_fireball", "fire_mage_molten_shield", "fire_mage_bomb", ""});
+        m_abilitySystem->setAbilityLevel(m_scene.getRegistry(), character, AbilitySlot::Q, 1);
+        m_abilitySystem->setAbilityLevel(m_scene.getRegistry(), character, AbilitySlot::W, 1);
+        m_abilitySystem->setAbilityLevel(m_scene.getRegistry(), character, AbilitySlot::E, 1);
+
+        // D-key purple trick skillshot — manually wire SUMMONER slot
+        const auto* trickDef = m_abilitySystem->findDefinition("fire_mage_trick");
+        if (trickDef) {
+            auto& book = m_scene.getRegistry().get<AbilityBookComponent>(character);
+            auto& inst = book.abilities[static_cast<size_t>(AbilitySlot::SUMMONER)];
+            inst.def   = trickDef;
+            inst.level = 1;
+            inst.currentPhase = AbilityPhase::READY;
+        }
+    }
+    
     m_playerEntity = character;
     m_isoCam.setFollowTarget(glm::vec3(100.0f, 0.0f, 100.0f));
 
@@ -869,12 +1246,145 @@ void Renderer::buildScene() {
                 spdlog::warn("No walk animation found in minion base model.");
             }
 
+            // Attack animation (clip[2])
+            bool attackOk = false;
+            try {
+                auto attackData = Model::loadSkinnedFromGLB(
+                    *m_device, m_device->getAllocator(),
+                    minionAnimBase + "melee_minion_attack1.glb", 0.0f);
+                if (!attackData.animations.empty()) {
+                    m_minionClips.push_back(std::move(attackData.animations[0]));
+                    retargetClip(m_minionClips.back(), m_minionSkeleton);
+                    attackOk = true;
+                    spdlog::info("Minion attack animation loaded and retargeted");
+                }
+            } catch (const std::exception& ae) {
+                spdlog::warn("Could not load minion attack animation: {}", ae.what());
+            }
+            if (!attackOk)
+                m_minionClips.push_back(AnimationClip{}); // empty fallback
+
             spdlog::info("Minion model and {} animations loaded for spawning", m_minionClips.size());
         }    } catch (const std::exception& e) {
         spdlog::warn("Could not load minion model: {}", e.what());
     }
 
     spdlog::info("Scene built: flat map + player character");
+
+    // ── Pre-load Q ability model (q+ability.glb) for projectile rendering ────
+    if (m_projectileSystem) {
+        try {
+            std::string qModelPath = std::string(MODEL_DIR) + "models/abiliities_models/q+ability.glb";
+            auto model = Model::loadFromGLB(*m_device, m_device->getAllocator(), qModelPath);
+            uint32_t qMeshIdx = m_scene.addMesh(std::move(model));
+
+            // Try to load embedded texture; fall back to default
+            uint32_t qTexIdx = defaultTex;
+            auto glbTextures = Model::loadGLBTextures(*m_device, qModelPath);
+            if (!glbTextures.empty()) {
+                qTexIdx = m_scene.addTexture(std::move(glbTextures[0].texture));
+                m_descriptors->writeBindlessTexture(
+                    qTexIdx,
+                    m_scene.getTexture(qTexIdx).getImageView(),
+                    m_scene.getTexture(qTexIdx).getSampler());
+            }
+
+            // Register with the projectile system (scale = 1.0 — model is ~1 unit long)
+            m_projectileSystem->registerAbilityMesh("fire_mage_fireball",
+                { qMeshIdx, qTexIdx, m_flatNormIndex, glm::vec3(3.5f) });
+
+            // Reuse the same Q model for the D-key purple trick skillshot
+            // but with a solid purple texture so it's visually distinct
+            uint32_t purplePixel = 0xFF9900CC;  // ABGR: opaque purple (R=0xCC, G=0x00, B=0x99)
+            auto purpleTex = Texture::createFromPixels(*m_device, &purplePixel, 1, 1);
+            uint32_t purpleTexIdx = m_scene.addTexture(std::move(purpleTex));
+            m_descriptors->writeBindlessTexture(
+                purpleTexIdx,
+                m_scene.getTexture(purpleTexIdx).getImageView(),
+                m_scene.getTexture(purpleTexIdx).getSampler());
+            m_projectileSystem->registerAbilityMesh("fire_mage_trick",
+                { qMeshIdx, purpleTexIdx, m_flatNormIndex, glm::vec3(3.0f) });
+
+            spdlog::info("Q ability model loaded (meshIdx={})", qMeshIdx);
+        } catch (const std::exception& e) {
+            spdlog::warn("Could not load Q ability model: {}", e.what());
+        }
+    }
+}
+
+// ── spawnTestEnemy ───────────────────────────────────────────────────────────
+void Renderer::spawnTestEnemy() {
+    if (m_playerEntity == entt::null) return;
+
+    auto& reg = m_scene.getRegistry();
+    glm::vec3 playerPos = reg.get<TransformComponent>(m_playerEntity).position;
+    glm::vec3 spawnPos = playerPos + glm::vec3(5.0f, 0.0f, 0.0f);
+
+    auto enemy = m_scene.createEntity("TestDummy");
+    auto& t = reg.get<TransformComponent>(enemy);
+    t.position = spawnPos;
+    t.scale    = glm::vec3(0.05f);
+
+    reg.emplace<SelectableComponent>(enemy, SelectableComponent{ false, 1.0f });
+    reg.emplace<UnitComponent>(enemy, UnitComponent{ UnitComponent::State::IDLE, spawnPos, 0.0f });
+    // moveSpeed=0 → immobile test dummy
+    reg.emplace<CharacterComponent>(enemy, CharacterComponent{ spawnPos, 0.0f });
+    reg.emplace<TeamComponent>(enemy, TeamComponent{ Team::ENEMY });
+    reg.emplace<TestDummyTag>(enemy);
+    reg.emplace<CombatComponent>(enemy);
+
+    // StatsComponent with explicit values
+    StatsComponent stats;
+    stats.base.maxHP      = 600.0f;
+    stats.base.currentHP  = 600.0f;
+    stats.base.armor      = 30.0f;
+    reg.emplace<StatsComponent>(enemy, stats);
+
+    // Reuse cached minion visuals
+    reg.emplace<GPUSkinnedMeshComponent>(enemy, GPUSkinnedMeshComponent{ m_minionMeshIndex });
+    uint32_t flatNorm = 0;
+    reg.emplace<MaterialComponent>(enemy,
+        MaterialComponent{ m_minionTexIndex, flatNorm, 0.0f, 0.0f, 0.5f, 0.2f });
+
+    SkeletonComponent skelComp;
+    skelComp.skeleton         = m_minionSkeleton;
+    skelComp.skinVertices     = m_minionSkinVertices;
+    skelComp.bindPoseVertices = m_minionBindPoseVertices;
+
+    AnimationComponent animComp;
+    animComp.player.setSkeleton(&skelComp.skeleton);
+    animComp.clips = m_minionClips;
+    if (!animComp.clips.empty()) {
+        animComp.activeClipIndex = 0; // idle
+        animComp.player.setClip(&animComp.clips[0]);
+    }
+    reg.emplace<SkeletonComponent>(enemy, std::move(skelComp));
+    reg.emplace<AnimationComponent>(enemy, std::move(animComp));
+
+    spdlog::info("Spawned test dummy at ({:.1f}, {:.1f}, {:.1f})",
+                 spawnPos.x, spawnPos.y, spawnPos.z);
+}
+
+// ── pickEntityUnderCursor ────────────────────────────────────────────────────
+entt::entity Renderer::pickEntityUnderCursor() {
+    glm::vec2 mousePos = m_input->getMousePos();
+    glm::vec3 worldPos = screenToWorld(mousePos.x, mousePos.y);
+
+    float closestDist = FLT_MAX;
+    entt::entity closest = entt::null;
+
+    auto view = m_scene.getRegistry().view<TransformComponent, TeamComponent, SelectableComponent>();
+    for (auto [entity, transform, team, selectable] : view.each()) {
+        if (team.team != Team::ENEMY) continue;
+
+        float dist = glm::distance(glm::vec2(worldPos.x, worldPos.z),
+                                   glm::vec2(transform.position.x, transform.position.z));
+        if (dist < selectable.selectionRadius && dist < closestDist) {
+            closestDist = dist;
+            closest = entity;
+        }
+    }
+    return closest;
 }
 
 // ── recreateSwapchain ────────────────────────────────────────────────────────

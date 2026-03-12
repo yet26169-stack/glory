@@ -107,7 +107,9 @@ struct StatModifier {
 
 // ── Projectile definition ──────────────────────────────────────────────────
 struct ProjectileDef {
-    float  speed          = 1200.0f; // units/s
+    float  speed          = 1200.0f; // units/s initial speed
+    float  acceleration   = 0.0f;    // units/s² — speed increase per second
+    float  maxSpeed       = 9999.0f; // cap for accelerating projectiles
     float  width          = 60.0f;   // collision hitbox width
     float  maxRange       = 1100.0f; // despawn distance
     bool   piercing       = false;   // passes through targets
@@ -115,6 +117,11 @@ struct ProjectileDef {
     bool   returnsToSource = false;  // boomerang style
     float  curveAngle     = 0.0f;   // 0 = straight, >0 = arc
     bool   destroyOnWall  = true;
+
+    // Lob (arc) projectile — used for thrown grenades / bombs
+    bool   isLob         = false;
+    float  lobFlightTime = 1.0f;   // total arc duration in seconds
+    float  lobApexHeight = 8.0f;   // extra Y added at arc midpoint (Bezier P1)
 };
 
 // ── Effect definition ──────────────────────────────────────────────────────

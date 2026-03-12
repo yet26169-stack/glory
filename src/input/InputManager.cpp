@@ -1,6 +1,9 @@
 #include "input/InputManager.h"
 #include "camera/Camera.h"
 
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+
 namespace glory {
 
 static InputManager *s_activeInput = nullptr;
@@ -22,15 +25,35 @@ bool InputManager::wasEPressed()  { bool p = m_ePressed;  m_ePressed  = false; r
 bool InputManager::wasRPressed()  { bool p = m_rPressed;  m_rPressed  = false; return p; }
 bool InputManager::wasRightClicked() { bool p = m_rightClicked; m_rightClicked = false; return p; }
 bool InputManager::wasLeftClicked()  { bool p = m_leftClicked;  m_leftClicked  = false; return p; }
+bool InputManager::wasTabPressed()   { bool p = m_tabPressed;   m_tabPressed   = false; return p; }
+bool InputManager::wasAPressed()     { bool p = m_aPressed;     m_aPressed     = false; return p; }
+bool InputManager::wasDPressed()     { bool p = m_dPressed;     m_dPressed     = false; return p; }
+bool InputManager::wasSPressed()     { bool p = m_sPressed;     m_sPressed     = false; return p; }
+bool InputManager::wasSReleased()    { bool p = m_sReleased;    m_sReleased    = false; return p; }
 
-void InputManager::keyCallback(GLFWwindow*, int key, int, int action, int) {
+void InputManager::keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+  // Forward to ImGui first (install_callbacks=false, so we do it manually)
+  ImGui_ImplGlfw_KeyCallback(window, key, scancode, action, mods);
+  if (ImGui::GetIO().WantCaptureKeyboard) return;
+
   if (!s_activeInput) return;
-  if (key == GLFW_KEY_F4 && action == GLFW_PRESS) s_activeInput->m_f4Pressed = true;
-  if (key == GLFW_KEY_Y  && action == GLFW_PRESS) s_activeInput->m_yPressed  = true;
-  if (key == GLFW_KEY_Q  && action == GLFW_PRESS) s_activeInput->m_qPressed  = true;
-  if (key == GLFW_KEY_W  && action == GLFW_PRESS) s_activeInput->m_wPressed  = true;
-  if (key == GLFW_KEY_E  && action == GLFW_PRESS) s_activeInput->m_ePressed  = true;
-  if (key == GLFW_KEY_R  && action == GLFW_PRESS) s_activeInput->m_rPressed  = true;
+  if (key == GLFW_KEY_F4  && action == GLFW_PRESS) s_activeInput->m_f4Pressed = true;
+  if (key == GLFW_KEY_Y   && action == GLFW_PRESS) s_activeInput->m_yPressed  = true;
+  if (key == GLFW_KEY_Q   && action == GLFW_PRESS) s_activeInput->m_qPressed  = true;
+  if (key == GLFW_KEY_W   && action == GLFW_PRESS) s_activeInput->m_wPressed  = true;
+  if (key == GLFW_KEY_E   && action == GLFW_PRESS) s_activeInput->m_ePressed  = true;
+  if (key == GLFW_KEY_R   && action == GLFW_PRESS) s_activeInput->m_rPressed  = true;
+  if (key == GLFW_KEY_TAB && action == GLFW_PRESS) s_activeInput->m_tabPressed = true;
+  if (key == GLFW_KEY_A   && action == GLFW_PRESS) s_activeInput->m_aPressed  = true;
+  if (key == GLFW_KEY_D   && action == GLFW_PRESS) s_activeInput->m_dPressed  = true;
+  if (key == GLFW_KEY_S   && action == GLFW_PRESS) {
+    s_activeInput->m_sHeld = true;
+    s_activeInput->m_sPressed = true;
+  }
+  if (key == GLFW_KEY_S   && action == GLFW_RELEASE) {
+    s_activeInput->m_sHeld = false;
+    s_activeInput->m_sReleased = true;
+  }
   if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS && s_activeInput->m_cursorCaptured) {
     s_activeInput->m_cursorCaptured = false;
     glfwSetInputMode(s_activeInput->m_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
@@ -50,7 +73,9 @@ void InputManager::update(float deltaTime) {
   }
 }
 
-void InputManager::mouseCallback(GLFWwindow*, double xPos, double yPos) {
+void InputManager::mouseCallback(GLFWwindow* window, double xPos, double yPos) {
+  ImGui_ImplGlfw_CursorPosCallback(window, xPos, yPos);
+
   if (!s_activeInput || !s_activeInput->m_cursorCaptured) return;
   auto* self = s_activeInput;
   if (self->m_firstMouse) { self->m_lastX = xPos; self->m_lastY = yPos; self->m_firstMouse = false; }
@@ -60,14 +85,19 @@ void InputManager::mouseCallback(GLFWwindow*, double xPos, double yPos) {
   self->m_camera.processMouse(dx, dy);
 }
 
-void InputManager::scrollCallback(GLFWwindow*, double, double yOffset) {
+void InputManager::scrollCallback(GLFWwindow* window, double xOffset, double yOffset) {
+  ImGui_ImplGlfw_ScrollCallback(window, xOffset, yOffset);
+
   if (!s_activeInput) return;
   float d = static_cast<float>(yOffset);
   s_activeInput->m_scrollDelta += d;
   if (s_activeInput->m_cursorCaptured) s_activeInput->m_camera.processScroll(d);
 }
 
-void InputManager::mouseButtonCallback(GLFWwindow* window, int button, int action, int) {
+void InputManager::mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
+  ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
+  if (ImGui::GetIO().WantCaptureMouse) return;
+
   if (!s_activeInput) return;
   if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS) {
     if (s_activeInput->m_captureEnabled) {

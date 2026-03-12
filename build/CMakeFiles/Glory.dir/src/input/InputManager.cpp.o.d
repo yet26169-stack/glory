@@ -248,7 +248,6 @@ CMakeFiles/Glory.dir/src/input/InputManager.cpp.o: \
   /opt/homebrew/include/glm/detail/setup.hpp \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/cassert \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/assert.h \
-  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/_assert.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/_static_assert.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/cstddef \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__cstddef/byte.h \
@@ -1144,4 +1143,7 @@ CMakeFiles/Glory.dir/src/input/InputManager.cpp.o: \
   /opt/homebrew/include/glm/gtc/matrix_transform.inl \
   /opt/homebrew/include/glm/gtc/../geometric.hpp \
   /opt/homebrew/include/glm/gtc/../trigonometric.hpp \
-  /opt/homebrew/include/glm/gtc/../matrix.hpp
+  /opt/homebrew/include/glm/gtc/../matrix.hpp \
+  /Users/donkey/Development/1/Glory/extern/imgui/imgui.h \
+  /Users/donkey/Development/1/Glory/extern/imgui/imconfig.h \
+  /Users/donkey/Development/1/Glory/extern/imgui/imgui_impl_glfw.h

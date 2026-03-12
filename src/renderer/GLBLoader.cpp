@@ -34,6 +34,7 @@
 #include <meshoptimizer.h>
 
 #include <cstring>
+#include <limits>
 #include <stdexcept>
 #include <unordered_map>
 #include <vector>
@@ -785,6 +786,53 @@ SkinnedModelData Model::loadSkinnedFromGLB(const Device &device,
       }
 
       clip.channels.push_back(std::move(ac));
+    }
+
+    // ── Normalise timestamps to t = 0.0 ──────────────────────────────────
+    // Mixamo (and many other DCC exporters) emit keyframe times starting at
+    // one frame-interval (e.g. 0.0333 s at 30 fps) rather than 0.0.
+    // AnimationPlayer resets m_time to 0.0 on every clip start and on every
+    // fmod loop-wrap.  With a non-zero start time that places playback in a
+    // "before-first-keyframe" dead zone for ~2 frames each cycle: alpha is
+    // clamped to 0, the character holds the loop-start pose for an extra
+    // frame interval, and the result is a visible stagger on every stride.
+    // Fix: subtract the earliest timestamp from every channel so that
+    // t[0] == 0.0 everywhere and the clip's period is exactly
+    // (original_last - original_first).
+    {
+      float clipStart = std::numeric_limits<float>::max();
+      for (const auto& ch : clip.channels)
+        if (!ch.timestamps.empty())
+          clipStart = std::min(clipStart, ch.timestamps.front());
+
+      if (clipStart > 1e-6f) {
+        for (auto& ch : clip.channels)
+          for (auto& t : ch.timestamps)
+            t -= clipStart;
+        clip.duration -= clipStart;
+      }
+    }
+
+    // Remove net translation drift from looping clips (Mixamo root-motion fix).
+    // Mixamo bakes locomotion into the Hips bone translation channel instead of
+    // a dedicated root bone.  At the loop wrap the Hips snaps from its final
+    // position back to the start, producing a hard visual jump every cycle.
+    // We strip only the linear (net) drift while preserving cyclic oscillation
+    // (hip bob, sway) by subtracting `drift * (timestamp / duration)` per key.
+    // This makes first == last for every translation channel → seamless loop.
+    if (clip.looping && clip.duration > 0.0f) {
+      for (auto& ch : clip.channels) {
+        if (ch.path != AnimationPath::Translation) continue;
+        if (ch.translationKeys.size() < 2) continue;
+        const glm::vec3 drift = ch.translationKeys.back() - ch.translationKeys.front();
+        if (glm::length(drift) < 0.001f) continue;
+        for (size_t k = 0; k < ch.translationKeys.size(); ++k) {
+          float frac = ch.timestamps[k] / clip.duration;
+          ch.translationKeys[k] -= drift * frac;
+        }
+        spdlog::info("  Root-motion stripped on joint {} (drift [{:.3f},{:.3f},{:.3f}])",
+                     ch.targetJointIndex, drift.x, drift.y, drift.z);
+      }
     }
 
     // Store the rest pose this clip was authored against.  When this animation

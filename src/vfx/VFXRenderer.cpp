@@ -246,13 +246,26 @@ void VFXRenderer::processQueue(VFXEventQueue& queue) {
 
 // ── update ────────────────────────────────────────────────────────────────────
 void VFXRenderer::update(float dt) {
+    ++m_frameCount;
+
     for (auto& ps : m_effects) ps.update(dt);
 
-    // Reap dead effects
-    m_effects.erase(
-        std::remove_if(m_effects.begin(), m_effects.end(),
-                       [](const ParticleSystem& ps){ return !ps.isAlive(); }),
-        m_effects.end());
+    // Move dead effects to graveyard — DO NOT destroy immediately.
+    // The GPU may still be reading the SSBO in an in-flight command buffer.
+    // We wait GRAVEYARD_DELAY frames before actually destroying them.
+    {
+        auto deadStart = std::partition(m_effects.begin(), m_effects.end(),
+                                        [](const ParticleSystem& ps){ return ps.isAlive(); });
+        for (auto it = deadStart; it != m_effects.end(); ++it)
+            m_graveyard.push_back({ m_frameCount + GRAVEYARD_DELAY, std::move(*it) });
+        m_effects.erase(deadStart, m_effects.end());
+    }
+
+    // Flush graveyard: only destroy entries whose GPU-safe frame has passed
+    m_graveyard.erase(
+        std::remove_if(m_graveyard.begin(), m_graveyard.end(),
+                       [this](const GraveyardEntry& g){ return g.killFrame <= m_frameCount; }),
+        m_graveyard.end());
 }
 
 // ── dispatchCompute ───────────────────────────────────────────────────────────
@@ -415,8 +428,8 @@ void VFXRenderer::handleSpawn(VFXEvent& ev) {
     const EmitterDef& def = it->second;
     Texture* atlas = getOrLoadAtlas(def.textureAtlas);
 
-    const uint32_t handle = m_nextHandle++;
-    ev.handle = handle;  // write-back so caller can track it
+    const uint32_t handle = (ev.handle != 0) ? ev.handle : m_nextHandle++;
+    ev.handle = handle;  // write-back just in case
 
     m_effects.emplace_back(m_device, def, m_descLayout, m_descPool,
                            atlas, ev.position, ev.direction,

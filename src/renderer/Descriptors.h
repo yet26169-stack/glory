@@ -57,8 +57,12 @@ public:
     void updateBoneBuffer(uint32_t frameIndex, const std::vector<glm::mat4>& matrices);
     // Ring-buffer API: write bone matrices for a specific character slot (0..MAX_SKINNED_CHARS-1).
     // Returns the bone SSBO byte offset to pass to the vertex shader.
+    // NOTE: does NOT flush — call flushBones() once after all slots are written.
     uint32_t writeBoneSlot(uint32_t frameIndex, uint32_t slotIndex,
                            const std::vector<glm::mat4>& matrices);
+    // Flush the entire bone SSBO for the given frame to make all per-frame
+    // bone writes visible to the GPU in a single coherency operation.
+    void flushBones(uint32_t frameIndex);
     void writeBindlessTexture(uint32_t arrayIndex, VkImageView imageView, VkSampler sampler);
     void updateShadowMap(VkImageView depthView, VkSampler shadowSampler);
 

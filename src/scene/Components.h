@@ -101,6 +101,10 @@ struct AnimationComponent {
   std::vector<AnimationClip> clips;
   int activeClipIndex = -1;
   std::vector<Vertex> skinnedVertices;
+  // Smoothed playback speed to prevent jarring animation stutters from rapid
+  // character deceleration (30×/s factor).  Lerped toward the raw target each
+  // frame at ~15 Hz lag, keeping the walk cycle visually continuous.
+  float smoothedTimeScale = 1.0f;
 };
 
 struct DynamicMeshComponent {

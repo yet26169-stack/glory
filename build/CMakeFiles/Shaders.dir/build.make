@@ -78,6 +78,19 @@ CMakeFiles/Shaders: shaders/click_indicator.frag.spv
 CMakeFiles/Shaders: shaders/particle_sim.comp.spv
 CMakeFiles/Shaders: shaders/particle.vert.spv
 CMakeFiles/Shaders: shaders/particle.frag.spv
+CMakeFiles/Shaders: shaders/shield_bubble.vert.spv
+CMakeFiles/Shaders: shaders/shield_bubble.frag.spv
+CMakeFiles/Shaders: shaders/cone_ability.vert.spv
+CMakeFiles/Shaders: shaders/cone_grid.frag.spv
+CMakeFiles/Shaders: shaders/cone_energy.frag.spv
+CMakeFiles/Shaders: shaders/cone_lightning.vert.spv
+CMakeFiles/Shaders: shaders/cone_lightning.frag.spv
+CMakeFiles/Shaders: shaders/explosion_disk.vert.spv
+CMakeFiles/Shaders: shaders/explosion_sphere.vert.spv
+CMakeFiles/Shaders: shaders/explosion_shockwave.frag.spv
+CMakeFiles/Shaders: shaders/explosion_fireball.frag.spv
+CMakeFiles/Shaders: shaders/sprite_effect_additive.frag.spv
+CMakeFiles/Shaders: shaders/sprite_effect_billboard.vert.spv
 
 shaders/click_indicator.frag.spv: /Users/donkey/Development/1/Glory/shaders/click_indicator.frag
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Compiling shader click_indicator.frag"
@@ -87,44 +100,96 @@ shaders/click_indicator.vert.spv: /Users/donkey/Development/1/Glory/shaders/clic
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Compiling shader click_indicator.vert"
 	/opt/homebrew/bin/glslc /Users/donkey/Development/1/Glory/shaders/click_indicator.vert -o /Users/donkey/Development/1/Glory/build/shaders/click_indicator.vert.spv
 
+shaders/cone_ability.vert.spv: /Users/donkey/Development/1/Glory/shaders/cone_ability.vert
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Compiling shader cone_ability.vert"
+	/opt/homebrew/bin/glslc /Users/donkey/Development/1/Glory/shaders/cone_ability.vert -o /Users/donkey/Development/1/Glory/build/shaders/cone_ability.vert.spv
+
+shaders/cone_energy.frag.spv: /Users/donkey/Development/1/Glory/shaders/cone_energy.frag
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Compiling shader cone_energy.frag"
+	/opt/homebrew/bin/glslc /Users/donkey/Development/1/Glory/shaders/cone_energy.frag -o /Users/donkey/Development/1/Glory/build/shaders/cone_energy.frag.spv
+
+shaders/cone_grid.frag.spv: /Users/donkey/Development/1/Glory/shaders/cone_grid.frag
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Compiling shader cone_grid.frag"
+	/opt/homebrew/bin/glslc /Users/donkey/Development/1/Glory/shaders/cone_grid.frag -o /Users/donkey/Development/1/Glory/build/shaders/cone_grid.frag.spv
+
+shaders/cone_lightning.frag.spv: /Users/donkey/Development/1/Glory/shaders/cone_lightning.frag
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Compiling shader cone_lightning.frag"
+	/opt/homebrew/bin/glslc /Users/donkey/Development/1/Glory/shaders/cone_lightning.frag -o /Users/donkey/Development/1/Glory/build/shaders/cone_lightning.frag.spv
+
+shaders/cone_lightning.vert.spv: /Users/donkey/Development/1/Glory/shaders/cone_lightning.vert
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Compiling shader cone_lightning.vert"
+	/opt/homebrew/bin/glslc /Users/donkey/Development/1/Glory/shaders/cone_lightning.vert -o /Users/donkey/Development/1/Glory/build/shaders/cone_lightning.vert.spv
+
 shaders/debug.frag.spv: /Users/donkey/Development/1/Glory/shaders/debug.frag
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Compiling shader debug.frag"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Compiling shader debug.frag"
 	/opt/homebrew/bin/glslc /Users/donkey/Development/1/Glory/shaders/debug.frag -o /Users/donkey/Development/1/Glory/build/shaders/debug.frag.spv
 
 shaders/debug.vert.spv: /Users/donkey/Development/1/Glory/shaders/debug.vert
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Compiling shader debug.vert"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Compiling shader debug.vert"
 	/opt/homebrew/bin/glslc /Users/donkey/Development/1/Glory/shaders/debug.vert -o /Users/donkey/Development/1/Glory/build/shaders/debug.vert.spv
 
+shaders/explosion_disk.vert.spv: /Users/donkey/Development/1/Glory/shaders/explosion_disk.vert
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_10) "Compiling shader explosion_disk.vert"
+	/opt/homebrew/bin/glslc /Users/donkey/Development/1/Glory/shaders/explosion_disk.vert -o /Users/donkey/Development/1/Glory/build/shaders/explosion_disk.vert.spv
+
+shaders/explosion_fireball.frag.spv: /Users/donkey/Development/1/Glory/shaders/explosion_fireball.frag
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_11) "Compiling shader explosion_fireball.frag"
+	/opt/homebrew/bin/glslc /Users/donkey/Development/1/Glory/shaders/explosion_fireball.frag -o /Users/donkey/Development/1/Glory/build/shaders/explosion_fireball.frag.spv
+
+shaders/explosion_shockwave.frag.spv: /Users/donkey/Development/1/Glory/shaders/explosion_shockwave.frag
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_12) "Compiling shader explosion_shockwave.frag"
+	/opt/homebrew/bin/glslc /Users/donkey/Development/1/Glory/shaders/explosion_shockwave.frag -o /Users/donkey/Development/1/Glory/build/shaders/explosion_shockwave.frag.spv
+
+shaders/explosion_sphere.vert.spv: /Users/donkey/Development/1/Glory/shaders/explosion_sphere.vert
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_13) "Compiling shader explosion_sphere.vert"
+	/opt/homebrew/bin/glslc /Users/donkey/Development/1/Glory/shaders/explosion_sphere.vert -o /Users/donkey/Development/1/Glory/build/shaders/explosion_sphere.vert.spv
+
 shaders/grid.frag.spv: /Users/donkey/Development/1/Glory/shaders/grid.frag
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Compiling shader grid.frag"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_14) "Compiling shader grid.frag"
 	/opt/homebrew/bin/glslc /Users/donkey/Development/1/Glory/shaders/grid.frag -o /Users/donkey/Development/1/Glory/build/shaders/grid.frag.spv
 
 shaders/grid.vert.spv: /Users/donkey/Development/1/Glory/shaders/grid.vert
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Compiling shader grid.vert"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_15) "Compiling shader grid.vert"
 	/opt/homebrew/bin/glslc /Users/donkey/Development/1/Glory/shaders/grid.vert -o /Users/donkey/Development/1/Glory/build/shaders/grid.vert.spv
 
 shaders/particle.frag.spv: /Users/donkey/Development/1/Glory/shaders/particle.frag
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Compiling shader particle.frag"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_16) "Compiling shader particle.frag"
 	/opt/homebrew/bin/glslc /Users/donkey/Development/1/Glory/shaders/particle.frag -o /Users/donkey/Development/1/Glory/build/shaders/particle.frag.spv
 
 shaders/particle.vert.spv: /Users/donkey/Development/1/Glory/shaders/particle.vert
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Compiling shader particle.vert"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_17) "Compiling shader particle.vert"
 	/opt/homebrew/bin/glslc /Users/donkey/Development/1/Glory/shaders/particle.vert -o /Users/donkey/Development/1/Glory/build/shaders/particle.vert.spv
 
 shaders/particle_sim.comp.spv: /Users/donkey/Development/1/Glory/shaders/particle_sim.comp
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Compiling shader particle_sim.comp"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_18) "Compiling shader particle_sim.comp"
 	/opt/homebrew/bin/glslc /Users/donkey/Development/1/Glory/shaders/particle_sim.comp -o /Users/donkey/Development/1/Glory/build/shaders/particle_sim.comp.spv
 
+shaders/shield_bubble.frag.spv: /Users/donkey/Development/1/Glory/shaders/shield_bubble.frag
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_19) "Compiling shader shield_bubble.frag"
+	/opt/homebrew/bin/glslc /Users/donkey/Development/1/Glory/shaders/shield_bubble.frag -o /Users/donkey/Development/1/Glory/build/shaders/shield_bubble.frag.spv
+
+shaders/shield_bubble.vert.spv: /Users/donkey/Development/1/Glory/shaders/shield_bubble.vert
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_20) "Compiling shader shield_bubble.vert"
+	/opt/homebrew/bin/glslc /Users/donkey/Development/1/Glory/shaders/shield_bubble.vert -o /Users/donkey/Development/1/Glory/build/shaders/shield_bubble.vert.spv
+
 shaders/skinned.vert.spv: /Users/donkey/Development/1/Glory/shaders/skinned.vert
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_10) "Compiling shader skinned.vert"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_21) "Compiling shader skinned.vert"
 	/opt/homebrew/bin/glslc /Users/donkey/Development/1/Glory/shaders/skinned.vert -o /Users/donkey/Development/1/Glory/build/shaders/skinned.vert.spv
 
+shaders/sprite_effect_additive.frag.spv: /Users/donkey/Development/1/Glory/shaders/sprite_effect_additive.frag
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_22) "Compiling shader sprite_effect_additive.frag"
+	/opt/homebrew/bin/glslc /Users/donkey/Development/1/Glory/shaders/sprite_effect_additive.frag -o /Users/donkey/Development/1/Glory/build/shaders/sprite_effect_additive.frag.spv
+
+shaders/sprite_effect_billboard.vert.spv: /Users/donkey/Development/1/Glory/shaders/sprite_effect_billboard.vert
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_23) "Compiling shader sprite_effect_billboard.vert"
+	/opt/homebrew/bin/glslc /Users/donkey/Development/1/Glory/shaders/sprite_effect_billboard.vert -o /Users/donkey/Development/1/Glory/build/shaders/sprite_effect_billboard.vert.spv
+
 shaders/triangle.frag.spv: /Users/donkey/Development/1/Glory/shaders/triangle.frag
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_11) "Compiling shader triangle.frag"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_24) "Compiling shader triangle.frag"
 	/opt/homebrew/bin/glslc /Users/donkey/Development/1/Glory/shaders/triangle.frag -o /Users/donkey/Development/1/Glory/build/shaders/triangle.frag.spv
 
 shaders/triangle.vert.spv: /Users/donkey/Development/1/Glory/shaders/triangle.vert
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_12) "Compiling shader triangle.vert"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/donkey/Development/1/Glory/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_25) "Compiling shader triangle.vert"
 	/opt/homebrew/bin/glslc /Users/donkey/Development/1/Glory/shaders/triangle.vert -o /Users/donkey/Development/1/Glory/build/shaders/triangle.vert.spv
 
 CMakeFiles/Shaders.dir/codegen:
@@ -133,14 +198,27 @@ CMakeFiles/Shaders.dir/codegen:
 Shaders: CMakeFiles/Shaders
 Shaders: shaders/click_indicator.frag.spv
 Shaders: shaders/click_indicator.vert.spv
+Shaders: shaders/cone_ability.vert.spv
+Shaders: shaders/cone_energy.frag.spv
+Shaders: shaders/cone_grid.frag.spv
+Shaders: shaders/cone_lightning.frag.spv
+Shaders: shaders/cone_lightning.vert.spv
 Shaders: shaders/debug.frag.spv
 Shaders: shaders/debug.vert.spv
+Shaders: shaders/explosion_disk.vert.spv
+Shaders: shaders/explosion_fireball.frag.spv
+Shaders: shaders/explosion_shockwave.frag.spv
+Shaders: shaders/explosion_sphere.vert.spv
 Shaders: shaders/grid.frag.spv
 Shaders: shaders/grid.vert.spv
 Shaders: shaders/particle.frag.spv
 Shaders: shaders/particle.vert.spv
 Shaders: shaders/particle_sim.comp.spv
+Shaders: shaders/shield_bubble.frag.spv
+Shaders: shaders/shield_bubble.vert.spv
 Shaders: shaders/skinned.vert.spv
+Shaders: shaders/sprite_effect_additive.frag.spv
+Shaders: shaders/sprite_effect_billboard.vert.spv
 Shaders: shaders/triangle.frag.spv
 Shaders: shaders/triangle.vert.spv
 Shaders: CMakeFiles/Shaders.dir/build.make

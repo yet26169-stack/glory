@@ -1,0 +1,43 @@
+{
+    "id": "fire_mage_trick",
+    "displayName": "Arcane Bolt",
+    "slot": "SUMMONER",
+    "targeting": "SKILLSHOT",
+    "resourceType": "MANA",
+    "costPerLevel": [40, 40, 40, 40, 40],
+    "cooldownPerLevel": [3.0, 3.0, 3.0, 3.0, 3.0],
+    "castTime": 0.1,
+    "channelDuration": 0.0,
+    "canMoveWhileCasting": false,
+    "canBeInterrupted": true,
+    "castRange": 40.0,
+    "projectile": {
+        "speed": 22.0,
+        "acceleration": 40.0,
+        "maxSpeed": 100.0,
+        "width": 1.2,
+        "maxRange": 40.0,
+        "piercing": false,
+        "maxTargets": 1,
+        "returnsToSource": false,
+        "curveAngle": 0.0,
+        "destroyOnWall": true
+    },
+    "onHitEffects": [
+        {
+            "type": "DAMAGE",
+            "damageType": "MAGICAL",
+            "scaling": {
+                "basePerLevel": [60, 90, 120, 150, 180],
+                "apRatio": 0.5
+            }
+        }
+    ],
+    "onSelfEffects": [],
+    "castVFX": "",
+    "projectileVFX": "vfx_trick_bolt",
+    "impactVFX": "vfx_trick_impact",
+    "castSFX": "",
+    "impactSFX": "",
+    "tags": ["damage", "skillshot", "magical"]
+}

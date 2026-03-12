@@ -1,0 +1,20 @@
+{
+    "id":              "vfx_shield",
+    "maxParticles":    1,
+    "emitRate":        0.0,
+    "burstCount":      1.0,
+    "looping":         false,
+    "duration":        10.0,
+    "lifetimeMin":     10.0,
+    "lifetimeMax":     10.0,
+    "initialSpeedMin": 0.0,
+    "initialSpeedMax": 0.0,
+    "sizeMin":         1.5,
+    "sizeMax":         1.5,
+    "spreadAngle":     0.0,
+    "gravity":         0.0,
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [0.2, 0.8, 1.0, 0.6]},
+        {"time": 1.0, "color": [0.2, 0.8, 1.0, 0.6]}
+    ]
+}

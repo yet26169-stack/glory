@@ -32,6 +32,19 @@ set(SHADER_SOURCES
     ${CMAKE_SOURCE_DIR}/shaders/particle_sim.comp
     ${CMAKE_SOURCE_DIR}/shaders/particle.vert
     ${CMAKE_SOURCE_DIR}/shaders/particle.frag
+    ${CMAKE_SOURCE_DIR}/shaders/shield_bubble.vert
+    ${CMAKE_SOURCE_DIR}/shaders/shield_bubble.frag
+    ${CMAKE_SOURCE_DIR}/shaders/cone_ability.vert
+    ${CMAKE_SOURCE_DIR}/shaders/cone_grid.frag
+    ${CMAKE_SOURCE_DIR}/shaders/cone_energy.frag
+    ${CMAKE_SOURCE_DIR}/shaders/cone_lightning.vert
+    ${CMAKE_SOURCE_DIR}/shaders/cone_lightning.frag
+    ${CMAKE_SOURCE_DIR}/shaders/explosion_disk.vert
+    ${CMAKE_SOURCE_DIR}/shaders/explosion_sphere.vert
+    ${CMAKE_SOURCE_DIR}/shaders/explosion_shockwave.frag
+    ${CMAKE_SOURCE_DIR}/shaders/explosion_fireball.frag
+    ${CMAKE_SOURCE_DIR}/shaders/sprite_effect_additive.frag
+    ${CMAKE_SOURCE_DIR}/shaders/sprite_effect_billboard.vert
 )
 
 foreach(SHADER ${SHADER_SOURCES})
@@ -75,6 +88,10 @@ set(SOURCES
     src/renderer/Pipeline.cpp
     src/renderer/Sync.cpp
     src/renderer/ClickIndicatorRenderer.cpp
+    src/renderer/ShieldBubbleRenderer.cpp
+    src/renderer/ConeAbilityRenderer.cpp
+    src/renderer/ExplosionRenderer.cpp
+    src/renderer/SpriteEffectRenderer.cpp
     src/renderer/Renderer.cpp
     src/renderer/GLBLoader.cpp
     src/renderer/DynamicMesh.cpp
@@ -88,6 +105,8 @@ set(SOURCES
     src/vfx/ParticleSystem.cpp
     src/vfx/VFXRenderer.cpp
     src/ability/AbilitySystem.cpp
+    src/ability/ProjectileSystem.cpp
+    src/combat/CombatSystem.cpp
     extern/vma/vma_impl.cpp
     extern/imgui/imgui.cpp
     extern/imgui/imgui_draw.cpp

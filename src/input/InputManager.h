@@ -35,6 +35,14 @@ public:
   glm::vec2 getLastLeftClickPos() const { return m_leftClickPos; }
   bool isLeftMouseDown() const { return glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS; }
   bool isRightMouseDown() const { return glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS; }
+
+  // ── Combat keys (A/S/D) and debug UI (Tab) ─────────────────────────────
+  bool wasTabPressed();
+  bool wasAPressed();
+  bool wasDPressed();
+  bool wasSPressed();
+  bool isSHeld() const { return m_sHeld; }
+  bool wasSReleased();
   glm::vec2 getMousePos() const {
     double x, y;
     glfwGetCursorPos(m_window, &x, &y);
@@ -66,6 +74,14 @@ private:
   glm::vec2 m_rightClickPos{0.0f};
   bool m_leftClicked = false;
   glm::vec2 m_leftClickPos{0.0f};
+
+  // Combat / debug keys
+  bool m_tabPressed  = false;
+  bool m_aPressed    = false;
+  bool m_dPressed    = false;
+  bool m_sPressed    = false;
+  bool m_sHeld       = false;   // true while S is physically held down
+  bool m_sReleased   = false;   // consume-once: set on S key-up
 
   float m_scrollDelta = 0.0f;
 

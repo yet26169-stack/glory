@@ -1,6 +1,6 @@
 {
     "id": "fire_mage_fireball",
-    "displayName": "Fireball",
+    "displayName": "Mystic Shot",
     "slot": "Q",
     "targeting": "SKILLSHOT",
     "resourceType": "MANA",
@@ -12,21 +12,23 @@
         80
     ],
     "cooldownPerLevel": [
-        8.0,
-        7.5,
-        7.0,
-        6.5,
-        6.0
+        5.0,
+        4.5,
+        4.0,
+        3.5,
+        3.0
     ],
-    "castTime": 0.25,
+    "castTime": 0.15,
     "channelDuration": 0.0,
     "canMoveWhileCasting": false,
     "canBeInterrupted": true,
-    "castRange": 1100.0,
+    "castRange": 50.0,
     "projectile": {
-        "speed": 1200.0,
-        "width": 60.0,
-        "maxRange": 1100.0,
+        "speed": 18.0,
+        "acceleration": 55.0,
+        "maxSpeed": 120.0,
+        "width": 1.5,
+        "maxRange": 50.0,
         "piercing": false,
         "maxTargets": 1,
         "returnsToSource": false,
@@ -50,8 +52,8 @@
         }
     ],
     "onSelfEffects": [],
-    "castVFX": "vfx_fireball_cast",
-    "projectileVFX": "vfx_fireball_projectile",
+    "castVFX": "",
+    "projectileVFX": "vfx_q_bolt",
     "impactVFX": "vfx_fireball_explosion",
     "castSFX": "sfx_fireball_cast",
     "impactSFX": "sfx_fireball_impact",

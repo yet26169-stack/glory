@@ -80,12 +80,22 @@ struct ProjectileComponent {
     const AbilityDefinition* sourceDef      = nullptr;
     EntityID                 casterEntity   = NULL_ENTITY;
     glm::vec3                velocity       {0.f};
+    float                    acceleration   = 0.0f;   // units/s² speed increase
+    float                    maxSpeed       = 9999.0f;
     float                    maxRange       = 1100.0f;
     float                    traveledDist   = 0.0f;
     bool                     piercing       = false;
     int                      maxTargets     = 1;
     int                      hitCount       = 0;
     uint32_t                 vfxHandle      = INVALID_VFX_HANDLE;
+
+    // Lob (arc) projectile fields
+    bool      isLob         = false;
+    glm::vec3 lobOrigin     {0.f};    // Bezier P0: spawn position
+    glm::vec3 lobApex       {0.f};    // Bezier P1: arc peak
+    glm::vec3 lobTarget     {0.f};    // Bezier P2: landing point
+    float     lobFlightTime = 1.0f;   // total arc duration in seconds
+    float     lobElapsed    = 0.0f;   // seconds since lob was spawned
 };
 
 // ── ResourceComponent ─────────────────────────────────────────────────────

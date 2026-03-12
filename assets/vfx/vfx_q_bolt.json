@@ -1,0 +1,21 @@
+{
+    "id":              "vfx_q_bolt",
+    "maxParticles":    64,
+    "emitRate":        80.0,
+    "burstCount":      0.0,
+    "looping":         true,
+    "duration":        3.0,
+    "lifetimeMin":     0.05,
+    "lifetimeMax":     0.12,
+    "initialSpeedMin": 0.1,
+    "initialSpeedMax": 0.6,
+    "sizeMin":         0.12,
+    "sizeMax":         0.22,
+    "spreadAngle":     5.0,
+    "gravity":         0.0,
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [0.85, 0.95, 1.0,  1.0]},
+        {"time": 0.4, "color": [0.3,  0.7,  1.0,  0.7]},
+        {"time": 1.0, "color": [0.1,  0.4,  0.85, 0.0]}
+    ]
+}

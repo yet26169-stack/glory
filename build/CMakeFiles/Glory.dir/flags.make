@@ -6,7 +6,7 @@ CXX_DEFINES = -DASSET_DIR=\"/Users/donkey/Development/1/Glory/build/assets/\" -D
 
 CXX_INCLUDES = -I/Users/donkey/Development/1/Glory/src -I/Users/donkey/Development/1/Glory/extern/vma -I/Users/donkey/Development/1/Glory/extern/stb -I/Users/donkey/Development/1/Glory/extern/tinyobj -I/Users/donkey/Development/1/Glory/extern/entt -I/Users/donkey/Development/1/Glory/extern/imgui -I/Users/donkey/Development/1/Glory/extern/tinygltf -I/Users/donkey/Development/1/Glory/extern -I/Users/donkey/Development/1/Glory/extern/meshoptimizer/src -isystem /opt/homebrew/include
 
-CXX_FLAGSarm64 = -g -std=gnu++20 -arch arm64
+CXX_FLAGSarm64 = -O3 -DNDEBUG -std=gnu++20 -arch arm64
 
-CXX_FLAGS = -g -std=gnu++20 -arch arm64
+CXX_FLAGS = -O3 -DNDEBUG -std=gnu++20 -arch arm64
 

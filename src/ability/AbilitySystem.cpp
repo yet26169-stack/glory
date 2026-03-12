@@ -273,16 +273,16 @@ void AbilitySystem::executeAbility(entt::registry& reg, entt::entity caster,
 
     if (def.targeting == TargetingType::SKILLSHOT && !def.projectileVFX.empty()) {
         spawnProjectile(reg, caster, def, target);
+    } else if (def.targeting == TargetingType::POINT && def.projectile.isLob) {
+        spawnLobProjectile(reg, caster, def, target);
     } else {
         resolveInstantEffects(reg, caster, def, target);
     }
 
-    // Impact VFX at target position
-    if (!def.impactVFX.empty()) {
-        glm::vec3 impactPos = (def.targeting == TargetingType::SKILLSHOT)
-                              ? casterPos + target.direction * def.castRange
-                              : target.targetPosition;
-        emitVFX(def.impactVFX, impactPos, target.direction);
+    // Impact VFX: for SKILLSHOT the projectile handles it on actual hit.
+    // For instant-hit abilities emit it now at the target position.
+    if (!def.impactVFX.empty() && def.targeting != TargetingType::SKILLSHOT) {
+        emitVFX(def.impactVFX, target.targetPosition, target.direction);
     }
 }
 
@@ -306,12 +306,59 @@ void AbilitySystem::spawnProjectile(entt::registry& reg, entt::entity caster,
     pc.sourceDef   = &def;
     pc.casterEntity = static_cast<EntityID>(entt::to_integral(caster));
     pc.velocity    = dir * def.projectile.speed;
+    pc.acceleration= def.projectile.acceleration;
+    pc.maxSpeed    = def.projectile.maxSpeed;
     pc.maxRange    = def.projectile.maxRange;
     pc.piercing    = def.projectile.piercing;
     pc.maxTargets  = def.projectile.maxTargets;
 
     if (!def.projectileVFX.empty()) {
-        emitVFX(def.projectileVFX, origin, dir, 1.0f, -1.0f); // looping until impact
+        // Use (entity index + 1) as a stable, pre-assigned VFX handle so we can
+        // move/destroy the trail each frame from ProjectileSystem.
+        const uint32_t vfxHandle = static_cast<uint32_t>(entt::to_integral(proj)) + 1u;
+        pc.vfxHandle = vfxHandle;
+        // Spawn VFX at character center height so trail doesn't clip into the ground
+        const glm::vec3 vfxOrigin = origin + glm::vec3(0.f, 0.5f, 0.f);
+        emitVFX(def.projectileVFX, vfxOrigin, dir, 1.0f, -1.0f, vfxHandle);
+    }
+}
+
+// ── spawnLobProjectile ─────────────────────────────────────────────────────────
+void AbilitySystem::spawnLobProjectile(entt::registry& reg, entt::entity caster,
+                                        const AbilityDefinition& def,
+                                        const TargetInfo& target) {
+    glm::vec3 origin{0.f};
+    if (reg.all_of<TransformComponent>(caster))
+        origin = reg.get<TransformComponent>(caster).position;
+
+    const glm::vec3 spawnPos = origin + glm::vec3(0.f, 1.0f, 0.f);
+    const glm::vec3 landPos  = target.targetPosition;
+    const glm::vec3 midPoint = (spawnPos + landPos) * 0.5f
+                              + glm::vec3(0.f, def.projectile.lobApexHeight, 0.f);
+
+    entt::entity proj = reg.create();
+    reg.emplace<TransformComponent>(proj,
+        TransformComponent{spawnPos, glm::vec3(0.f), glm::vec3(0.6f)});
+
+    auto& pc          = reg.emplace<ProjectileComponent>(proj);
+    pc.sourceDef      = &def;
+    pc.casterEntity   = static_cast<EntityID>(entt::to_integral(caster));
+    pc.maxRange       = def.projectile.maxRange;
+    pc.piercing       = def.projectile.piercing;
+    pc.maxTargets     = def.projectile.maxTargets;
+    pc.isLob          = true;
+    pc.lobOrigin      = spawnPos;
+    pc.lobApex        = midPoint;
+    pc.lobTarget      = landPos;
+    pc.lobFlightTime  = def.projectile.lobFlightTime;
+    pc.lobElapsed     = 0.0f;
+
+    if (!def.projectileVFX.empty()) {
+        const uint32_t vfxHandle = static_cast<uint32_t>(entt::to_integral(proj)) + 1u;
+        pc.vfxHandle = vfxHandle;
+        emitVFX(def.projectileVFX, spawnPos,
+                glm::normalize(landPos - spawnPos + glm::vec3(0.f, 0.01f, 0.f)),
+                1.0f, -1.0f, vfxHandle);
     }
 }
 
@@ -401,13 +448,15 @@ void AbilitySystem::applyEffectToEntity(entt::registry& reg, entt::entity caster
 }
 
 // ── emitVFX ───────────────────────────────────────────────────────────────────
-void AbilitySystem::emitVFX(const std::string& effectID,
-                              const glm::vec3& position,
-                              const glm::vec3& direction,
-                              float scale,
-                              float lifetime) {
+uint32_t AbilitySystem::emitVFX(const std::string& effectID,
+                                 const glm::vec3& position,
+                                 const glm::vec3& direction,
+                                 float scale,
+                                 float lifetime,
+                                 uint32_t preHandle) {
     VFXEvent ev{};
     ev.type     = VFXEventType::Spawn;
+    ev.handle   = preHandle;   // 0 → VFXRenderer auto-assigns; non-zero → pinned handle
     ev.position = position;
     ev.direction= direction;
     ev.scale    = scale;
@@ -417,6 +466,24 @@ void AbilitySystem::emitVFX(const std::string& effectID,
     if (!m_vfxQueue.push(ev)) {
         spdlog::warn("AbilitySystem: VFX queue full, dropping '{}'", effectID);
     }
+    return preHandle;
+}
+
+// ── emitVFXPublic (public façade for external callers) ────────────────────────
+uint32_t AbilitySystem::emitVFXPublic(const std::string& effectID,
+                                       const glm::vec3& position,
+                                       const glm::vec3& direction,
+                                       float scale,
+                                       float lifetime,
+                                       uint32_t preHandle) {
+    return emitVFX(effectID, position, direction, scale, lifetime, preHandle);
+}
+
+// ── resolveHit (public wrapper used by ProjectileSystem) ─────────────────────
+void AbilitySystem::resolveHit(entt::registry& reg, entt::entity caster,
+                                const AbilityDefinition& def,
+                                const TargetInfo& target) {
+    resolveInstantEffects(reg, caster, def, target);
 }
 
 // ── JSON parsing ──────────────────────────────────────────────────────────────
@@ -432,7 +499,7 @@ AbilityDefinition AbilitySystem::parseJSON(const nlohmann::json& j,
     else if (slotStr == "E") def.slot = AbilitySlot::E;
     else if (slotStr == "R") def.slot = AbilitySlot::R;
     else if (slotStr == "PASSIVE")  def.slot = AbilitySlot::PASSIVE;
-    else if (slotStr == "SUMMONER") def.slot = AbilitySlot::SUMMONER;
+    else if (slotStr == "SUMMONER" || slotStr == "D") def.slot = AbilitySlot::SUMMONER;
     else                             def.slot = AbilitySlot::Q;
 
     // Targeting
@@ -472,12 +539,17 @@ AbilityDefinition AbilitySystem::parseJSON(const nlohmann::json& j,
     if (j.contains("projectile")) {
         const auto& p    = j["projectile"];
         def.projectile.speed          = p.value("speed",          1200.0f);
+        def.projectile.acceleration   = p.value("acceleration",   0.0f);
+        def.projectile.maxSpeed       = p.value("maxSpeed",       9999.0f);
         def.projectile.width          = p.value("width",          60.0f);
         def.projectile.maxRange       = p.value("maxRange",       1100.0f);
         def.projectile.piercing       = p.value("piercing",       false);
         def.projectile.maxTargets     = p.value("maxTargets",     1);
         def.projectile.returnsToSource= p.value("returnsToSource",false);
         def.projectile.destroyOnWall  = p.value("destroyOnWall",  true);
+        def.projectile.isLob          = p.value("isLob",          false);
+        def.projectile.lobFlightTime  = p.value("lobFlightTime",  1.0f);
+        def.projectile.lobApexHeight  = p.value("lobApexHeight",  8.0f);
     }
 
     if (j.contains("onHitEffects"))

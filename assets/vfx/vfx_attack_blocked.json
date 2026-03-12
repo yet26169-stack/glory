@@ -1,0 +1,21 @@
+{
+    "id":              "vfx_attack_blocked",
+    "maxParticles":    32,
+    "emitRate":        0.0,
+    "burstCount":      24.0,
+    "looping":         false,
+    "duration":        0.3,
+    "lifetimeMin":     0.1,
+    "lifetimeMax":     0.25,
+    "initialSpeedMin": 2.0,
+    "initialSpeedMax": 5.0,
+    "sizeMin":         0.03,
+    "sizeMax":         0.08,
+    "spreadAngle":     90.0,
+    "gravity":         3.0,
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [1.0, 1.0, 1.0, 1.0]},
+        {"time": 0.5, "color": [0.5, 0.8, 1.0, 0.6]},
+        {"time": 1.0, "color": [0.2, 0.5, 0.8, 0.0]}
+    ]
+}
