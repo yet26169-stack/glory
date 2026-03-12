@@ -151,6 +151,11 @@ private:
 
     void spawnTestEnemy();
     entt::entity pickEntityUnderCursor();
+
+    enum class AppState { Launcher, TestMode };
+    AppState m_state = AppState::Launcher;
+
+    void drawLauncherUI();
 };
 
 } // namespace glory

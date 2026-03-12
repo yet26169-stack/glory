@@ -1,0 +1,22 @@
+{
+    "id":              "vfx_fireball_cast_glow",
+    "maxParticles":    8,
+    "emitRate":        0.0,
+    "burstCount":      4.0,
+    "looping":         false,
+    "duration":        1.0,
+    "lifetimeMin":     0.8,
+    "lifetimeMax":     1.2,
+    "initialSpeedMin": 0.0,
+    "initialSpeedMax": 0.5,
+    "sizeMin":         3.0,
+    "sizeMax":         5.0,
+    "sizeEnd":         6.0,
+    "drag":            0.5,
+    "spreadAngle":     180.0,
+    "gravity":         -0.1,
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [1.0, 0.4, 0.0, 0.3]},
+        {"time": 1.0, "color": [0.5, 0.1, 0.0, 0.0]}
+    ]
+}

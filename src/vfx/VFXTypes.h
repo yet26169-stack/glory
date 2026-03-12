@@ -10,7 +10,7 @@ namespace glory {
 
 // ── Constants ──────────────────────────────────────────────────────────────
 static constexpr uint32_t MAX_PARTICLES_PER_EMITTER = 2048;
-static constexpr uint32_t MAX_CONCURRENT_EMITTERS   = 32;
+static constexpr uint32_t MAX_CONCURRENT_EMITTERS   = 64;
 static constexpr uint32_t INVALID_VFX_HANDLE        = 0;
 
 // ── GPU Particle layout (must EXACTLY match GLSL struct in shaders) ────────
@@ -18,8 +18,8 @@ static constexpr uint32_t INVALID_VFX_HANDLE        = 0;
 struct alignas(16) GpuParticle {
     glm::vec4 posLife;   // xyz = world pos, w = remaining lifetime (s)
     glm::vec4 velAge;    // xyz = velocity (m/s), w = age (s)
-    glm::vec4 color;     // rgba (alpha fades in compute shader over lifetime)
-    glm::vec4 params;    // x=size, y=rotation, z=atlasFrame, w=active(1)/dead(0)
+    glm::vec4 color;     // rgba
+    glm::vec4 params;    // x=size, y=rotation, z=angularVel, w=packed (atlasFrame+active)
 };
 static_assert(sizeof(GpuParticle) == 64, "GpuParticle must be 64 bytes");
 
@@ -34,6 +34,23 @@ struct FloatKey {
     float time;   // normalised lifetime fraction [0..1]
     float value;
 };
+
+// ── Emitter Params (passed to GPU via UBO) ───────────────────────────────
+struct alignas(16) GpuColorKey {
+    glm::vec4 color;
+    float     time;
+    float     _pad[3];
+};
+
+struct alignas(16) EmitterParams {
+    glm::vec4  wind_dt;        // xyz=windDir*strength, w=dt
+    glm::vec4  phys;           // x=gravity, y=drag, z=alphaCurve, w=count
+    glm::vec4  size;           // x=sizeMin, y=sizeMax, z=sizeEnd, w=reserved
+    uint32_t   colorKeyCount;
+    float      _pad[3];
+    GpuColorKey colorKeys[8];
+};
+static_assert(sizeof(EmitterParams) <= 512, "EmitterParams must be compact");
 
 // ── Emitter definition (loaded from JSON or hard-coded) ───────────────────
 struct EmitterDef {
@@ -59,14 +76,21 @@ struct EmitterDef {
     float        initialSpeedMax = 6.0f;
     float        sizeMin         = 0.2f;
     float        sizeMax         = 0.6f;
+    float        sizeEnd         = -1.0f;   // if negative, use sizeMin (no change over life)
+    float        rotationSpeedMin= 0.0f;    // deg/s
+    float        rotationSpeedMax= 0.0f;
     float        spreadAngle     = 45.0f;   // cone half-angle in degrees (0 = straight up)
 
     // Physics
     float        gravity         = 4.0f;    // m/s² downward
+    float        drag            = 0.0f;    // damping: vel *= (1.0 - drag * dt)
+    float        alphaCurve      = 1.0f;    // 1.0 = linear, >1.0 = fast fade in, etc.
+    glm::vec3    windDirection   {0.0f};
+    float        windStrength    = 0.0f;
 
-    // Visual curves (evaluated at spawn; full curve support in AbilitySystem)
-    std::vector<ColorKey> colorOverLifetime;  // empty = white→transparent
-    std::vector<FloatKey> sizeOverLifetime;   // empty = constant sizeMin
+    // Visual curves
+    std::vector<ColorKey> colorOverLifetime;  // Evaluated on GPU if not empty
+    std::vector<FloatKey> sizeOverLifetime;   // Not strictly used if sizeEnd is set, but keeping for compatibility
 };
 
 // ── VFX Event (game logic → render thread via SPSC queue) ─────────────────

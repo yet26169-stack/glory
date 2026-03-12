@@ -59,6 +59,7 @@ public:
 
     // Accessors needed by VFXRenderer during dispatch / draw
     VkBuffer        ssbo()        const { return m_ssboBuffer.getBuffer(); }
+    VkBuffer        emitterUbo()  const { return m_emitterBuffer.getBuffer(); }
     VkDescriptorSet descSet()     const { return m_descSet; }
     uint32_t        maxParticles()const { return m_maxParticles; }
 
@@ -70,6 +71,10 @@ private:
     Buffer             m_ssboBuffer;
     GpuParticle*       m_particles  = nullptr;    // mapped pointer into SSBO
     uint32_t           m_maxParticles = 0;
+
+    // GPU UBO for emitter parameters
+    Buffer             m_emitterBuffer;
+    EmitterParams*     m_emitterParams = nullptr;
 
     // Descriptor set (shared layout: binding 0 = SSBO, binding 1 = atlas)
     VkDescriptorSet    m_descSet    = VK_NULL_HANDLE;

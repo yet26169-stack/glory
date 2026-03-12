@@ -1,34 +1,22 @@
 {
     "id": "fire_mage_fireball",
-    "displayName": "Mystic Shot",
+    "displayName": "Fireball",
     "slot": "Q",
     "targeting": "SKILLSHOT",
     "resourceType": "MANA",
-    "costPerLevel": [
-        60,
-        65,
-        70,
-        75,
-        80
-    ],
-    "cooldownPerLevel": [
-        5.0,
-        4.5,
-        4.0,
-        3.5,
-        3.0
-    ],
-    "castTime": 0.15,
+    "costPerLevel": [60, 65, 70, 75, 80],
+    "cooldownPerLevel": [5.0, 4.5, 4.0, 3.5, 3.0],
+    "castTime": 0.25,
     "channelDuration": 0.0,
     "canMoveWhileCasting": false,
     "canBeInterrupted": true,
-    "castRange": 50.0,
+    "castRange": 25.0,
     "projectile": {
-        "speed": 18.0,
-        "acceleration": 55.0,
-        "maxSpeed": 120.0,
-        "width": 1.5,
-        "maxRange": 50.0,
+        "speed": 22.0,
+        "acceleration": 0.0,
+        "maxSpeed": 22.0,
+        "width": 1.2,
+        "maxRange": 25.0,
         "piercing": false,
         "maxTargets": 1,
         "returnsToSource": false,
@@ -40,26 +28,16 @@
             "type": "DAMAGE",
             "damageType": "MAGICAL",
             "scaling": {
-                "basePerLevel": [
-                    80,
-                    130,
-                    180,
-                    230,
-                    280
-                ],
+                "basePerLevel": [80, 130, 180, 230, 280],
                 "apRatio": 0.75
             }
         }
     ],
     "onSelfEffects": [],
-    "castVFX": "",
-    "projectileVFX": "vfx_q_bolt",
-    "impactVFX": "vfx_fireball_explosion",
+    "castVFX": ["vfx_fireball_cast", "vfx_fireball_cast_sparks", "vfx_fireball_cast_glow"],
+    "projectileVFX": ["vfx_fireball_projectile", "vfx_fireball_trail_embers"],
+    "impactVFX": ["vfx_fireball_explosion", "vfx_fireball_explosion_smoke", "vfx_fireball_explosion_sparks"],
     "castSFX": "sfx_fireball_cast",
     "impactSFX": "sfx_fireball_impact",
-    "tags": [
-        "damage",
-        "skillshot",
-        "magical"
-    ]
+    "tags": ["damage", "skillshot", "magical"]
 }

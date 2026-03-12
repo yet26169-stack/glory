@@ -166,9 +166,9 @@ struct AbilityDefinition {
     std::vector<EffectDef> onSelfEffects;
 
     std::string castAnimation;
-    std::string castVFX;        // e.g. "vfx_fireball_cast"
-    std::string projectileVFX;
-    std::string impactVFX;
+    std::vector<std::string> castVFX;        // e.g. ["vfx_fireball_cast", "vfx_glow"]
+    std::vector<std::string> projectileVFX;
+    std::vector<std::string> impactVFX;
     std::string castSFX;
     std::string impactSFX;
 

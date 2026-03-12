@@ -58,7 +58,8 @@ void VFXRenderer::createDescriptorLayoutAndPool() {
 
     // binding 0: SSBO (particle buffer) — compute writes, vertex reads
     // binding 1: combined image sampler (particle atlas) — fragment reads
-    VkDescriptorSetLayoutBinding bindings[2]{};
+    // binding 2: UBO (emitter parameters) — compute/vertex reads
+    VkDescriptorSetLayoutBinding bindings[3]{};
 
     bindings[0].binding         = 0;
     bindings[0].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -70,23 +71,30 @@ void VFXRenderer::createDescriptorLayoutAndPool() {
     bindings[1].descriptorCount = 1;
     bindings[1].stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
 
+    bindings[2].binding         = 2;
+    bindings[2].descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    bindings[2].descriptorCount = 1;
+    bindings[2].stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT;
+
     VkDescriptorSetLayoutCreateInfo layoutCI{};
     layoutCI.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutCI.bindingCount = 2;
+    layoutCI.bindingCount = 3;
     layoutCI.pBindings    = bindings;
     vkCreateDescriptorSetLayout(dev, &layoutCI, nullptr, &m_descLayout);
 
     // Pool — allocate one set per possible concurrent emitter
-    VkDescriptorPoolSize poolSizes[2]{};
+    VkDescriptorPoolSize poolSizes[3]{};
     poolSizes[0].type            = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     poolSizes[0].descriptorCount = MAX_CONCURRENT_EMITTERS;
     poolSizes[1].type            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     poolSizes[1].descriptorCount = MAX_CONCURRENT_EMITTERS;
+    poolSizes[2].type            = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSizes[2].descriptorCount = MAX_CONCURRENT_EMITTERS;
 
     VkDescriptorPoolCreateInfo poolCI{};
     poolCI.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolCI.maxSets       = MAX_CONCURRENT_EMITTERS;
-    poolCI.poolSizeCount = 2;
+    poolCI.poolSizeCount = 3;
     poolCI.pPoolSizes    = poolSizes;
     // Allow individual free (needed when effects are destroyed out-of-order)
     poolCI.flags         = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
@@ -380,8 +388,19 @@ void VFXRenderer::loadEmitterDirectory(const std::string& dirPath) {
             def.initialSpeedMax = j.value("initialSpeedMax",6.0f);
             def.sizeMin         = j.value("sizeMin",        0.2f);
             def.sizeMax         = j.value("sizeMax",        0.6f);
+            def.sizeEnd         = j.value("sizeEnd",        -1.0f);
+            def.rotationSpeedMin= j.value("rotationSpeedMin", 0.0f);
+            def.rotationSpeedMax= j.value("rotationSpeedMax", 0.0f);
             def.spreadAngle     = j.value("spreadAngle",    45.0f);
             def.gravity         = j.value("gravity",        4.0f);
+            def.drag            = j.value("drag",           0.0f);
+            def.alphaCurve      = j.value("alphaCurve",     1.0f);
+            def.windStrength    = j.value("windStrength",   0.0f);
+
+            if (j.contains("windDirection")) {
+                auto& w = j["windDirection"];
+                def.windDirection = {w[0].get<float>(), w[1].get<float>(), w[2].get<float>()};
+            }
 
             if (j.contains("colorOverLifetime")) {
                 for (const auto& k : j["colorOverLifetime"]) {

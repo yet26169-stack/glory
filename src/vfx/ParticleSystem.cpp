@@ -46,6 +46,25 @@ ParticleSystem::ParticleSystem(const Device&          device,
     // Zero all particles (marks them as inactive via params.w = 0)
     std::memset(m_particles, 0, bufSize);
 
+    // Create UBO for emitter parameters
+    m_emitterBuffer = Buffer(device.getAllocator(),
+                             sizeof(EmitterParams),
+                             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                             VMA_MEMORY_USAGE_CPU_TO_GPU);
+    m_emitterParams = reinterpret_cast<EmitterParams*>(m_emitterBuffer.map());
+
+    // Fill parameters
+    m_emitterParams->wind_dt = {def.windDirection * def.windStrength, 0.0f}; // dt set in update/render
+    m_emitterParams->phys    = {def.gravity, def.drag, def.alphaCurve, static_cast<float>(m_maxParticles)};
+    m_emitterParams->size    = {def.sizeMin, def.sizeMax, def.sizeEnd, 0.0f};
+
+    const uint32_t keyCount = std::min(static_cast<uint32_t>(def.colorOverLifetime.size()), 8u);
+    m_emitterParams->colorKeyCount = keyCount;
+    for (uint32_t k = 0; k < keyCount; ++k) {
+        m_emitterParams->colorKeys[k].color = def.colorOverLifetime[k].color;
+        m_emitterParams->colorKeys[k].time  = def.colorOverLifetime[k].time;
+    }
+
     // Allocate descriptor set from the shared pool
     VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -67,6 +86,10 @@ void ParticleSystem::destroy() {
         m_ssboBuffer.unmap();
         m_particles = nullptr;
     }
+    if (m_emitterParams && m_emitterBuffer.getBuffer() != VK_NULL_HANDLE) {
+        m_emitterBuffer.unmap();
+        m_emitterParams = nullptr;
+    }
     // Descriptor set is freed when the pool is reset; no individual free needed.
     m_descSet = VK_NULL_HANDLE;
 }
@@ -78,6 +101,8 @@ ParticleSystem::ParticleSystem(ParticleSystem&& o) noexcept
     , m_ssboBuffer  (std::move(o.m_ssboBuffer))
     , m_particles   (o.m_particles)
     , m_maxParticles(o.m_maxParticles)
+    , m_emitterBuffer(std::move(o.m_emitterBuffer))
+    , m_emitterParams(o.m_emitterParams)
     , m_descSet     (o.m_descSet)
     , m_position    (o.m_position)
     , m_direction   (o.m_direction)
@@ -92,6 +117,7 @@ ParticleSystem::ParticleSystem(ParticleSystem&& o) noexcept
     , m_rng         (std::move(o.m_rng))
 {
     o.m_particles = nullptr;
+    o.m_emitterParams = nullptr;
     o.m_descSet   = VK_NULL_HANDLE;
 }
 
@@ -103,6 +129,8 @@ ParticleSystem& ParticleSystem::operator=(ParticleSystem&& o) noexcept {
         m_ssboBuffer   = std::move(o.m_ssboBuffer);
         m_particles    = o.m_particles;
         m_maxParticles = o.m_maxParticles;
+        m_emitterBuffer= std::move(o.m_emitterBuffer);
+        m_emitterParams= o.m_emitterParams;
         m_descSet      = o.m_descSet;
         m_position     = o.m_position;
         m_direction    = o.m_direction;
@@ -116,6 +144,7 @@ ParticleSystem& ParticleSystem::operator=(ParticleSystem&& o) noexcept {
         m_handle       = o.m_handle;
         m_rng          = std::move(o.m_rng);
         o.m_particles  = nullptr;
+        o.m_emitterParams = nullptr;
         o.m_descSet    = VK_NULL_HANDLE;
     }
     return *this;
@@ -124,6 +153,10 @@ ParticleSystem& ParticleSystem::operator=(ParticleSystem&& o) noexcept {
 // ── update ─────────────────────────────────────────────────────────────────
 void ParticleSystem::update(float dt) {
     if (!m_particles || !m_def) return;
+
+    if (m_emitterParams) {
+        m_emitterParams->wind_dt.w = dt;
+    }
 
     m_timeAlive += dt;
 
@@ -195,6 +228,8 @@ void ParticleSystem::spawnParticle() {
 
             const float life = frand(m_def->lifetimeMin, m_def->lifetimeMax);
             const float size = frand(m_def->sizeMin, m_def->sizeMax) * m_scale;
+            const float rot  = frand(0.0f, glm::two_pi<float>());
+            const float angVel = glm::radians(frand(m_def->rotationSpeedMin, m_def->rotationSpeedMax));
 
             // Choose spawn colour: first key or white if not defined
             glm::vec4 col{1.0f};
@@ -205,7 +240,11 @@ void ParticleSystem::spawnParticle() {
             p.posLife = {m_position.x, m_position.y, m_position.z, life};
             p.velAge  = {vel.x, vel.y, vel.z, 0.0f};
             p.color   = col;
-            p.params  = {size, 0.0f, 0.0f, 1.0f}; // active = 1.0
+            
+            // Packed params.w: atlasFrame (integer part) + active (0.5 bias if active)
+            // For now, use frame 0; future expansion can randomize frame if needed.
+            const float activePacked = 0.5f; // 0 frame + active
+            p.params  = {size, rot, angVel, activePacked};
 
             return; // only spawn one particle per call
         }
@@ -223,7 +262,12 @@ void ParticleSystem::writeToDescriptorSet(VkDescriptorSetLayout /*layout*/,
     bufInfo.offset = 0;
     bufInfo.range  = VK_WHOLE_SIZE;
 
-    VkWriteDescriptorSet writes[2]{};
+    VkDescriptorBufferInfo uboInfo{};
+    uboInfo.buffer = m_emitterBuffer.getBuffer();
+    uboInfo.offset = 0;
+    uboInfo.range  = VK_WHOLE_SIZE;
+
+    VkWriteDescriptorSet writes[3]{};
     writes[0].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     writes[0].dstSet          = m_descSet;
     writes[0].dstBinding      = 0;
@@ -244,7 +288,15 @@ void ParticleSystem::writeToDescriptorSet(VkDescriptorSetLayout /*layout*/,
     writes[1].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     writes[1].pImageInfo      = &imgInfo;
 
-    vkUpdateDescriptorSets(dev, 2, writes, 0, nullptr);
+    // Binding 2 — Emitter UBO
+    writes[2].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[2].dstSet          = m_descSet;
+    writes[2].dstBinding      = 2;
+    writes[2].descriptorCount = 1;
+    writes[2].descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    writes[2].pBufferInfo     = &uboInfo;
+
+    vkUpdateDescriptorSets(dev, 3, writes, 0, nullptr);
 }
 
 } // namespace glory

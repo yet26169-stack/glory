@@ -166,7 +166,9 @@ void AbilitySystem::processRequest(entt::registry& reg, const AbilityRequest& re
         glm::vec3 pos{0.f};
         if (reg.all_of<TransformComponent>(req.casterEntity))
             pos = reg.get<TransformComponent>(req.casterEntity).position;
-        emitVFX(inst.def->castVFX, pos, req.target.direction);
+        for (const auto& vfxID : inst.def->castVFX) {
+            emitVFX(vfxID, pos, req.target.direction);
+        }
     }
 }
 
@@ -282,7 +284,9 @@ void AbilitySystem::executeAbility(entt::registry& reg, entt::entity caster,
     // Impact VFX: for SKILLSHOT the projectile handles it on actual hit.
     // For instant-hit abilities emit it now at the target position.
     if (!def.impactVFX.empty() && def.targeting != TargetingType::SKILLSHOT) {
-        emitVFX(def.impactVFX, target.targetPosition, target.direction);
+        for (const auto& vfxID : def.impactVFX) {
+            emitVFX(vfxID, target.targetPosition, target.direction);
+        }
     }
 }
 
@@ -313,13 +317,15 @@ void AbilitySystem::spawnProjectile(entt::registry& reg, entt::entity caster,
     pc.maxTargets  = def.projectile.maxTargets;
 
     if (!def.projectileVFX.empty()) {
-        // Use (entity index + 1) as a stable, pre-assigned VFX handle so we can
-        // move/destroy the trail each frame from ProjectileSystem.
-        const uint32_t vfxHandle = static_cast<uint32_t>(entt::to_integral(proj)) + 1u;
-        pc.vfxHandle = vfxHandle;
         // Spawn VFX at character center height so trail doesn't clip into the ground
         const glm::vec3 vfxOrigin = origin + glm::vec3(0.f, 0.5f, 0.f);
-        emitVFX(def.projectileVFX, vfxOrigin, dir, 1.0f, -1.0f, vfxHandle);
+        
+        uint32_t baseHandle = (static_cast<uint32_t>(entt::to_integral(proj)) + 1u) * 100u;
+        for (uint32_t i = 0; i < def.projectileVFX.size(); ++i) {
+            uint32_t h = baseHandle + i;
+            pc.vfxHandles.push_back(h);
+            emitVFX(def.projectileVFX[i], vfxOrigin, dir, 1.0f, -1.0f, h);
+        }
     }
 }
 
@@ -354,11 +360,14 @@ void AbilitySystem::spawnLobProjectile(entt::registry& reg, entt::entity caster,
     pc.lobElapsed     = 0.0f;
 
     if (!def.projectileVFX.empty()) {
-        const uint32_t vfxHandle = static_cast<uint32_t>(entt::to_integral(proj)) + 1u;
-        pc.vfxHandle = vfxHandle;
-        emitVFX(def.projectileVFX, spawnPos,
-                glm::normalize(landPos - spawnPos + glm::vec3(0.f, 0.01f, 0.f)),
-                1.0f, -1.0f, vfxHandle);
+        uint32_t baseHandle = (static_cast<uint32_t>(entt::to_integral(proj)) + 1u) * 100u;
+        for (uint32_t i = 0; i < def.projectileVFX.size(); ++i) {
+            uint32_t h = baseHandle + i;
+            pc.vfxHandles.push_back(h);
+            emitVFX(def.projectileVFX[i], spawnPos,
+                    glm::normalize(landPos - spawnPos + glm::vec3(0.f, 0.01f, 0.f)),
+                    1.0f, -1.0f, h);
+        }
     }
 }
 
@@ -560,9 +569,22 @@ AbilityDefinition AbilitySystem::parseJSON(const nlohmann::json& j,
         for (const auto& e : j["onSelfEffects"])
             def.onSelfEffects.push_back(parseEffect(e));
 
-    def.castVFX       = j.value("castVFX",       "");
-    def.projectileVFX = j.value("projectileVFX", "");
-    def.impactVFX     = j.value("impactVFX",     "");
+    auto parseVFX = [&](const nlohmann::json& vfxJ) -> std::vector<std::string> {
+        if (vfxJ.is_array()) {
+            std::vector<std::string> res;
+            for (const auto& v : vfxJ) res.push_back(v.get<std::string>());
+            return res;
+        } else if (vfxJ.is_string()) {
+            std::string s = vfxJ.get<std::string>();
+            return s.empty() ? std::vector<std::string>{} : std::vector<std::string>{s};
+        }
+        return {};
+    };
+
+    if (j.contains("castVFX"))       def.castVFX       = parseVFX(j["castVFX"]);
+    if (j.contains("projectileVFX")) def.projectileVFX = parseVFX(j["projectileVFX"]);
+    if (j.contains("impactVFX"))     def.impactVFX     = parseVFX(j["impactVFX"]);
+
     def.castSFX       = j.value("castSFX",       "");
     def.impactSFX     = j.value("impactSFX",     "");
     def.castAnimation = j.value("castAnimation", "");

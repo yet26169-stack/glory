@@ -188,45 +188,53 @@ void Renderer::drawFrame() {
     m_gameTime += dt;
     m_currentDt = dt;
 
-    // ── VFX: flush event queues and update CPU emitters ─────────────────
-    if (m_vfxRenderer) {
-        if (m_vfxQueue)      m_vfxRenderer->processQueue(*m_vfxQueue);
-        if (m_combatVfxQueue) m_vfxRenderer->processQueue(*m_combatVfxQueue);
-        m_vfxRenderer->update(dt);
-    }
-    if (m_abilitySystem) {
-        m_abilitySystem->update(m_scene.getRegistry(), dt);
-    }
-    if (m_projectileSystem && m_abilitySystem && m_vfxQueue) {
-        m_projectileSystem->update(m_scene.getRegistry(), dt,
-                                   *m_vfxQueue, *m_abilitySystem);
-        // Collect landing positions from lob projectiles → trigger explosion visuals
-        if (m_explosionRenderer) {
-            for (const auto& pos : m_projectileSystem->getLandedPositions()) {
-                m_explosionRenderer->addExplosion(pos);
-            }
-            m_projectileSystem->clearLandedPositions();
+    if (m_state == AppState::Launcher) {
+        ImGui_ImplVulkan_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+        
+        drawLauncherUI();
+    } else {
+        // ── VFX: flush event queues and update CPU emitters ─────────────────
+        if (m_vfxRenderer) {
+            if (m_vfxQueue)      m_vfxRenderer->processQueue(*m_vfxQueue);
+            if (m_combatVfxQueue) m_vfxRenderer->processQueue(*m_combatVfxQueue);
+            m_vfxRenderer->update(dt);
         }
-    }
-    if (m_explosionRenderer)
-        m_explosionRenderer->update(dt);
-    if (m_spriteEffectRenderer)
-        m_spriteEffectRenderer->update(dt);
-    // Tick cone effect if active
-    if (m_coneEffectTimer > 0.0f && m_coneEffect) {
-        m_coneEffectTimer -= dt;
-        float coneElapsed = CONE_DURATION - m_coneEffectTimer;
-        m_coneEffect->update(dt, m_coneApex, m_coneDirection,
-                             CONE_HALF_ANGLE, CONE_RANGE, coneElapsed);
-    }
-    if (m_combatSystem) {
-        m_combatSystem->update(m_scene.getRegistry(), dt);
-    }
+        if (m_abilitySystem) {
+            m_abilitySystem->update(m_scene.getRegistry(), dt);
+        }
+        if (m_projectileSystem && m_abilitySystem && m_vfxQueue) {
+            m_projectileSystem->update(m_scene.getRegistry(), dt,
+                                       *m_vfxQueue, *m_abilitySystem);
+            // Collect landing positions from lob projectiles → trigger explosion visuals
+            if (m_explosionRenderer) {
+                for (const auto& pos : m_projectileSystem->getLandedPositions()) {
+                    m_explosionRenderer->addExplosion(pos);
+                }
+                m_projectileSystem->clearLandedPositions();
+            }
+        }
+        if (m_explosionRenderer)
+            m_explosionRenderer->update(dt);
+        if (m_spriteEffectRenderer)
+            m_spriteEffectRenderer->update(dt);
+        // Tick cone effect if active
+        if (m_coneEffectTimer > 0.0f && m_coneEffect) {
+            m_coneEffectTimer -= dt;
+            float coneElapsed = CONE_DURATION - m_coneEffectTimer;
+            m_coneEffect->update(dt, m_coneApex, m_coneDirection,
+                                 CONE_HALF_ANGLE, CONE_RANGE, coneElapsed);
+        }
+        if (m_combatSystem) {
+            m_combatSystem->update(m_scene.getRegistry(), dt);
+        }
 
-    // ── ImGui new frame (before any UI building) ─────────────────────────
-    ImGui_ImplVulkan_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
+        // ── ImGui new frame (before any UI building) ─────────────────────────
+        ImGui_ImplVulkan_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+    }
     
     // ── Standard frame loop: Wait for GPU ─────────────────────────────────
     VkDevice dev = m_device->getDevice();
@@ -245,9 +253,10 @@ void Renderer::drawFrame() {
     
     m_debugRenderer.clear();
 
-    // ── Input ────────────────────────────────────────────────────────────
-    auto ext = m_swapchain->getExtent();
-    float aspect = static_cast<float>(ext.width) / static_cast<float>(ext.height);
+    if (m_state != AppState::Launcher) {
+        // ── Input ────────────────────────────────────────────────────────────
+        auto ext = m_swapchain->getExtent();
+        float aspect = static_cast<float>(ext.width) / static_cast<float>(ext.height);
 
     int winW, winH;
     glfwGetWindowSize(m_window.getHandle(), &winW, &winH);
@@ -725,9 +734,10 @@ void Renderer::drawFrame() {
     // operation, avoiding N redundant VK_WHOLE_SIZE flushes per frame.
     if (currentBoneSlot > 0)
         m_descriptors->flushBones(m_currentFrame);
+    } // end if (m_state != AppState::Launcher)
 
     // ── Debug UI (ImGui) ─────────────────────────────────────────────────
-    if (m_showDebugUI) {
+    if (m_showDebugUI && m_state != AppState::Launcher) {
         ImGui::Begin("Debug Tools", &m_showDebugUI);
 
         if (ImGui::Button("Spawn Test Enemy")) {
@@ -811,7 +821,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
     VK_CHECK(vkBeginCommandBuffer(cmd, &bi), "Begin command buffer");
 
     // ── VFX compute pass (particle simulation, OUTSIDE render pass) ──────
-    if (m_vfxRenderer) {
+    if (m_vfxRenderer && m_state != AppState::Launcher) {
         m_vfxRenderer->dispatchCompute(cmd);
         m_vfxRenderer->barrierComputeToGraphics(cmd);
     }
@@ -860,162 +870,164 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
     vkCmdSetViewport(cmd, 0, 1, &vp);
     vkCmdSetScissor(cmd, 0, 1, &sc);
 
-    // ── Static mesh pass ─────────────────────────────────────────────────
-    VkPipeline mainPipeline = m_wireframe ? m_pipeline->getWireframePipeline()
-                                          : m_pipeline->getGraphicsPipeline();
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline);
-    VkDescriptorSet ds = m_descriptors->getSet(m_currentFrame);
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            m_pipeline->getPipelineLayout(), 0, 1, &ds, 0, nullptr);
-
-    auto* instances = static_cast<InstanceData*>(m_instanceMapped[m_currentFrame]);
-    uint32_t instanceIndex = 0;
-
-    auto staticView = m_scene.getRegistry()
-        .view<TransformComponent, MeshComponent, MaterialComponent>(
-            entt::exclude<GPUSkinnedMeshComponent>);
-    for (auto&& [e, t, mc, mat] : staticView.each()) {
-        if (instanceIndex >= MAX_INSTANCES) break;
-        glm::mat4 model = t.getModelMatrix();
-        instances[instanceIndex].model        = model;
-        instances[instanceIndex].normalMatrix = glm::transpose(glm::inverse(model));
-
-        // Highlight hovered static entities in red
-        glm::vec4 tint(1.0f);
-        if (e == m_hoveredEntity) {
-            tint = glm::vec4(1.0f, 0.4f, 0.4f, 1.0f);
-        }
-        instances[instanceIndex].tint = tint;
-
-        instances[instanceIndex].params       = glm::vec4(mat.shininess, mat.metallic, mat.roughness, mat.emissive);
-        instances[instanceIndex].texIndices   = glm::vec4(
-            static_cast<float>(mat.materialIndex), static_cast<float>(mat.normalMapIndex), 0.0f, 0.0f);
-
-        VkBuffer     instBuf    = m_instanceBuffers[m_currentFrame].getBuffer();
-        VkDeviceSize instOffset = instanceIndex * sizeof(InstanceData);
-        vkCmdBindVertexBuffers(cmd, 1, 1, &instBuf, &instOffset);
-        m_scene.getMesh(mc.meshIndex).draw(cmd);
-        ++instanceIndex;
-    }
-
-    // ── GPU-skinned pass ─────────────────────────────────────────────────
-    if (m_skinnedPipeline != VK_NULL_HANDLE) {
-        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_skinnedPipeline);
+    if (m_state != AppState::Launcher) {
+        // ── Static mesh pass ─────────────────────────────────────────────────
+        VkPipeline mainPipeline = m_wireframe ? m_pipeline->getWireframePipeline()
+                                              : m_pipeline->getGraphicsPipeline();
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline);
+        VkDescriptorSet ds = m_descriptors->getSet(m_currentFrame);
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                m_skinnedPipelineLayout, 0, 1, &ds, 0, nullptr);
+                                m_pipeline->getPipelineLayout(), 0, 1, &ds, 0, nullptr);
 
-        auto skinnedView = m_scene.getRegistry()
-            .view<TransformComponent, MaterialComponent, GPUSkinnedMeshComponent>();
-        for (auto&& [e, t, mat, ssm] : skinnedView.each()) {
+        auto* instances = static_cast<InstanceData*>(m_instanceMapped[m_currentFrame]);
+        uint32_t instanceIndex = 0;
+
+        auto staticView = m_scene.getRegistry()
+            .view<TransformComponent, MeshComponent, MaterialComponent>(
+                entt::exclude<GPUSkinnedMeshComponent>);
+        for (auto&& [e, t, mc, mat] : staticView.each()) {
             if (instanceIndex >= MAX_INSTANCES) break;
             glm::mat4 model = t.getModelMatrix();
             instances[instanceIndex].model        = model;
             instances[instanceIndex].normalMatrix = glm::transpose(glm::inverse(model));
-            
-            // Highlight logic: Red for hovered, Green for selected
+
+            // Highlight hovered static entities in red
             glm::vec4 tint(1.0f);
             if (e == m_hoveredEntity) {
-                tint = glm::vec4(1.0f, 0.4f, 0.4f, 1.0f); // Hover red
-            } else if (m_scene.getRegistry().all_of<SelectableComponent>(e)) {
-                if (m_scene.getRegistry().get<SelectableComponent>(e).isSelected) {
-                    tint = glm::vec4(0.5f, 1.0f, 0.5f, 1.0f); // Selected green
-                }
+                tint = glm::vec4(1.0f, 0.4f, 0.4f, 1.0f);
             }
             instances[instanceIndex].tint = tint;
 
-            instances[instanceIndex].params = glm::vec4(mat.shininess, mat.metallic, mat.roughness, mat.emissive);
+            instances[instanceIndex].params       = glm::vec4(mat.shininess, mat.metallic, mat.roughness, mat.emissive);
             instances[instanceIndex].texIndices   = glm::vec4(
                 static_cast<float>(mat.materialIndex), static_cast<float>(mat.normalMapIndex), 0.0f, 0.0f);
 
             VkBuffer     instBuf    = m_instanceBuffers[m_currentFrame].getBuffer();
             VkDeviceSize instOffset = instanceIndex * sizeof(InstanceData);
             vkCmdBindVertexBuffers(cmd, 1, 1, &instBuf, &instOffset);
-
-            uint32_t boneBase = ssm.boneSlot * Descriptors::MAX_BONES;
-            vkCmdPushConstants(cmd, m_skinnedPipelineLayout,
-                               VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(uint32_t), &boneBase);
-
-            const auto& mesh = m_scene.getStaticSkinnedMesh(ssm.staticSkinnedMeshIndex);
-            mesh.bind(cmd);
-            mesh.draw(cmd);
+            m_scene.getMesh(mc.meshIndex).draw(cmd);
             ++instanceIndex;
         }
-    }
 
-    // ── Debug grid ───────────────────────────────────────────────────────
-    if (m_showGrid && m_gridPipeline != VK_NULL_HANDLE) {
-        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_gridPipeline);
-        struct GridPC { glm::mat4 viewProj; float gridY; } gridPC;
-        gridPC.viewProj = m_isoCam.getProjectionMatrix(aspect) * m_isoCam.getViewMatrix();
-        gridPC.gridY    = 0.0f;
-        vkCmdPushConstants(cmd, m_gridPipelineLayout,
-                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                           0, sizeof(GridPC), &gridPC);
-        vkCmdDraw(cmd, 6, 1, 0, 0);
-    }
+        // ── GPU-skinned pass ─────────────────────────────────────────────────
+        if (m_skinnedPipeline != VK_NULL_HANDLE) {
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_skinnedPipeline);
+            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                    m_skinnedPipelineLayout, 0, 1, &ds, 0, nullptr);
 
-    // ── Click indicator ───────────────────────────────────────────────────
-    if (m_clickAnim && m_clickIndicatorRenderer) {
-        float t_norm = m_clickAnim->lifetime / m_clickAnim->maxLife;
-        glm::mat4 vp = m_isoCam.getProjectionMatrix(aspect) * m_isoCam.getViewMatrix();
-        m_clickIndicatorRenderer->render(cmd, vp, m_clickAnim->position, t_norm, 1.5f);
-    }
+            auto skinnedView = m_scene.getRegistry()
+                .view<TransformComponent, MaterialComponent, GPUSkinnedMeshComponent>();
+            for (auto&& [e, t, mat, ssm] : skinnedView.each()) {
+                if (instanceIndex >= MAX_INSTANCES) break;
+                glm::mat4 model = t.getModelMatrix();
+                instances[instanceIndex].model        = model;
+                instances[instanceIndex].normalMatrix = glm::transpose(glm::inverse(model));
+                
+                // Highlight logic: Red for hovered, Green for selected
+                glm::vec4 tint(1.0f);
+                if (e == m_hoveredEntity) {
+                    tint = glm::vec4(1.0f, 0.4f, 0.4f, 1.0f); // Hover red
+                } else if (m_scene.getRegistry().all_of<SelectableComponent>(e)) {
+                    if (m_scene.getRegistry().get<SelectableComponent>(e).isSelected) {
+                        tint = glm::vec4(0.5f, 1.0f, 0.5f, 1.0f); // Selected green
+                    }
+                }
+                instances[instanceIndex].tint = tint;
 
-    // ── Debug Renderer (Marquee Box) ──────────────────────────────────────
-    glm::mat4 viewProj = m_isoCam.getProjectionMatrix(aspect) * m_isoCam.getViewMatrix();
-    m_debugRenderer.render(cmd, viewProj);
+                instances[instanceIndex].params = glm::vec4(mat.shininess, mat.metallic, mat.roughness, mat.emissive);
+                instances[instanceIndex].texIndices   = glm::vec4(
+                    static_cast<float>(mat.materialIndex), static_cast<float>(mat.normalMapIndex), 0.0f, 0.0f);
 
-    // ── VFX particle render pass ──────────────────────────────────────────
-    if (m_vfxRenderer) {
-        const glm::mat4& view = m_isoCam.getViewMatrix();
-        // Extract camera right and up from the view matrix rows
-        glm::vec3 camRight{view[0][0], view[1][0], view[2][0]};
-        glm::vec3 camUp   {view[0][1], view[1][1], view[2][1]};
-        m_vfxRenderer->render(cmd, viewProj, camRight, camUp);
-    }
+                VkBuffer     instBuf    = m_instanceBuffers[m_currentFrame].getBuffer();
+                VkDeviceSize instOffset = instanceIndex * sizeof(InstanceData);
+                vkCmdBindVertexBuffers(cmd, 1, 1, &instBuf, &instOffset);
 
-    // ── Glass shield bubble ───────────────────────────────────────────────
-    if (m_shieldBubble) {
-        auto& reg = m_scene.getRegistry();
-        if (reg.all_of<CombatComponent, TransformComponent>(m_playerEntity)) {
-            const auto& combat = reg.get<CombatComponent>(m_playerEntity);
-            if (combat.state == CombatState::SHIELDING) {
-                const auto& t = reg.get<TransformComponent>(m_playerEntity);
-                float elapsed  = combat.shieldDuration - combat.stateTimer;
-                float fadeIn   = std::min(elapsed / 0.25f, 1.0f);
-                float fadeOut  = std::min(combat.stateTimer / 0.25f, 1.0f);
-                float alpha    = fadeIn * fadeOut;
-                // Center at half character world-height (~5 units at scale 0.05 with armature transform)
-                glm::vec3 center    = t.position + glm::vec3(0.0f, 2.5f, 0.0f);
-                glm::vec3 cameraPos = m_isoCam.getPosition();
-                float appTime = static_cast<float>(glfwGetTime());
-                m_shieldBubble->render(cmd, viewProj, center, cameraPos,
-                                       3.2f, appTime, alpha);
+                uint32_t boneBase = ssm.boneSlot * Descriptors::MAX_BONES;
+                vkCmdPushConstants(cmd, m_skinnedPipelineLayout,
+                                   VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(uint32_t), &boneBase);
+
+                const auto& mesh = m_scene.getStaticSkinnedMesh(ssm.staticSkinnedMeshIndex);
+                mesh.bind(cmd);
+                mesh.draw(cmd);
+                ++instanceIndex;
             }
         }
-    }
 
-    // ── W-ability cone effect ─────────────────────────────────────────────
-    if (m_coneEffectTimer > 0.0f && m_coneEffect) {
-        float elapsed    = CONE_DURATION - m_coneEffectTimer;
-        glm::vec3 camPos = m_isoCam.getPosition();
-        float     t      = static_cast<float>(glfwGetTime());
-        m_coneEffect->render(cmd, viewProj, m_coneApex, m_coneDirection,
-                             CONE_HALF_ANGLE, CONE_RANGE,
-                             camPos, t, elapsed, 1.0f);
-    }
+        // ── Debug grid ───────────────────────────────────────────────────────
+        if (m_showGrid && m_gridPipeline != VK_NULL_HANDLE) {
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_gridPipeline);
+            struct GridPC { glm::mat4 viewProj; float gridY; } gridPC;
+            gridPC.viewProj = m_isoCam.getProjectionMatrix(aspect) * m_isoCam.getViewMatrix();
+            gridPC.gridY    = 0.0f;
+            vkCmdPushConstants(cmd, m_gridPipelineLayout,
+                               VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                               0, sizeof(GridPC), &gridPC);
+            vkCmdDraw(cmd, 6, 1, 0, 0);
+        }
 
-    // ── E-ability explosion effects ───────────────────────────────────────
-    if (m_explosionRenderer) {
-        glm::vec3 camPos = m_isoCam.getPosition();
-        float appTime    = static_cast<float>(glfwGetTime());
-        m_explosionRenderer->render(cmd, viewProj, camPos, appTime);
-    }
+        // ── Click indicator ───────────────────────────────────────────────────
+        if (m_clickAnim && m_clickIndicatorRenderer) {
+            float t_norm = m_clickAnim->lifetime / m_clickAnim->maxLife;
+            glm::mat4 vp = m_isoCam.getProjectionMatrix(aspect) * m_isoCam.getViewMatrix();
+            m_clickIndicatorRenderer->render(cmd, vp, m_clickAnim->position, t_norm, 1.5f);
+        }
 
-    // ── Sprite-atlas VFX effects (W cone, E explosion) ────────────────────
-    if (m_spriteEffectRenderer) {
-        glm::vec3 camPos = m_isoCam.getPosition();
-        m_spriteEffectRenderer->render(cmd, viewProj, camPos);
+        // ── Debug Renderer (Marquee Box) ──────────────────────────────────────
+        glm::mat4 viewProj = m_isoCam.getProjectionMatrix(aspect) * m_isoCam.getViewMatrix();
+        m_debugRenderer.render(cmd, viewProj);
+
+        // ── VFX particle render pass ──────────────────────────────────────────
+        if (m_vfxRenderer) {
+            const glm::mat4& view = m_isoCam.getViewMatrix();
+            // Extract camera right and up from the view matrix rows
+            glm::vec3 camRight{view[0][0], view[1][0], view[2][0]};
+            glm::vec3 camUp   {view[0][1], view[1][1], view[2][1]};
+            m_vfxRenderer->render(cmd, viewProj, camRight, camUp);
+        }
+
+        // ── Glass shield bubble ───────────────────────────────────────────────
+        if (m_shieldBubble) {
+            auto& reg = m_scene.getRegistry();
+            if (reg.all_of<CombatComponent, TransformComponent>(m_playerEntity)) {
+                const auto& combat = reg.get<CombatComponent>(m_playerEntity);
+                if (combat.state == CombatState::SHIELDING) {
+                    const auto& t = reg.get<TransformComponent>(m_playerEntity);
+                    float elapsed  = combat.shieldDuration - combat.stateTimer;
+                    float fadeIn   = std::min(elapsed / 0.25f, 1.0f);
+                    float fadeOut  = std::min(combat.stateTimer / 0.25f, 1.0f);
+                    float alpha    = fadeIn * fadeOut;
+                    // Center at half character world-height (~5 units at scale 0.05 with armature transform)
+                    glm::vec3 center    = t.position + glm::vec3(0.0f, 2.5f, 0.0f);
+                    glm::vec3 cameraPos = m_isoCam.getPosition();
+                    float appTime = static_cast<float>(glfwGetTime());
+                    m_shieldBubble->render(cmd, viewProj, center, cameraPos,
+                                           3.2f, appTime, alpha);
+                }
+            }
+        }
+
+        // ── W-ability cone effect ─────────────────────────────────────────────
+        if (m_coneEffectTimer > 0.0f && m_coneEffect) {
+            float elapsed    = CONE_DURATION - m_coneEffectTimer;
+            glm::vec3 camPos = m_isoCam.getPosition();
+            float     t      = static_cast<float>(glfwGetTime());
+            m_coneEffect->render(cmd, viewProj, m_coneApex, m_coneDirection,
+                                 CONE_HALF_ANGLE, CONE_RANGE,
+                                 camPos, t, elapsed, 1.0f);
+        }
+
+        // ── E-ability explosion effects ───────────────────────────────────────
+        if (m_explosionRenderer) {
+            glm::vec3 camPos = m_isoCam.getPosition();
+            float appTime    = static_cast<float>(glfwGetTime());
+            m_explosionRenderer->render(cmd, viewProj, camPos, appTime);
+        }
+
+        // ── Sprite-atlas VFX effects (W cone, E explosion) ────────────────────
+        if (m_spriteEffectRenderer) {
+            glm::vec3 camPos = m_isoCam.getPosition();
+            m_spriteEffectRenderer->render(cmd, viewProj, camPos);
+        }
     }
 
     // ── ImGui render draw data (last thing inside render pass) ────────────
@@ -1155,8 +1167,14 @@ void Renderer::buildScene() {
         CharacterComponent{ glm::vec3(100.0f, 0.0f, 100.0f), 8.0f });
     m_scene.getRegistry().emplace<TeamComponent>(character, TeamComponent{ Team::PLAYER });
     m_scene.getRegistry().emplace<CombatComponent>(character);
+    m_scene.getRegistry().emplace<SelectableComponent>(character, SelectableComponent{ false, 2.5f });
     m_scene.getRegistry().emplace<ResourceComponent>(character);
-    m_scene.getRegistry().emplace<StatsComponent>(character);
+    
+    StatsComponent playerStats;
+    playerStats.base.maxHP = 600.0f;
+    playerStats.base.currentHP = 600.0f;
+    m_scene.getRegistry().emplace<StatsComponent>(character, playerStats);
+
     m_scene.getRegistry().emplace<StatusEffectsComponent>(character);
     
     if (m_abilitySystem) {
@@ -1325,7 +1343,7 @@ void Renderer::spawnTestEnemy() {
     t.position = spawnPos;
     t.scale    = glm::vec3(0.05f);
 
-    reg.emplace<SelectableComponent>(enemy, SelectableComponent{ false, 1.0f });
+    reg.emplace<SelectableComponent>(enemy, SelectableComponent{ false, 2.5f });
     reg.emplace<UnitComponent>(enemy, UnitComponent{ UnitComponent::State::IDLE, spawnPos, 0.0f });
     // moveSpeed=0 → immobile test dummy
     reg.emplace<CharacterComponent>(enemy, CharacterComponent{ spawnPos, 0.0f });
@@ -1679,6 +1697,32 @@ void Renderer::destroySkinnedPipeline() {
     VkDevice dev = m_device->getDevice();
     if (m_skinnedPipeline)       { vkDestroyPipeline(dev, m_skinnedPipeline, nullptr);            m_skinnedPipeline       = VK_NULL_HANDLE; }
     if (m_skinnedPipelineLayout) { vkDestroyPipelineLayout(dev, m_skinnedPipelineLayout, nullptr); m_skinnedPipelineLayout = VK_NULL_HANDLE; }
+}
+
+void Renderer::drawLauncherUI() {
+    auto ext = m_swapchain->getExtent();
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    ImGui::SetNextWindowSize(ImVec2(static_cast<float>(ext.width), static_cast<float>(ext.height)));
+    
+    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings;
+    
+    if (ImGui::Begin("Launcher", nullptr, window_flags)) {
+        // Center the content
+        float window_width = ImGui::GetWindowWidth();
+        float window_height = ImGui::GetWindowHeight();
+        
+        ImGui::SetCursorPos(ImVec2(window_width * 0.5f - 100, window_height * 0.5f - 50));
+        
+        if (ImGui::Button("Launch Test Mode", ImVec2(200, 100))) {
+            m_state = AppState::TestMode;
+            spdlog::info("Transitioning to Test Mode");
+        }
+        
+        ImGui::SetCursorPosX(window_width * 0.5f - 150);
+        ImGui::SetCursorPosY(window_height * 0.5f + 60);
+        ImGui::Text("Glory Engine - Alpha Client");
+    }
+    ImGui::End();
 }
 
 } // namespace glory

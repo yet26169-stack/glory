@@ -30,7 +30,7 @@ struct AbilityInstance {
     AbilityPhase             currentPhase     = AbilityPhase::READY;
     float                    phaseTimer       = 0.0f;    // counts down within phase
     TargetInfo               currentTarget;
-    uint32_t                 activeVFXHandle  = INVALID_VFX_HANDLE;
+    std::vector<uint32_t>    vfxHandles;
 
     bool isReady() const {
         return level > 0 && currentPhase == AbilityPhase::READY;
@@ -51,7 +51,7 @@ struct ActiveStatusEffect {
     float            remainingDuration = 0.0f;
     float            tickAccumulator  = 0.0f;
     float            totalValue       = 0.0f;     // pre-computed at apply time
-    uint32_t         vfxHandle        = INVALID_VFX_HANDLE;
+    std::vector<uint32_t>    vfxHandles;
 };
 
 // ── StatusEffectsComponent ─────────────────────────────────────────────────
@@ -87,7 +87,7 @@ struct ProjectileComponent {
     bool                     piercing       = false;
     int                      maxTargets     = 1;
     int                      hitCount       = 0;
-    uint32_t                 vfxHandle      = INVALID_VFX_HANDLE;
+    std::vector<uint32_t>    vfxHandles;
 
     // Lob (arc) projectile fields
     bool      isLob         = false;

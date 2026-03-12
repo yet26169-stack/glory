@@ -43,12 +43,14 @@ void ProjectileSystem::update(entt::registry& reg, float dt,
                 tc.rotation.x = glm::mix(0.0f, 1.6f, (t - 0.5f) * 2.0f);
 
             // Keep trail VFX locked to bomb position
-            if (pc.vfxHandle != INVALID_VFX_HANDLE) {
-                VFXEvent mv{};
-                mv.type     = VFXEventType::Move;
-                mv.handle   = pc.vfxHandle;
-                mv.position = tc.position;
-                vfxQueue.push(mv);
+            if (!pc.vfxHandles.empty()) {
+                for (auto vfxH : pc.vfxHandles) {
+                    VFXEvent mv{};
+                    mv.type     = VFXEventType::Move;
+                    mv.handle   = vfxH;
+                    mv.position = tc.position;
+                    vfxQueue.push(mv);
+                }
             }
 
             if (t >= 1.0f) {
@@ -103,10 +105,10 @@ void ProjectileSystem::update(entt::registry& reg, float dt,
         pc.traveledDist     += moveDist;
 
         // Keep VFX trail locked to projectile position
-        if (pc.vfxHandle != INVALID_VFX_HANDLE) {
+        for (auto vfxH : pc.vfxHandles) {
             VFXEvent mv{};
             mv.type     = VFXEventType::Move;
-            mv.handle   = pc.vfxHandle;
+            mv.handle   = vfxH;
             mv.position = tc.position + glm::vec3(0.f, 0.5f, 0.f);
             vfxQueue.push(mv);
         }
@@ -172,10 +174,10 @@ void ProjectileSystem::destroyProjectile(entt::registry& reg, entt::entity /*e*/
                                           const glm::vec3& hitPos,
                                           bool applyHit) {
     // Stop looping trail VFX
-    if (pc.vfxHandle != INVALID_VFX_HANDLE) {
+    for (auto vfxH : pc.vfxHandles) {
         VFXEvent ev{};
         ev.type   = VFXEventType::Destroy;
-        ev.handle = pc.vfxHandle;
+        ev.handle = vfxH;
         vfxQueue.push(ev);
     }
 
@@ -184,7 +186,9 @@ void ProjectileSystem::destroyProjectile(entt::registry& reg, entt::entity /*e*/
         const glm::vec3 dir = glm::length(pc.velocity) > 0.001f
                               ? glm::normalize(pc.velocity)
                               : glm::vec3(0, 1, 0);
-        abilitySystem->emitVFXPublic(pc.sourceDef->impactVFX, hitPos, dir);
+        for (const auto& impactID : pc.sourceDef->impactVFX) {
+            abilitySystem->emitVFXPublic(impactID, hitPos, dir);
+        }
     }
 }
 
