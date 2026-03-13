@@ -84,6 +84,7 @@ set(SOURCES
     src/main.cpp
     src/core/Log.cpp
     src/core/Application.cpp
+    src/core/SimulationLoop.cpp
     src/window/Window.cpp
     src/camera/Camera.cpp
     src/input/InputManager.cpp
@@ -128,6 +129,10 @@ set(SOURCES
     src/ability/AbilitySystem.cpp
     src/ability/ProjectileSystem.cpp
     src/combat/CombatSystem.cpp
+    src/audio/AudioEngine.cpp
+    src/audio/SoundHandle.cpp
+    src/audio/AudioResourceManager.cpp
+    src/audio/GameAudioEvents.cpp
     extern/vma/vma_impl.cpp
     extern/imgui/imgui.cpp
     extern/imgui/imgui_draw.cpp

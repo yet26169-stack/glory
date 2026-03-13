@@ -1,0 +1,20 @@
+{
+    "events": {
+        "ability_cast_default": "sfx/ability_cast.wav",
+        "ability_hit_default": "sfx/ability_hit.wav",
+        "auto_attack_melee": "sfx/melee_attack.wav",
+        "auto_attack_ranged": "sfx/ranged_attack.wav",
+        "death": "sfx/death.wav",
+        "level_up": "sfx/level_up.wav",
+        "gold_gain": "sfx/gold_gain.wav",
+        "projectile_fire": "sfx/projectile_fire.wav",
+        "projectile_impact": "sfx/projectile_impact.wav",
+        "tower_attack": "sfx/tower_attack.wav",
+        "tower_destroy": "sfx/tower_destroy.wav",
+        "inhibitor_destroy": "sfx/inhibitor_destroy.wav",
+        "button_click": "ui/click.wav",
+        "ping": "sfx/ping.wav",
+        "chat_message": "ui/chat_message.wav",
+        "ambient_loop": "music/ambient.ogg"
+    }
+}
