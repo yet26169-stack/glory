@@ -1,0 +1,27 @@
+{
+    "id":              "vfx_flame_pillar_cast",
+    "maxParticles":    128,
+    "emitRate":        100.0,
+    "burstCount":      25.0,
+    "looping":         false,
+    "duration":        0.5,
+    "lifetimeMin":     0.3,
+    "lifetimeMax":     0.6,
+    "initialSpeedMin": 3.0,
+    "initialSpeedMax": 7.0,
+    "sizeMin":         0.3,
+    "sizeMax":         0.7,
+    "sizeEnd":         0.1,
+    "rotationSpeedMin": -240.0,
+    "rotationSpeedMax": 240.0,
+    "drag":            4.0,
+    "spreadAngle":     160.0,
+    "gravity":         0.2,
+    "blendMode":       "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [1.0, 0.8, 0.3, 0.9]},
+        {"time": 0.3, "color": [1.0, 0.5, 0.1, 0.8]},
+        {"time": 0.7, "color": [0.9, 0.2, 0.0, 0.5]},
+        {"time": 1.0, "color": [0.4, 0.05, 0.0, 0.0]}
+    ]
+}

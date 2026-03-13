@@ -1,0 +1,8 @@
+{
+    "id": "frost_volley_impact_composite",
+    "layers": [
+        { "delay": 0.0,  "type": "PARTICLE",     "effectRef": "vfx_frost_volley_impact",       "anchor": "TARGET" },
+        { "delay": 0.0,  "type": "PARTICLE",     "effectRef": "vfx_frost_volley_impact_frost",  "anchor": "TARGET" },
+        { "delay": 0.1,  "type": "GROUND_DECAL", "effectRef": "decal_circle",                   "anchor": "TARGET", "scale": 3.0, "color": [0.4, 0.7, 1.0, 0.3] }
+    ]
+}

@@ -1,0 +1,10 @@
+{
+    "id": "flame_pillar_eruption_composite",
+    "layers": [
+        { "delay": 0.0,  "type": "PARTICLE",     "effectRef": "vfx_flame_pillar_eruption",        "anchor": "TARGET" },
+        { "delay": 0.05, "type": "PARTICLE",     "effectRef": "vfx_flame_pillar_eruption_smoke",   "anchor": "TARGET" },
+        { "delay": 0.0,  "type": "PARTICLE",     "effectRef": "vfx_flame_pillar_eruption_embers",  "anchor": "TARGET" },
+        { "delay": 0.0,  "type": "SHOCKWAVE",    "effectRef": "default",                           "anchor": "TARGET" },
+        { "delay": 0.1,  "type": "GROUND_DECAL", "effectRef": "decal_circle",                      "anchor": "TARGET", "scale": 5.0, "color": [0.1, 0.05, 0.02, 0.85] }
+    ]
+}

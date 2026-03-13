@@ -1,0 +1,21 @@
+{
+    "id":              "vfx_recall_spiral",
+    "maxParticles":    512,
+    "emitRate":        40.0,
+    "burstCount":      0.0,
+    "looping":         true,
+    "duration":        8.0,
+    "lifetimeMin":     0.6,
+    "lifetimeMax":     1.2,
+    "initialSpeedMin": 3.0,
+    "initialSpeedMax": 6.0,
+    "sizeMin":         0.15,
+    "sizeMax":         0.35,
+    "spreadAngle":     180.0,
+    "gravity":         -1.5,
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [0.3, 0.5, 1.0, 0.8]},
+        {"time": 0.5, "color": [0.45, 0.65, 1.0, 0.6]},
+        {"time": 1.0, "color": [0.6, 0.8, 1.0, 0.0]}
+    ]
+}

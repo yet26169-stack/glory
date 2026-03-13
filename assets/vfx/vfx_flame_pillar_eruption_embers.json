@@ -1,0 +1,24 @@
+{
+    "id":              "vfx_flame_pillar_eruption_embers",
+    "maxParticles":    128,
+    "emitRate":        0.0,
+    "burstCount":      100.0,
+    "looping":         false,
+    "duration":        2.0,
+    "lifetimeMin":     0.5,
+    "lifetimeMax":     1.5,
+    "initialSpeedMin": 10.0,
+    "initialSpeedMax": 25.0,
+    "sizeMin":         0.05,
+    "sizeMax":         0.15,
+    "drag":            2.0,
+    "spreadAngle":     120.0,
+    "gravity":         6.0,
+    "blendMode":       "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [1.0, 1.0, 0.9, 1.0]},
+        {"time": 0.2, "color": [1.0, 0.9, 0.5, 1.0]},
+        {"time": 0.5, "color": [1.0, 0.6, 0.1, 0.8]},
+        {"time": 1.0, "color": [0.8, 0.3, 0.0, 0.0]}
+    ]
+}

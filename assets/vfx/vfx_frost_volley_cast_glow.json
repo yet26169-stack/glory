@@ -1,0 +1,27 @@
+{
+    "id":              "vfx_frost_volley_cast_glow",
+    "maxParticles":    8,
+    "emitRate":        0.0,
+    "burstCount":      4.0,
+    "looping":         false,
+    "duration":        0.5,
+    "lifetimeMin":     0.3,
+    "lifetimeMax":     0.5,
+    "initialSpeedMin": 0.2,
+    "initialSpeedMax": 0.8,
+    "sizeMin":         2.0,
+    "sizeMax":         3.0,
+    "sizeEnd":         1.5,
+    "rotationSpeedMin": -30.0,
+    "rotationSpeedMax": 30.0,
+    "drag":            1.0,
+    "spreadAngle":     45.0,
+    "gravity":         0.0,
+    "alphaCurve":      1.5,
+    "blendMode":       "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [0.9,  0.97, 1.0,  0.3]},
+        {"time": 0.4, "color": [0.7,  0.9,  1.0,  0.25]},
+        {"time": 1.0, "color": [0.4,  0.8,  1.0,  0.0]}
+    ]
+}

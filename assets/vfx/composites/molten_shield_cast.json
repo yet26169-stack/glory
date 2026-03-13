@@ -1,7 +1,9 @@
 {
-  "id": "molten_shield_cast_composite",
-  "layers": [
-    { "delay": 0.0, "type": "PARTICLE",     "effectRef": "vfx_molten_shield_apply", "anchor": "CASTER" },
-    { "delay": 0.0, "type": "GROUND_DECAL", "effectRef": "decal_circle",            "anchor": "CASTER", "scale": 3.0, "color": [1.0, 0.3, 0.0, 0.4] }
-  ]
+    "id": "molten_shield_cast_composite",
+    "layers": [
+        { "delay": 0.0,  "type": "PARTICLE",     "effectRef": "vfx_molten_shield_apply",  "anchor": "CASTER" },
+        { "delay": 0.3,  "type": "PARTICLE",     "effectRef": "vfx_molten_shield_embers", "anchor": "CASTER" },
+        { "delay": 0.0,  "type": "SHIELD",       "effectRef": "default",                  "anchor": "CASTER" },
+        { "delay": 0.0,  "type": "GROUND_DECAL", "effectRef": "decal_circle",             "anchor": "CASTER", "scale": 3.0, "color": [1.0, 0.4, 0.05, 0.3] }
+    ]
 }

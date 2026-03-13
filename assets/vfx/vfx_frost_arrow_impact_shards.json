@@ -1,0 +1,28 @@
+{
+    "id":              "vfx_frost_arrow_impact_shards",
+    "maxParticles":    96,
+    "emitRate":        0.0,
+    "burstCount":      60.0,
+    "looping":         false,
+    "duration":        1.5,
+    "lifetimeMin":     0.4,
+    "lifetimeMax":     1.0,
+    "initialSpeedMin": 8.0,
+    "initialSpeedMax": 20.0,
+    "sizeMin":         0.5,
+    "sizeMax":         1.0,
+    "sizeEnd":         0.2,
+    "rotationSpeedMin": -350.0,
+    "rotationSpeedMax": 350.0,
+    "drag":            3.0,
+    "spreadAngle":     120.0,
+    "gravity":         8.0,
+    "alphaCurve":      1.5,
+    "blendMode":       "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [1.0,  1.0,  1.0,  1.0]},
+        {"time": 0.3, "color": [0.8,  0.95, 1.0,  0.8]},
+        {"time": 0.6, "color": [0.5,  0.85, 1.0,  0.5]},
+        {"time": 1.0, "color": [0.3,  0.7,  1.0,  0.0]}
+    ]
+}

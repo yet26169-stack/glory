@@ -35,10 +35,11 @@
         }
     ],
     "onSelfEffects": [],
-    "castVFX": "",
-    "projectileVFX": "vfx_bomb_trail",
-    "impactVFX": "vfx_bomb_impact",
-    "castSFX": "",
-    "impactSFX": "",
+    "castVFX": ["vfx_bomb_cast"],
+    "projectileVFX": ["vfx_bomb_trail", "vfx_bomb_trail_smoke"],
+    "impactVFX": ["vfx_bomb_impact", "vfx_bomb_impact_shockwave_sparks", "vfx_bomb_impact_smoke"],
+    "compositeImpactVFX": "bomb_impact_composite",
+    "castSFX": "sfx_bomb_cast",
+    "impactSFX": "sfx_bomb_impact",
     "tags": ["damage", "aoe", "magical", "lob"]
 }

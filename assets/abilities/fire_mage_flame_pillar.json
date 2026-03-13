@@ -57,8 +57,9 @@
             "tickRate": 1.0
         }
     ],
-    "castVFX": "vfx_flame_pillar_cast",
-    "impactVFX": "vfx_flame_pillar_eruption",
+    "castVFX": ["vfx_flame_pillar_cast"],
+    "impactVFX": ["vfx_flame_pillar_eruption", "vfx_flame_pillar_eruption_smoke", "vfx_flame_pillar_eruption_embers"],
+    "compositeImpactVFX": "flame_pillar_eruption_composite",
     "castSFX": "sfx_flame_pillar_cast",
     "impactSFX": "sfx_flame_pillar_eruption",
     "tags": [

@@ -1,0 +1,30 @@
+{
+    "id":              "vfx_frost_arrow_impact",
+    "maxParticles":    256,
+    "emitRate":        0.0,
+    "burstCount":      200.0,
+    "looping":         false,
+    "duration":        1.5,
+    "lifetimeMin":     0.3,
+    "lifetimeMax":     1.2,
+    "initialSpeedMin": 15.0,
+    "initialSpeedMax": 35.0,
+    "sizeMin":         0.3,
+    "sizeMax":         1.5,
+    "sizeEnd":         0.05,
+    "rotationSpeedMin": -400.0,
+    "rotationSpeedMax": 400.0,
+    "drag":            8.0,
+    "spreadAngle":     180.0,
+    "gravity":         4.0,
+    "alphaCurve":      2.0,
+    "blendMode":       "additive",
+    "colorOverLifetime": [
+        {"time": 0.0,  "color": [1.0,  1.0,  1.0,  1.0]},
+        {"time": 0.15, "color": [0.9,  0.97, 1.0,  0.95]},
+        {"time": 0.35, "color": [0.5,  0.85, 1.0,  0.7]},
+        {"time": 0.6,  "color": [0.3,  0.7,  1.0,  0.4]},
+        {"time": 0.8,  "color": [0.1,  0.3,  0.8,  0.15]},
+        {"time": 1.0,  "color": [0.05, 0.2,  0.6,  0.0]}
+    ]
+}

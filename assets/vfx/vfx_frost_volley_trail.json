@@ -1,0 +1,27 @@
+{
+    "id":              "vfx_frost_volley_trail",
+    "maxParticles":    96,
+    "emitRate":        60.0,
+    "burstCount":      0.0,
+    "looping":         true,
+    "duration":        3.0,
+    "lifetimeMin":     0.2,
+    "lifetimeMax":     0.5,
+    "initialSpeedMin": 0.3,
+    "initialSpeedMax": 1.2,
+    "sizeMin":         0.3,
+    "sizeMax":         0.6,
+    "sizeEnd":         0.1,
+    "rotationSpeedMin": -120.0,
+    "rotationSpeedMax": 120.0,
+    "drag":            4.0,
+    "spreadAngle":     35.0,
+    "gravity":         0.3,
+    "alphaCurve":      2.0,
+    "blendMode":       "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [0.7,  0.9,  1.0,  0.7]},
+        {"time": 0.4, "color": [0.4,  0.8,  1.0,  0.4]},
+        {"time": 1.0, "color": [0.3,  0.7,  1.0,  0.0]}
+    ]
+}

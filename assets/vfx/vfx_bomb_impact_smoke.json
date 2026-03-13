@@ -1,0 +1,27 @@
+{
+    "id":              "vfx_bomb_impact_smoke",
+    "maxParticles":    64,
+    "emitRate":        0.0,
+    "burstCount":      40.0,
+    "looping":         false,
+    "duration":        2.0,
+    "lifetimeMin":     0.8,
+    "lifetimeMax":     1.8,
+    "initialSpeedMin": 1.5,
+    "initialSpeedMax": 5.0,
+    "sizeMin":         1.0,
+    "sizeMax":         2.5,
+    "sizeEnd":         3.5,
+    "rotationSpeedMin": -45.0,
+    "rotationSpeedMax": 45.0,
+    "drag":            2.0,
+    "alphaCurve":      2.0,
+    "spreadAngle":     180.0,
+    "gravity":         -0.8,
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [0.35, 0.3, 0.25, 0.6]},
+        {"time": 0.3, "color": [0.25, 0.2, 0.15, 0.5]},
+        {"time": 0.7, "color": [0.15, 0.12, 0.1, 0.25]},
+        {"time": 1.0, "color": [0.08, 0.06, 0.05, 0.0]}
+    ]
+}

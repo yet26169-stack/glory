@@ -1,0 +1,28 @@
+{
+    "id":              "vfx_frost_arrow_projectile",
+    "maxParticles":    200,
+    "emitRate":        150.0,
+    "burstCount":      0.0,
+    "looping":         true,
+    "duration":        10.0,
+    "lifetimeMin":     0.04,
+    "lifetimeMax":     0.12,
+    "initialSpeedMin": 0.5,
+    "initialSpeedMax": 2.0,
+    "sizeMin":         0.5,
+    "sizeMax":         0.8,
+    "sizeEnd":         0.15,
+    "rotationSpeedMin": -150.0,
+    "rotationSpeedMax": 150.0,
+    "drag":            2.0,
+    "spreadAngle":     8.0,
+    "gravity":         0.0,
+    "alphaCurve":      3.0,
+    "blendMode":       "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [1.0,  1.0,  1.0,  1.0]},
+        {"time": 0.2, "color": [0.9,  0.97, 1.0,  0.95]},
+        {"time": 0.5, "color": [0.5,  0.85, 1.0,  0.7]},
+        {"time": 1.0, "color": [0.3,  0.7,  1.0,  0.0]}
+    ]
+}

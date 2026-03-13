@@ -1,0 +1,24 @@
+{
+    "id":              "vfx_molten_shield_embers",
+    "maxParticles":    64,
+    "emitRate":        30.0,
+    "burstCount":      0.0,
+    "looping":         true,
+    "duration":        10.0,
+    "lifetimeMin":     0.4,
+    "lifetimeMax":     0.8,
+    "initialSpeedMin": 1.0,
+    "initialSpeedMax": 3.0,
+    "sizeMin":         0.04,
+    "sizeMax":         0.12,
+    "drag":            1.5,
+    "spreadAngle":     180.0,
+    "gravity":         -0.5,
+    "blendMode":       "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [1.0, 0.85, 0.4, 1.0]},
+        {"time": 0.3, "color": [1.0, 0.6, 0.15, 0.9]},
+        {"time": 0.7, "color": [0.9, 0.3, 0.05, 0.5]},
+        {"time": 1.0, "color": [0.6, 0.1, 0.0, 0.0]}
+    ]
+}

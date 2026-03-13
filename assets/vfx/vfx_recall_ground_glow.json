@@ -1,0 +1,22 @@
+{
+    "id":              "vfx_recall_ground_glow",
+    "maxParticles":    128,
+    "emitRate":        10.0,
+    "burstCount":      0.0,
+    "looping":         true,
+    "duration":        8.0,
+    "lifetimeMin":     1.5,
+    "lifetimeMax":     2.5,
+    "initialSpeedMin": 0.0,
+    "initialSpeedMax": 0.3,
+    "sizeMin":         2.0,
+    "sizeMax":         3.5,
+    "spreadAngle":     360.0,
+    "gravity":         0.0,
+    "blendMode":       "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [0.2, 0.4, 1.0, 0.3]},
+        {"time": 0.5, "color": [0.25, 0.45, 1.0, 0.25]},
+        {"time": 1.0, "color": [0.2, 0.4, 1.0, 0.0]}
+    ]
+}

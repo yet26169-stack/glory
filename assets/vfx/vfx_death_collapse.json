@@ -1,0 +1,22 @@
+{
+    "id":              "vfx_death_collapse",
+    "maxParticles":    64,
+    "emitRate":        0.0,
+    "burstCount":      40.0,
+    "looping":         false,
+    "duration":        0.8,
+    "lifetimeMin":     0.4,
+    "lifetimeMax":     0.8,
+    "initialSpeedMin": 2.0,
+    "initialSpeedMax": 6.0,
+    "sizeMin":         0.3,
+    "sizeMax":         0.7,
+    "spreadAngle":     150.0,
+    "gravity":         2.0,
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [0.5, 0.45, 0.35, 0.8]},
+        {"time": 0.3, "color": [0.45, 0.4, 0.3, 0.7]},
+        {"time": 0.7, "color": [0.4, 0.35, 0.3, 0.4]},
+        {"time": 1.0, "color": [0.35, 0.3, 0.25, 0.0]}
+    ]
+}

@@ -1,0 +1,23 @@
+{
+    "id":              "vfx_bomb_cast",
+    "maxParticles":    32,
+    "emitRate":        0.0,
+    "burstCount":      20.0,
+    "looping":         false,
+    "duration":        0.3,
+    "lifetimeMin":     0.1,
+    "lifetimeMax":     0.3,
+    "initialSpeedMin": 5.0,
+    "initialSpeedMax": 12.0,
+    "sizeMin":         0.05,
+    "sizeMax":         0.15,
+    "drag":            6.0,
+    "spreadAngle":     90.0,
+    "gravity":         2.0,
+    "blendMode":       "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [1.0, 0.9, 0.6, 1.0]},
+        {"time": 0.3, "color": [1.0, 0.6, 0.15, 0.8]},
+        {"time": 1.0, "color": [0.8, 0.2, 0.0, 0.0]}
+    ]
+}

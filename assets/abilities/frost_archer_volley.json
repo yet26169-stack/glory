@@ -28,5 +28,10 @@
             "value": 0.20
         }
     ],
+    "castVFX": ["vfx_frost_volley_cast", "vfx_frost_volley_cast_glow"],
+    "projectileVFX": ["vfx_frost_volley_projectile"],
+    "projectileTrailDef": "vfx_frost_volley_trail",
+    "impactVFX": ["vfx_frost_volley_impact", "vfx_frost_volley_impact_frost"],
+    "compositeImpactVFX": "frost_volley_impact_composite",
     "tags": ["damage", "skillshot", "physical", "slow"]
 }

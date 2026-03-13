@@ -1,0 +1,27 @@
+{
+    "id":              "vfx_frost_enchant_cast_ring",
+    "maxParticles":    64,
+    "emitRate":        0.0,
+    "burstCount":      40.0,
+    "looping":         false,
+    "duration":        0.5,
+    "lifetimeMin":     0.2,
+    "lifetimeMax":     0.5,
+    "initialSpeedMin": 10.0,
+    "initialSpeedMax": 18.0,
+    "sizeMin":         0.2,
+    "sizeMax":         0.45,
+    "sizeEnd":         0.08,
+    "rotationSpeedMin": -100.0,
+    "rotationSpeedMax": 100.0,
+    "drag":            6.0,
+    "spreadAngle":     180.0,
+    "gravity":         3.0,
+    "alphaCurve":      2.5,
+    "blendMode":       "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [0.8,  0.95, 1.0,  0.8]},
+        {"time": 0.4, "color": [0.5,  0.85, 1.0,  0.5]},
+        {"time": 1.0, "color": [0.3,  0.7,  1.0,  0.0]}
+    ]
+}

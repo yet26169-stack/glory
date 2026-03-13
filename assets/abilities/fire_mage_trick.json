@@ -34,10 +34,11 @@
         }
     ],
     "onSelfEffects": [],
-    "castVFX": "",
-    "projectileVFX": "vfx_trick_bolt",
-    "impactVFX": "vfx_trick_impact",
-    "castSFX": "",
-    "impactSFX": "",
+    "castVFX": ["vfx_trick_cast"],
+    "projectileVFX": ["vfx_trick_bolt", "vfx_trick_trail"],
+    "impactVFX": ["vfx_trick_impact"],
+    "compositeImpactVFX": "trick_impact_composite",
+    "castSFX": "sfx_trick_cast",
+    "impactSFX": "sfx_trick_impact",
     "tags": ["damage", "skillshot", "magical"]
 }

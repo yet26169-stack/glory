@@ -1,0 +1,29 @@
+{
+    "id":              "vfx_flame_pillar_eruption",
+    "maxParticles":    512,
+    "emitRate":        0.0,
+    "burstCount":      250.0,
+    "looping":         false,
+    "duration":        1.5,
+    "lifetimeMin":     0.5,
+    "lifetimeMax":     1.4,
+    "initialSpeedMin": 15.0,
+    "initialSpeedMax": 35.0,
+    "sizeMin":         1.0,
+    "sizeMax":         2.5,
+    "sizeEnd":         0.3,
+    "rotationSpeedMin": -540.0,
+    "rotationSpeedMax": 540.0,
+    "drag":            3.0,
+    "alphaCurve":      1.5,
+    "spreadAngle":     30.0,
+    "gravity":         -8.0,
+    "blendMode":       "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [1.0, 1.0, 0.85, 1.0]},
+        {"time": 0.15, "color": [1.0, 0.8, 0.3, 1.0]},
+        {"time": 0.4, "color": [1.0, 0.45, 0.05, 0.9]},
+        {"time": 0.7, "color": [0.7, 0.15, 0.0, 0.5]},
+        {"time": 1.0, "color": [0.15, 0.02, 0.0, 0.0]}
+    ]
+}

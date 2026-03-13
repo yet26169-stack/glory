@@ -1,0 +1,27 @@
+{
+    "id":              "vfx_trick_bolt",
+    "maxParticles":    128,
+    "emitRate":        80.0,
+    "burstCount":      0.0,
+    "looping":         true,
+    "duration":        -1.0,
+    "lifetimeMin":     0.15,
+    "lifetimeMax":     0.35,
+    "initialSpeedMin": 2.0,
+    "initialSpeedMax": 5.0,
+    "sizeMin":         0.25,
+    "sizeMax":         0.5,
+    "sizeEnd":         0.1,
+    "rotationSpeedMin": -300.0,
+    "rotationSpeedMax": 300.0,
+    "drag":            4.0,
+    "spreadAngle":     15.0,
+    "gravity":         0.0,
+    "blendMode":       "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [1.0, 0.8, 1.0, 1.0]},
+        {"time": 0.2, "color": [0.8, 0.3, 0.95, 0.9]},
+        {"time": 0.6, "color": [0.6, 0.1, 0.8, 0.6]},
+        {"time": 1.0, "color": [0.3, 0.0, 0.5, 0.0]}
+    ]
+}

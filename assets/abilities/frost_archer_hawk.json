@@ -16,5 +16,10 @@
         "maxTargets": -1
     },
     "onHitEffects": [],
+    "castVFX": ["vfx_frost_hawk_cast"],
+    "projectileVFX": ["vfx_frost_hawk_projectile"],
+    "projectileTrailDef": "vfx_frost_hawk_feathers",
+    "impactVFX": ["vfx_frost_hawk_reveal"],
+    "compositeImpactVFX": "frost_hawk_reveal_composite",
     "tags": ["utility", "skillshot", "vision"]
 }

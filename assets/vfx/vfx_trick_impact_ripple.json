@@ -1,0 +1,24 @@
+{
+    "id":              "vfx_trick_impact_ripple",
+    "maxParticles":    8,
+    "emitRate":        0.0,
+    "burstCount":      3.0,
+    "looping":         false,
+    "duration":        0.4,
+    "lifetimeMin":     0.3,
+    "lifetimeMax":     0.5,
+    "initialSpeedMin": 0.0,
+    "initialSpeedMax": 0.5,
+    "sizeMin":         1.0,
+    "sizeMax":         2.0,
+    "sizeEnd":         4.0,
+    "drag":            0.0,
+    "spreadAngle":     180.0,
+    "gravity":         0.0,
+    "alphaCurve":      3.0,
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [0.7, 0.3, 0.9, 0.5]},
+        {"time": 0.5, "color": [0.4, 0.1, 0.6, 0.2]},
+        {"time": 1.0, "color": [0.2, 0.0, 0.3, 0.0]}
+    ]
+}

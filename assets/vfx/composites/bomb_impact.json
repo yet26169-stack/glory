@@ -1,0 +1,10 @@
+{
+    "id": "bomb_impact_composite",
+    "layers": [
+        { "delay": 0.0,  "type": "PARTICLE",     "effectRef": "vfx_bomb_impact",                 "anchor": "TARGET" },
+        { "delay": 0.0,  "type": "PARTICLE",     "effectRef": "vfx_bomb_impact_shockwave_sparks", "anchor": "TARGET" },
+        { "delay": 0.05, "type": "PARTICLE",     "effectRef": "vfx_bomb_impact_smoke",            "anchor": "TARGET" },
+        { "delay": 0.0,  "type": "SHOCKWAVE",    "effectRef": "default",                          "anchor": "TARGET" },
+        { "delay": 0.1,  "type": "GROUND_DECAL", "effectRef": "decal_circle",                     "anchor": "TARGET", "scale": 6.0, "color": [0.08, 0.05, 0.03, 0.8] }
+    ]
+}

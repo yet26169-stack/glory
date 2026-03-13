@@ -1,0 +1,28 @@
+{
+    "id":              "vfx_frost_arrow_trail_shards",
+    "maxParticles":    96,
+    "emitRate":        50.0,
+    "burstCount":      0.0,
+    "looping":         true,
+    "duration":        10.0,
+    "lifetimeMin":     0.3,
+    "lifetimeMax":     0.7,
+    "initialSpeedMin": 1.5,
+    "initialSpeedMax": 4.0,
+    "sizeMin":         0.05,
+    "sizeMax":         0.15,
+    "sizeEnd":         0.02,
+    "rotationSpeedMin": -500.0,
+    "rotationSpeedMax": 500.0,
+    "drag":            2.0,
+    "spreadAngle":     45.0,
+    "gravity":         2.0,
+    "alphaCurve":      2.0,
+    "blendMode":       "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [1.0,  1.0,  1.0,  0.9]},
+        {"time": 0.3, "color": [0.8,  0.95, 1.0,  0.7]},
+        {"time": 0.7, "color": [0.5,  0.85, 1.0,  0.3]},
+        {"time": 1.0, "color": [0.3,  0.7,  1.0,  0.0]}
+    ]
+}

@@ -21,5 +21,8 @@
             "duration": 6.0
         }
     ],
+    "castVFX": ["vfx_frost_enchant_cast", "vfx_frost_enchant_cast_ring"],
+    "persistentVFX": "vfx_frost_enchant_buff",
+    "buffEndVFX": "vfx_frost_enchant_end",
     "tags": ["buff", "self", "attack_speed"]
 }

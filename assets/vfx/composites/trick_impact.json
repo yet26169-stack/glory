@@ -1,0 +1,7 @@
+{
+    "id": "trick_impact_composite",
+    "layers": [
+        { "delay": 0.0,  "type": "PARTICLE",    "effectRef": "vfx_trick_impact",        "anchor": "TARGET" },
+        { "delay": 0.02, "type": "DISTORTION",  "effectRef": "vfx_trick_impact_ripple",  "anchor": "TARGET" }
+    ]
+}

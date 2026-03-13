@@ -1,0 +1,8 @@
+{
+    "id": "frost_hawk_reveal_composite",
+    "layers": [
+        { "delay": 0.0,  "type": "PARTICLE",     "effectRef": "vfx_frost_hawk_reveal", "anchor": "TARGET" },
+        { "delay": 0.0,  "type": "SHOCKWAVE",    "effectRef": "default",                "anchor": "TARGET" },
+        { "delay": 0.1,  "type": "GROUND_DECAL", "effectRef": "decal_circle",            "anchor": "TARGET", "scale": 8.0, "color": [0.3, 0.6, 1.0, 0.2] }
+    ]
+}

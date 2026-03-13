@@ -1,0 +1,24 @@
+{
+    "id":              "vfx_fireball_core_glow",
+    "maxParticles":    4,
+    "emitRate":        20.0,
+    "burstCount":      0.0,
+    "looping":         true,
+    "duration":        -1.0,
+    "lifetimeMin":     0.1,
+    "lifetimeMax":     0.2,
+    "initialSpeedMin": 0.0,
+    "initialSpeedMax": 0.3,
+    "sizeMin":         2.0,
+    "sizeMax":         3.0,
+    "sizeEnd":         2.5,
+    "drag":            0.0,
+    "spreadAngle":     180.0,
+    "gravity":         0.0,
+    "blendMode":       "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [1.0, 0.75, 0.3, 0.4]},
+        {"time": 0.5, "color": [1.0, 0.6, 0.15, 0.35]},
+        {"time": 1.0, "color": [0.9, 0.4, 0.05, 0.0]}
+    ]
+}
