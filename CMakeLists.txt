@@ -58,6 +58,8 @@ set(SHADER_SOURCES
     ${CMAKE_SOURCE_DIR}/shaders/mesh_effect_slash.frag
     ${CMAKE_SOURCE_DIR}/shaders/distortion.frag
     ${CMAKE_SOURCE_DIR}/shaders/particle_compact.comp
+    ${CMAKE_SOURCE_DIR}/shaders/shadow.vert
+    ${CMAKE_SOURCE_DIR}/shaders/shadow_skinned.vert
 )
 
 foreach(SHADER ${SHADER_SOURCES})
@@ -111,6 +113,7 @@ set(SOURCES
     src/renderer/DynamicMesh.cpp
     src/renderer/StaticSkinnedMesh.cpp
     src/renderer/HDRFramebuffer.cpp
+    src/renderer/ShadowPass.cpp
     src/renderer/BloomPass.cpp
     src/renderer/ToneMapPass.cpp
     src/renderer/GroundDecalRenderer.cpp
@@ -133,6 +136,14 @@ set(SOURCES
     src/audio/SoundHandle.cpp
     src/audio/AudioResourceManager.cpp
     src/audio/GameAudioEvents.cpp
+    src/assets/CookedLoader.cpp
+    src/assets/AssetRegistry.cpp
+    src/scripting/ScriptEngine.cpp
+    src/scripting/LuaBindings.cpp
+    src/network/Transport.cpp
+    src/network/InputSync.cpp
+    src/network/StateSnapshot.cpp
+    src/network/NetworkGameLoop.cpp
     extern/vma/vma_impl.cpp
     extern/imgui/imgui.cpp
     extern/imgui/imgui_draw.cpp
@@ -196,3 +207,15 @@ add_executable(test_terrain tests/test_terrain.cpp src/terrain/IsometricCamera.c
 target_include_directories(test_terrain PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(test_terrain PRIVATE glm::glm)
 target_compile_definitions(test_terrain PRIVATE GLM_FORCE_RADIANS GLM_FORCE_DEPTH_ZERO_TO_ONE)
+
+# ── Asset cook tool ───────────────────────────────────────────────────────────
+add_executable(asset_cook tools/asset_cook.cpp)
+target_include_directories(asset_cook PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/extern/tinygltf
+    ${CMAKE_SOURCE_DIR}/extern/stb
+    ${CMAKE_SOURCE_DIR}/extern/nlohmann
+    ${CMAKE_SOURCE_DIR}/extern
+)
+target_link_libraries(asset_cook PRIVATE meshoptimizer)
+target_compile_definitions(asset_cook PRIVATE GLM_FORCE_RADIANS GLM_FORCE_DEPTH_ZERO_TO_ONE)
