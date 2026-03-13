@@ -3,8 +3,10 @@
 #include "renderer/Model.h"
 #include "renderer/StaticSkinnedMesh.h"
 #include "renderer/Frustum.h"
+#include "core/SimulationLoop.h"
 #include "scene/Components.h"
 #include "ability/AbilityComponents.h"
+#include "map/MapLoader.h"
 #include "window/Window.h"
 
 #include "imgui.h"
@@ -45,7 +47,10 @@ Renderer::Renderer(Window& window) : m_window(window) {
     // Dummy 1×1 white texture bound to the shadow-map descriptor slot.
     // The shader's calcShadow() reads depth 1.0 from it → always returns 1.0 (no shadow).
     m_dummyShadow = Texture::createDefault(*m_device);
-    m_descriptors->updateShadowMap(m_dummyShadow.getImageView(), m_dummyShadow.getSampler());
+
+    // Initialize cascaded shadow maps — replaces dummy shadow with real atlas
+    m_shadowPass.init(*m_device, m_descriptors->getLayout());
+    m_shadowPass.bindToDescriptors(*m_descriptors);
 
     m_clickIndicatorRenderer = std::make_unique<ClickIndicatorRenderer>(
         *m_device, m_hdrFB->renderPass());
@@ -229,6 +234,7 @@ Renderer::~Renderer() {
     destroyGridPipeline();
     destroySkinnedPipeline();
     m_dummyShadow = Texture{};
+    m_shadowPass.destroy();
     m_descriptors.reset();
     m_sync.reset();
     m_pipeline.reset();
@@ -269,65 +275,33 @@ void Renderer::drawFrame() {
         
         drawLauncherUI();
     } else {
-        // ── VFX: flush event queues and update CPU emitters ─────────────────
-        if (m_vfxRenderer) {
-            if (m_vfxQueue)      m_vfxRenderer->processQueue(*m_vfxQueue);
-            if (m_combatVfxQueue) m_vfxRenderer->processQueue(*m_combatVfxQueue);
-            m_vfxRenderer->update(dt);
-        }
-        if (m_trailRenderer) {
-            m_trailRenderer->update(dt);
-        }
-        if (m_groundDecalRenderer) {
-            m_groundDecalRenderer->update(dt);
-        }
-        if (m_meshEffectRenderer) {
-            m_meshEffectRenderer->update(dt);
-        }
-        if (m_distortionRenderer) {
-            m_distortionRenderer->update(dt);
-        }
-        if (m_abilitySystem) {
-            m_abilitySystem->update(m_scene.getRegistry(), dt, m_trailRenderer.get());
-            
-            if (m_vfxQueue && m_trailRenderer && m_groundDecalRenderer && m_meshEffectRenderer &&
-                m_explosionRenderer && m_coneEffect && m_spriteEffectRenderer && m_distortionRenderer) 
-            {
-                m_abilitySystem->getSequencer().update(dt,
-                    *m_vfxQueue,
-                    *m_trailRenderer,
-                    *m_groundDecalRenderer,
-                    *m_meshEffectRenderer,
-                    *m_explosionRenderer,
-                    *m_coneEffect,
-                    *m_spriteEffectRenderer,
-                    *m_distortionRenderer);
-            }
-        }
-        if (m_projectileSystem && m_abilitySystem && m_vfxQueue) {
-            m_projectileSystem->update(m_scene.getRegistry(), dt,
-                                       *m_vfxQueue, *m_abilitySystem, m_trailRenderer.get());
-            // Collect landing positions from lob projectiles → trigger explosion visuals
-            if (m_explosionRenderer) {
-                for (const auto& pos : m_projectileSystem->getLandedPositions()) {
-                    m_explosionRenderer->addExplosion(pos);
-                }
-                m_projectileSystem->clearLandedPositions();
-            }
-        }
-        if (m_explosionRenderer)
-            m_explosionRenderer->update(dt);
-        if (m_spriteEffectRenderer)
-            m_spriteEffectRenderer->update(dt);
-        // Tick cone effect if active
-        if (m_coneEffectTimer > 0.0f && m_coneEffect) {
-            m_coneEffectTimer -= dt;
-            float coneElapsed = CONE_DURATION - m_coneEffectTimer;
-            m_coneEffect->update(dt, m_coneApex, m_coneDirection,
-                                 CONE_HALF_ANGLE, CONE_RANGE, coneElapsed);
-        }
-        if (m_combatSystem) {
-            m_combatSystem->update(m_scene.getRegistry(), dt);
+        // ── Simulation tick (gameplay + VFX updates, decoupled from rendering) ─
+        {
+            SimulationContext simCtx{
+                .registry       = m_scene.getRegistry(),
+                .dt             = dt,
+                .abilities      = m_abilitySystem.get(),
+                .projectiles    = m_projectileSystem.get(),
+                .combat         = m_combatSystem.get(),
+                .vfxRenderer    = m_vfxRenderer.get(),
+                .vfxQueue       = m_vfxQueue.get(),
+                .combatVfxQueue = m_combatVfxQueue.get(),
+                .trailRenderer  = m_trailRenderer.get(),
+                .groundDecals   = m_groundDecalRenderer.get(),
+                .meshEffects    = m_meshEffectRenderer.get(),
+                .distortion     = m_distortionRenderer.get(),
+                .explosions     = m_explosionRenderer.get(),
+                .coneEffect     = m_coneEffect.get(),
+                .spriteEffects  = m_spriteEffectRenderer.get(),
+                .coneEffectTimer = m_coneEffectTimer,
+                .coneDuration    = CONE_DURATION,
+                .coneHalfAngle   = CONE_HALF_ANGLE,
+                .coneRange       = CONE_RANGE,
+                .coneApex        = m_coneApex,
+                .coneDirection   = m_coneDirection,
+            };
+            SimulationLoop::tick(simCtx);
+            m_coneEffectTimer = simCtx.coneEffectTimer;
         }
 
         // ── ImGui new frame (before any UI building) ─────────────────────────
@@ -391,30 +365,68 @@ void Renderer::drawFrame() {
     // Pick entity under cursor for highlighting and combat targeting
     m_hoveredEntity = pickEntityUnderCursor();
 
+    // ── HUD / Minimap update ─────────────────────────────────────────────
+    {
+        MinimapUpdateContext hudCtx{
+            m_scene.getRegistry(),
+            m_playerEntity,
+            m_isoCam,
+            m_mapData,
+            static_cast<float>(winW),
+            static_cast<float>(winH),
+            aspect,
+            *m_input
+        };
+        m_hud.update(hudCtx);
+
+        // Process minimap action requests
+        if (hudCtx.actions.detachCamera)
+            m_isoCam.setAttached(false);
+        if (hudCtx.actions.moveCameraTo)
+            m_isoCam.setTarget(hudCtx.actions.cameraTarget);
+        if (hudCtx.actions.movePlayerTo && m_playerEntity != entt::null) {
+            auto& reg = m_scene.getRegistry();
+            auto& c   = reg.get<CharacterComponent>(m_playerEntity);
+            auto& cmb = reg.get<CombatComponent>(m_playerEntity);
+            cmb.targetEntity = entt::null;
+            c.targetPosition = hudCtx.actions.moveTarget;
+            c.hasTarget      = true;
+            m_clickAnim = ClickAnim{ hudCtx.actions.moveTarget, 0.0f, 0.25f };
+            if (cmb.state == CombatState::ATTACK_WINDUP || cmb.state == CombatState::ATTACK_WINDDOWN)
+                cmb.state = CombatState::IDLE;
+        }
+    }
+
     // Right-click: move player to world position OR target enemy for auto-attack
-    if (m_input->wasRightClicked() && m_playerEntity != entt::null) {
+    if (m_input->wasRightClicked() && !m_hud.isMinimapHovered() && m_playerEntity != entt::null) {
         glm::vec2 clickPos = m_input->getLastClickPos();
         glm::vec3 worldPos = screenToWorld(clickPos.x, clickPos.y);
+
+        auto& reg = m_scene.getRegistry();
+        auto& c = reg.get<CharacterComponent>(m_playerEntity);
+        auto& combat = reg.get<CombatComponent>(m_playerEntity);
 
         // Try to pick an enemy entity under cursor
         entt::entity target = pickEntityUnderCursor();
         if (target != entt::null && m_combatSystem) {
-            // Auto-attack the targeted enemy
-            auto& reg = m_scene.getRegistry();
-            if (reg.all_of<CombatComponent>(m_playerEntity)) {
-                auto& combat = reg.get<CombatComponent>(m_playerEntity);
-                if (combat.state == CombatState::IDLE && combat.attackCooldown <= 0.0f) {
-                    combat.state = CombatState::AUTO_ATTACKING;
-                    combat.stateTimer = combat.attackWindup;
-                    combat.targetEntity = target;
-                }
+            // Target enemy for auto-attack (will chase if out of range)
+            combat.targetEntity = target;
+            
+            // Animation canceling: interrupt windup if a new target is clicked
+            if (combat.state == CombatState::ATTACK_WINDUP || combat.state == CombatState::ATTACK_WINDDOWN) {
+                combat.state = CombatState::IDLE;
             }
         } else {
-            // No enemy under cursor — move to position
-            auto& c = m_scene.getRegistry().get<CharacterComponent>(m_playerEntity);
+            // No enemy under cursor — move to position and clear target
+            combat.targetEntity = entt::null;
             c.targetPosition = worldPos;
             c.hasTarget = true;
             m_clickAnim = ClickAnim{ worldPos, 0.0f, 0.25f };
+
+            // Animation canceling: interrupt windup if move command issued
+            if (combat.state == CombatState::ATTACK_WINDUP || combat.state == CombatState::ATTACK_WINDDOWN) {
+                combat.state = CombatState::IDLE;
+            }
         }
     }
 
@@ -445,21 +457,19 @@ void Renderer::drawFrame() {
             m_abilitySystem->enqueueRequest(m_playerEntity, slot, groundTarget);
         };
         tryAbility(m_input->wasQPressed(), AbilitySlot::Q);
+        tryAbility(m_input->wasWPressed(), AbilitySlot::W);
 
-        // W: fire ability AND start cone visual effect
-        if (m_input->wasWPressed()) {
-            m_abilitySystem->enqueueRequest(m_playerEntity, AbilitySlot::W, groundTarget);
+        // E: Molten Shield — self-buff + cone visual effect
+        if (m_input->wasEPressed()) {
+            m_abilitySystem->enqueueRequest(m_playerEntity, AbilitySlot::E, groundTarget);
             m_coneDirection   = groundTarget.direction;
             m_coneEffectTimer = CONE_DURATION;
-            // Latch apex at cast position — effect stays on the ground even if
-            // the character moves away after casting.
             if (m_scene.getRegistry().all_of<TransformComponent>(m_playerEntity)) {
                 const auto& pt = m_scene.getRegistry().get<TransformComponent>(m_playerEntity);
                 m_coneApex = pt.position + glm::vec3(0.0f, 0.05f, 0.0f);
             }
         }
 
-        tryAbility(m_input->wasEPressed(), AbilitySlot::E);
         tryAbility(m_input->wasRPressed(), AbilitySlot::R);
 
         // D — purple trick skillshot (uses SUMMONER slot in AbilityBook)
@@ -478,9 +488,7 @@ void Renderer::drawFrame() {
             entt::entity target = m_combatSystem->findNearestEnemy(
                 reg, m_playerEntity, combat.attackRange);
             if (target != entt::null) {
-                combat.state = CombatState::AUTO_ATTACKING;
-                combat.stateTimer = combat.attackWindup;
-                combat.targetEntity = target;
+                combat.targetEntity = target; // Start chasing/attacking
             }
         }
 
@@ -698,24 +706,48 @@ void Renderer::drawFrame() {
     // ── Update character movement ─────────────────────────────────────────
     if (m_playerEntity != entt::null &&
         m_scene.getRegistry().valid(m_playerEntity) &&
-        m_scene.getRegistry().all_of<CharacterComponent, TransformComponent>(m_playerEntity)) {
+        m_scene.getRegistry().all_of<CharacterComponent, TransformComponent, CombatComponent>(m_playerEntity)) {
+
+        auto& reg = m_scene.getRegistry();
+        auto& c = reg.get<CharacterComponent>(m_playerEntity);
+        auto& t = reg.get<TransformComponent>(m_playerEntity);
+        auto& combat = reg.get<CombatComponent>(m_playerEntity);
+
+        // Chasing / Attack Logic
+        if (combat.targetEntity != entt::null && reg.valid(combat.targetEntity)) {
+            if (reg.all_of<TransformComponent>(combat.targetEntity)) {
+                auto& targetT = reg.get<TransformComponent>(combat.targetEntity);
+                float dist = glm::distance(t.position, targetT.position);
+
+                if (dist > combat.attackRange) {
+                    // OUT OF RANGE: Chase the target
+                    // Only update target position if we aren't currently windup/firing
+                    if (combat.state == CombatState::IDLE || combat.state == CombatState::ATTACK_WINDDOWN) {
+                        c.targetPosition = targetT.position;
+                        c.hasTarget = true;
+                    }
+                } else {
+                    // IN RANGE: Start attack cycle if possible
+                    if (combat.state == CombatState::IDLE && combat.attackCooldown <= 0.0f) {
+                        c.hasTarget = false; // Stop moving to attack
+                        combat.state = CombatState::ATTACK_WINDUP;
+                        // Windup duration scaled by Attack Speed
+                        combat.stateTimer = (1.0f / combat.attackSpeed) * combat.windupPercent;
+                    } else if (combat.state == CombatState::ATTACK_WINDUP || combat.state == CombatState::ATTACK_WINDDOWN) {
+                        c.hasTarget = false; // Stay still during attack
+                    }
+                }
+            }
+        }
 
         // Stunned player cannot move
-        bool playerStunned = false;
-        if (m_scene.getRegistry().all_of<CombatComponent>(m_playerEntity)) {
-            auto& combat = m_scene.getRegistry().get<CombatComponent>(m_playerEntity);
-            if (combat.state == CombatState::STUNNED) {
-                auto& c2 = m_scene.getRegistry().get<CharacterComponent>(m_playerEntity);
-                c2.hasTarget = false;
-                playerStunned = true;
-            }
+        bool playerStunned = (combat.state == CombatState::STUNNED);
+        if (playerStunned) {
+            c.hasTarget = false;
         }
 
         if (!playerStunned) {
         const float accelRate = 30.0f;
-
-        auto& c = m_scene.getRegistry().get<CharacterComponent>(m_playerEntity);
-        auto& t = m_scene.getRegistry().get<TransformComponent>(m_playerEntity);
         if (c.hasTarget) {
             glm::vec3 dir = c.targetPosition - t.position;
             dir.y = 0.0f;
@@ -748,7 +780,6 @@ void Renderer::drawFrame() {
             c.currentSpeed *= std::max(1.0f - 30.0f * dt, 0.0f);
         }
         } // end if (!playerStunned)
-        auto& t = m_scene.getRegistry().get<TransformComponent>(m_playerEntity);
         m_isoCam.setFollowTarget(t.position);
     }
 
@@ -765,7 +796,9 @@ void Renderer::drawFrame() {
 
             if (m_scene.getRegistry().all_of<CombatComponent>(e)) {
                 auto& combat = m_scene.getRegistry().get<CombatComponent>(e);
-                if (combat.state == CombatState::AUTO_ATTACKING) {
+                if (combat.state == CombatState::ATTACK_WINDUP || 
+                    combat.state == CombatState::ATTACK_FIRE ||
+                    combat.state == CombatState::ATTACK_WINDDOWN) {
                     targetClip = 2; // attack
                     
                     // Face the target while attacking
@@ -795,13 +828,13 @@ void Renderer::drawFrame() {
                 anim.player.crossfadeTo(&anim.clips[targetClip], 0.1f);
             }
 
-            // Scale walk animation speed to match movement (eliminates foot-slide).
-            // Apply this EVEN during the crossfade blend so there is no abrupt
-            // timeScale discontinuity the moment blending finishes.
-            // Then exponentially smooth the scale (~15 Hz lag) to prevent the
-            // aggressive 30×/s deceleration from causing a visible stutter as
-            // the character slows to a stop.
-            if (anim.activeClipIndex == 1 && anim.activeClipIndex < (int)anim.clips.size()) {
+            // Scale animation speed
+            if (anim.activeClipIndex == 2 && m_scene.getRegistry().all_of<CombatComponent>(e)) {
+                // Attack: scale by attackSpeed
+                auto& combat = m_scene.getRegistry().get<CombatComponent>(e);
+                anim.player.setTimeScale(combat.attackSpeed);
+            } else if (anim.activeClipIndex == 1 && anim.activeClipIndex < (int)anim.clips.size()) {
+                // Walk: scale to match movement speed
                 const auto& walkClip = anim.clips[anim.activeClipIndex];
                 float rawTimeScale = 1.0f;
                 if (walkClip.strideLength > 0.0f && walkClip.duration > 0.0f) {
@@ -856,11 +889,13 @@ void Renderer::drawFrame() {
             auto& combat = m_scene.getRegistry().get<CombatComponent>(m_playerEntity);
             ImGui::Separator();
             ImGui::Text("Combat State: %s",
-                combat.state == CombatState::IDLE           ? "IDLE" :
-                combat.state == CombatState::AUTO_ATTACKING ? "AUTO_ATTACKING" :
-                combat.state == CombatState::SHIELDING      ? "SHIELDING" :
-                combat.state == CombatState::TRICKING       ? "TRICKING" :
-                combat.state == CombatState::STUNNED        ? "STUNNED" : "???");
+                combat.state == CombatState::IDLE            ? "IDLE" :
+                combat.state == CombatState::ATTACK_WINDUP   ? "ATTACK_WINDUP" :
+                combat.state == CombatState::ATTACK_FIRE     ? "ATTACK_FIRE" :
+                combat.state == CombatState::ATTACK_WINDDOWN ? "ATTACK_WINDDOWN" :
+                combat.state == CombatState::SHIELDING       ? "SHIELDING" :
+                combat.state == CombatState::TRICKING        ? "TRICKING" :
+                combat.state == CombatState::STUNNED         ? "STUNNED" : "???");
             ImGui::Text("Attack CD: %.2f", combat.attackCooldown);
             ImGui::Text("Shield CD: %.2f", combat.shieldCooldown);
             ImGui::Text("Trick CD:  %.2f", combat.trickCooldown);
@@ -931,10 +966,23 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
 
     // ── Update per-frame UBO ─────────────────────────────────────────────
     {
+        glm::mat4 viewMat = m_isoCam.getViewMatrix();
+        glm::mat4 projMat = m_isoCam.getProjectionMatrix(aspect);
+
+        // Compute cascade shadow matrices from current camera
+        glm::vec3 lightDir = glm::normalize(glm::vec3(100.0f, 60.0f, 100.0f));
+        m_shadowPass.updateCascades(viewMat, projMat, lightDir, 0.1f, 150.0f);
+        const auto& cascades = m_shadowPass.getCascades();
+
         UniformBufferObject ubo{};
-        ubo.view             = m_isoCam.getViewMatrix();
-        ubo.proj             = m_isoCam.getProjectionMatrix(aspect);
-        ubo.lightSpaceMatrix = glm::mat4(1.0f); // no real shadows
+        ubo.view              = viewMat;
+        ubo.proj              = projMat;
+        ubo.lightSpaceMatrix  = cascades[0].lightViewProj;
+        ubo.lightSpaceMatrix1 = cascades[1].lightViewProj;
+        ubo.lightSpaceMatrix2 = cascades[2].lightViewProj;
+        ubo.cascadeSplits     = glm::vec4(cascades[0].splitDepth,
+                                          cascades[1].splitDepth,
+                                          cascades[2].splitDepth, 0.0f);
         m_descriptors->updateUniformBuffer(m_currentFrame, ubo);
     }
     {
@@ -950,6 +998,32 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
         light.fogStart   = 5.0f;
         light.fogEnd     = 50.0f;
         m_descriptors->updateLightBuffer(m_currentFrame, light);
+    }
+
+    // ── Shadow pass: render depth from light's perspective ───────────────
+    if (m_state != AppState::Launcher) {
+        VkDescriptorSet ds = m_descriptors->getSet(m_currentFrame);
+
+        auto drawStaticShadows = [&](VkCommandBuffer scmd, uint32_t /*cascade*/) {
+            auto* instances = static_cast<InstanceData*>(m_instanceMapped[m_currentFrame]);
+            uint32_t instanceIndex = 0;
+
+            auto staticView = m_scene.getRegistry()
+                .view<TransformComponent, MeshComponent, MaterialComponent>(
+                    entt::exclude<GPUSkinnedMeshComponent>);
+            for (auto&& [e, t, mc, mat] : staticView.each()) {
+                if (instanceIndex >= MAX_INSTANCES) break;
+                instances[instanceIndex].model = t.getModelMatrix();
+
+                VkBuffer     instBuf    = m_instanceBuffers[m_currentFrame].getBuffer();
+                VkDeviceSize instOffset = instanceIndex * sizeof(InstanceData);
+                vkCmdBindVertexBuffers(scmd, 1, 1, &instBuf, &instOffset);
+                m_scene.getMesh(mc.meshIndex).draw(scmd);
+                ++instanceIndex;
+            }
+        };
+
+        m_shadowPass.recordCommands(cmd, drawStaticShadows, nullptr);
     }
 
     // ── Begin HDR render pass ────────────────────────────────────────────────
@@ -1143,7 +1217,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
             }
         }
 
-        // ── W-ability cone effect ─────────────────────────────────────────────
+        // ── E-ability cone effect (Molten Shield) ─────────────────────────
         if (m_coneEffectTimer > 0.0f && m_coneEffect) {
             float elapsed    = CONE_DURATION - m_coneEffectTimer;
             glm::vec3 camPos = m_isoCam.getPosition();
@@ -1153,7 +1227,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
                                  camPos, t, elapsed, 1.0f);
         }
 
-        // ── E-ability explosion effects ───────────────────────────────────────
+        // ── R-ability explosion effects (Incendiary Bomb) ─────────────────
         if (m_explosionRenderer) {
             glm::vec3 camPos = m_isoCam.getPosition();
             float appTime    = static_cast<float>(glfwGetTime());
@@ -1207,6 +1281,16 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
 
 // ── buildScene ───────────────────────────────────────────────────────────────
 void Renderer::buildScene() {
+    // ── Load map data for minimap & spawn system ─────────────────────────
+    try {
+        m_mapData = MapLoader::LoadFromFile(std::string(ASSET_DIR) + "maps/map_summonersrift.json");
+        spdlog::info("Map '{}' loaded ({} towers per team)", m_mapData.mapName,
+                     m_mapData.teams[0].towers.size());
+    } catch (const std::exception& e) {
+        spdlog::warn("Could not load map JSON: {} — using default bounds", e.what());
+        // m_mapData keeps its default values (200×200, center 100,0,100)
+    }
+
     // Default textures
     uint32_t defaultTex  = m_scene.addTexture(Texture::createDefault(*m_device));
     uint32_t checkerTex  = m_scene.addTexture(Texture::createCheckerboard(*m_device));
@@ -1334,7 +1418,13 @@ void Renderer::buildScene() {
     m_scene.getRegistry().emplace<CharacterComponent>(character,
         CharacterComponent{ glm::vec3(100.0f, 0.0f, 100.0f), 8.0f });
     m_scene.getRegistry().emplace<TeamComponent>(character, TeamComponent{ Team::PLAYER });
-    m_scene.getRegistry().emplace<CombatComponent>(character);
+    auto& combat = m_scene.getRegistry().emplace<CombatComponent>(character);
+    combat.isRanged = true;
+    combat.projectileSpeed = 30.0f;
+    combat.projectileVfx = "vfx_fireball_projectile";
+    combat.attackRange = 15.0f;
+    combat.attackSpeed = 1.2f;
+
     m_scene.getRegistry().emplace<SelectableComponent>(character, SelectableComponent{ false, 2.5f });
     m_scene.getRegistry().emplace<ResourceComponent>(character);
     
@@ -1346,13 +1436,16 @@ void Renderer::buildScene() {
     m_scene.getRegistry().emplace<StatusEffectsComponent>(character);
     
     if (m_abilitySystem) {
+        // QWER: Q=Fireball, W=Flame Pillar, E=Molten Shield, R=Incendiary Bomb (ultimate)
         m_abilitySystem->initEntity(m_scene.getRegistry(), character,
-                                    {"fire_mage_fireball", "fire_mage_molten_shield", "fire_mage_bomb", ""});
+                                    {"fire_mage_fireball", "fire_mage_flame_pillar",
+                                     "fire_mage_molten_shield", "fire_mage_bomb"});
         m_abilitySystem->setAbilityLevel(m_scene.getRegistry(), character, AbilitySlot::Q, 1);
         m_abilitySystem->setAbilityLevel(m_scene.getRegistry(), character, AbilitySlot::W, 1);
         m_abilitySystem->setAbilityLevel(m_scene.getRegistry(), character, AbilitySlot::E, 1);
+        m_abilitySystem->setAbilityLevel(m_scene.getRegistry(), character, AbilitySlot::R, 1);
 
-        // D-key purple trick skillshot — manually wire SUMMONER slot
+        // D-key: Arcane Bolt (trick skillshot) — SUMMONER slot
         const auto* trickDef = m_abilitySystem->findDefinition("fire_mage_trick");
         if (trickDef) {
             auto& book = m_scene.getRegistry().get<AbilityBookComponent>(character);
@@ -1490,6 +1583,17 @@ void Renderer::buildScene() {
                 m_scene.getTexture(purpleTexIdx).getSampler());
             m_projectileSystem->registerAbilityMesh("fire_mage_trick",
                 { qMeshIdx, purpleTexIdx, m_flatNormIndex, glm::vec3(3.0f) });
+
+            // Reuse Q model for R-key bomb lob with a bright red-orange texture
+            uint32_t bombPixel = 0xFF0044FF;  // ABGR: opaque red-orange
+            auto bombTex = Texture::createFromPixels(*m_device, &bombPixel, 1, 1);
+            uint32_t bombTexIdx = m_scene.addTexture(std::move(bombTex));
+            m_descriptors->writeBindlessTexture(
+                bombTexIdx,
+                m_scene.getTexture(bombTexIdx).getImageView(),
+                m_scene.getTexture(bombTexIdx).getSampler());
+            m_projectileSystem->registerAbilityMesh("fire_mage_bomb",
+                { qMeshIdx, bombTexIdx, m_flatNormIndex, glm::vec3(4.5f) });
 
             spdlog::info("Q ability model loaded (meshIdx={})", qMeshIdx);
         } catch (const std::exception& e) {

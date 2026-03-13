@@ -22,6 +22,7 @@
 #include "renderer/ToneMapPass.h"
 #include "renderer/Sync.h"
 #include "renderer/Texture.h"
+#include "renderer/ShadowPass.h"
 #include "input/InputManager.h"
 #include "scene/Scene.h"
 #include "terrain/IsometricCamera.h"
@@ -34,6 +35,8 @@
 #include "ability/ProjectileSystem.h"
 #include "combat/CombatComponents.h"
 #include "combat/CombatSystem.h"
+#include "hud/HUD.h"
+#include "map/MapTypes.h"
 
 #include <glm/glm.hpp>
 #include <memory>
@@ -89,6 +92,7 @@ private:
     glm::vec3 m_coneDirection   = {0.0f, 0.0f, 1.0f};
     glm::vec3 m_coneApex        = {0.0f, 0.0f, 0.0f};  // latched at cast time
     Texture m_dummyShadow; // 1×1 white — bound to shadow-map slot so calcShadow()=1
+    ShadowPass m_shadowPass;
 
     // ── VFX system ────────────────────────────────────────────────────────
     std::unique_ptr<VFXEventQueue> m_vfxQueue;        // SPSC bridge game→render (AbilitySystem)
@@ -152,6 +156,10 @@ private:
 
     // ── ImGui ─────────────────────────────────────────────────────────────
     VkDescriptorPool m_imguiPool = VK_NULL_HANDLE;
+
+    // ── HUD / Minimap ────────────────────────────────────────────────────
+    HUD     m_hud;
+    MapData m_mapData;
 
     // ── Helpers ───────────────────────────────────────────────────────────
     void buildScene();

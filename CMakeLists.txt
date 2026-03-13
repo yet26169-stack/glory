@@ -60,6 +60,9 @@ set(SHADER_SOURCES
     ${CMAKE_SOURCE_DIR}/shaders/particle_compact.comp
     ${CMAKE_SOURCE_DIR}/shaders/shadow.vert
     ${CMAKE_SOURCE_DIR}/shaders/shadow_skinned.vert
+    ${CMAKE_SOURCE_DIR}/shaders/depth_only.vert
+    ${CMAKE_SOURCE_DIR}/shaders/hiz_generate.comp
+    ${CMAKE_SOURCE_DIR}/shaders/occlusion_cull.comp
 )
 
 foreach(SHADER ${SHADER_SOURCES})
@@ -114,6 +117,7 @@ set(SOURCES
     src/renderer/StaticSkinnedMesh.cpp
     src/renderer/HDRFramebuffer.cpp
     src/renderer/ShadowPass.cpp
+    src/renderer/HiZPass.cpp
     src/renderer/BloomPass.cpp
     src/renderer/ToneMapPass.cpp
     src/renderer/GroundDecalRenderer.cpp
@@ -121,7 +125,11 @@ set(SOURCES
     src/map/MapLoader.cpp
     src/terrain/IsometricCamera.cpp
     src/nav/DebugRenderer.cpp
+    src/nav/NavMeshBuilder.cpp
+    src/nav/PathfindingSystem.cpp
+    src/nav/DynamicObstacle.cpp
     src/hud/HUD.cpp
+    src/hud/Minimap.cpp
     src/animation/AnimationPlayer.cpp
     src/animation/CPUSkinning.cpp
     src/vfx/ParticleSystem.cpp
