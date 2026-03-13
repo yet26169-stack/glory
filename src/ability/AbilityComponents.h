@@ -88,6 +88,7 @@ struct ProjectileComponent {
     int                      maxTargets     = 1;
     int                      hitCount       = 0;
     std::vector<uint32_t>    vfxHandles;
+    uint32_t                 trailHandle    = 0;
 
     // Lob (arc) projectile fields
     bool      isLob         = false;

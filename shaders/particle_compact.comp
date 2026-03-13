@@ -1,0 +1,50 @@
+#version 450
+
+// ── GPU Particle Compaction / Indirect Draw Shader ──────────────────────────
+
+layout(local_size_x = 64) in;
+
+struct Particle {
+    vec4 posLife;
+    vec4 velAge;
+    vec4 color;
+    vec4 params;
+};
+
+layout(std430, set = 0, binding = 0) readonly buffer ParticleIn {
+    Particle particles[];
+};
+
+// Draw indirect command buffer (matches VkDrawIndirectCommand)
+layout(std430, set = 0, binding = 4) buffer DrawCmd {
+    uint vertexCount;    // count * 6
+    uint instanceCount;  // 1
+    uint firstVertex;    // 0
+    uint firstInstance;  // 0
+} indirect;
+
+layout(push_constant) uniform CompactPC {
+    uint totalCount;
+} pc;
+
+shared uint localAlive;
+
+void main() {
+    if (gl_LocalInvocationIndex == 0) {
+        localAlive = 0;
+    }
+    barrier();
+
+    uint i = gl_GlobalInvocationID.x;
+    bool isAlive = (i < pc.totalCount && particles[i].params.w >= 0.1);
+
+    if (isAlive) {
+        atomicAdd(localAlive, 1);
+    }
+
+    barrier();
+
+    if (gl_LocalInvocationIndex == 0) {
+        atomicAdd(indirect.vertexCount, localAlive * 6);
+    }
+}

@@ -169,6 +169,9 @@ struct AbilityDefinition {
     std::vector<std::string> castVFX;        // e.g. ["vfx_fireball_cast", "vfx_glow"]
     std::vector<std::string> projectileVFX;
     std::vector<std::string> impactVFX;
+    std::string              projectileTrailDef; // ID for TrailRenderer
+    std::string              compositeCastVFX;   // ID for CompositeVFXSequencer
+    std::string              compositeImpactVFX; // ID for CompositeVFXSequencer
     std::string castSFX;
     std::string impactSFX;
 

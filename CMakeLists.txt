@@ -45,6 +45,19 @@ set(SHADER_SOURCES
     ${CMAKE_SOURCE_DIR}/shaders/explosion_fireball.frag
     ${CMAKE_SOURCE_DIR}/shaders/sprite_effect_additive.frag
     ${CMAKE_SOURCE_DIR}/shaders/sprite_effect_billboard.vert
+    ${CMAKE_SOURCE_DIR}/shaders/bloom_extract.frag
+    ${CMAKE_SOURCE_DIR}/shaders/bloom_blur.frag
+    ${CMAKE_SOURCE_DIR}/shaders/tonemap.vert
+    ${CMAKE_SOURCE_DIR}/shaders/tonemap.frag
+    ${CMAKE_SOURCE_DIR}/shaders/trail_ribbon.vert
+    ${CMAKE_SOURCE_DIR}/shaders/trail_ribbon.frag
+    ${CMAKE_SOURCE_DIR}/shaders/ground_decal.vert
+    ${CMAKE_SOURCE_DIR}/shaders/ground_decal.frag
+    ${CMAKE_SOURCE_DIR}/shaders/mesh_effect.vert
+    ${CMAKE_SOURCE_DIR}/shaders/mesh_effect_energy.frag
+    ${CMAKE_SOURCE_DIR}/shaders/mesh_effect_slash.frag
+    ${CMAKE_SOURCE_DIR}/shaders/distortion.frag
+    ${CMAKE_SOURCE_DIR}/shaders/particle_compact.comp
 )
 
 foreach(SHADER ${SHADER_SOURCES})
@@ -96,6 +109,11 @@ set(SOURCES
     src/renderer/GLBLoader.cpp
     src/renderer/DynamicMesh.cpp
     src/renderer/StaticSkinnedMesh.cpp
+    src/renderer/HDRFramebuffer.cpp
+    src/renderer/BloomPass.cpp
+    src/renderer/ToneMapPass.cpp
+    src/renderer/GroundDecalRenderer.cpp
+    src/renderer/DistortionRenderer.cpp
     src/map/MapLoader.cpp
     src/terrain/IsometricCamera.cpp
     src/nav/DebugRenderer.cpp
@@ -104,6 +122,9 @@ set(SOURCES
     src/animation/CPUSkinning.cpp
     src/vfx/ParticleSystem.cpp
     src/vfx/VFXRenderer.cpp
+    src/vfx/TrailRenderer.cpp
+    src/vfx/MeshEffectRenderer.cpp
+    src/vfx/CompositeVFXSequencer.cpp
     src/ability/AbilitySystem.cpp
     src/ability/ProjectileSystem.cpp
     src/combat/CombatSystem.cpp

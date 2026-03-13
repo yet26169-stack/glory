@@ -10,7 +10,6 @@ layout(location = 1) in vec2 inUV;  // (u_angle, v_radius)
 layout(location = 0) out vec2  fragUV;
 layout(location = 1) out vec3  fragWorldPos;
 layout(location = 2) out float fragEdge;   // abs angular distance from axis (0=center, 1=side)
-
 layout(push_constant) uniform ConePC {
     mat4  viewProj;      // 64 B
     vec3  apex;          // 12 B
@@ -20,8 +19,11 @@ layout(push_constant) uniform ConePC {
     vec3  cameraPos;     // 12 B
     float range;         //  4 B
     float alpha;         //  4 B
-    float pad[3];        // 12 B
+    float elapsed;       //  4 B
+    float phase;         //  4 B
+    float pad[1];        //  4 B
 } pc;                    // 128 B total
+
 
 void main() {
     float u_angle  = inPos.x;   // 0..1 → left edge to right edge

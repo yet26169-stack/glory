@@ -64,7 +64,8 @@ private:
         float     range;         //  4 B
         float     alpha;         //  4 B
         float     elapsed;       //  4 B  ← seconds since W was cast
-        float     pad[2];        //  8 B
+        float     phase;         //  4 B  ← per-bolt phase for flicker
+        float     pad[1];        //  4 B
     };                           // = 128 B total
     static_assert(sizeof(ConePC) == 128, "ConePC must be exactly 128 bytes");
 

@@ -56,7 +56,12 @@ public:
     void render(VkCommandBuffer cmd,
                 const glm::mat4& viewProj,
                 const glm::vec3& camRight,
-                const glm::vec3& camUp);
+                const glm::vec3& camUp,
+                glm::vec2 screenSize,
+                float nearPlane,
+                float farPlane);
+
+    void setDepthBuffer(VkImageView depthView, VkSampler sampler);
 
     // ── Registry ──────────────────────────────────────────────────────────
 
@@ -75,9 +80,12 @@ private:
     // ── One shared pool with MAX_CONCURRENT_EMITTERS sets pre-allocated ────
     VkDescriptorPool       m_descPool   = VK_NULL_HANDLE;
 
-    // ── Compute pipeline (particle simulation) ─────────────────────────────
+    // ── Compute pipelines (simulation + compaction) ───────────────────────
     VkPipelineLayout       m_computeLayout   = VK_NULL_HANDLE;
     VkPipeline             m_computePipeline = VK_NULL_HANDLE;
+    VkPipelineLayout       m_compactLayout   = VK_NULL_HANDLE;
+    VkPipeline             m_compactPipeline = VK_NULL_HANDLE;
+
 
     struct SimPC {
         float    dt;
@@ -88,14 +96,22 @@ private:
 
     // ── Graphics pipeline (billboard rendering) ────────────────────────────
     VkPipelineLayout       m_renderLayout    = VK_NULL_HANDLE;
-    VkPipeline             m_renderPipeline  = VK_NULL_HANDLE;
+    VkPipeline             m_alphaPipeline   = VK_NULL_HANDLE;
+    VkPipeline             m_additivePipeline = VK_NULL_HANDLE;
 
     struct RenderPC {
-        glm::mat4 viewProj;
-        glm::vec4 camRight;
-        glm::vec4 camUp;
-    };
+        glm::mat4 viewProj;   // 64
+        glm::vec4 camRight;   // 16
+        glm::vec4 camUp;      // 16
+        glm::vec2 screenSize; //  8
+        float     nearPlane;  //  4
+        float     farPlane;   //  4
+    }; // Total: 112 bytes
     static_assert(sizeof(RenderPC) <= 128, "RenderPC exceeds push constant limit");
+
+    struct CompactPC {
+        uint32_t totalCount;
+    };
 
     // ── Default particle atlas (white 1×1 fallback) ────────────────────────
     Texture                m_defaultAtlas;
@@ -107,16 +123,20 @@ private:
     std::unordered_map<std::string, EmitterDef> m_emitterDefs;
 
     // ── Active effects ─────────────────────────────────────────────────────
-    std::vector<ParticleSystem> m_effects;
+    std::vector<std::unique_ptr<ParticleSystem>> m_effects;
     uint32_t                    m_nextHandle = 1;
+    float                       m_currentDt = 0.0f;
+
+    VkImageView m_depthView = VK_NULL_HANDLE;
+    VkSampler   m_depthSampler = VK_NULL_HANDLE;
 
     // ── Deferred deletion graveyard ────────────────────────────────────────
     // ParticleSystems moved here when dead; destroyed only after GPU is done.
     // Each entry holds the frame threshold after which destruction is safe.
-    static constexpr int GRAVEYARD_DELAY = 3; // MAX_FRAMES_IN_FLIGHT(2) + 1
+    static constexpr int GRAVEYARD_DELAY = 20; // Extra padding for safety
     struct GraveyardEntry {
         int            killFrame;
-        ParticleSystem ps;
+        std::unique_ptr<ParticleSystem> ps;
     };
     std::vector<GraveyardEntry> m_graveyard;
     int                         m_frameCount = 0;
@@ -124,6 +144,7 @@ private:
     // ── Initialisation helpers ─────────────────────────────────────────────
     void createDescriptorLayoutAndPool();
     void createComputePipeline();
+    void createCompactPipeline();
     void createRenderPipeline(VkRenderPass renderPass);
 
     // Returns existing or loaded atlas texture for a given path

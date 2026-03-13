@@ -98,6 +98,7 @@ public:
                           uint32_t teeth = 16);
   static Model createPyramid(const Device &device, VmaAllocator allocator,
                               float baseSize = 1.0f, float height = 1.5f);
+  static Model createUnitQuad(const Device &device, VmaAllocator allocator);
 
   // Load a skinned GLB: mesh + skeleton + animations + per-vertex bone data
   // (declared here but defined after SkinnedModelData below)

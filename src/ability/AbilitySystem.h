@@ -3,6 +3,7 @@
 #include "ability/AbilityTypes.h"
 #include "ability/AbilityComponents.h"
 #include "vfx/VFXEventQueue.h"
+#include "vfx/CompositeVFXSequencer.h"
 
 #include <entt.hpp>
 #include <nlohmann/json.hpp>
@@ -12,6 +13,8 @@
 #include <queue>
 
 namespace glory {
+
+class TrailRenderer;
 
 // ── AbilitySystem ──────────────────────────────────────────────────────────
 // Processes ability requests, drives the per-slot state machine, resolves
@@ -52,7 +55,7 @@ public:
 
     // ── Per-frame update ──────────────────────────────────────────────────
 
-    void update(entt::registry& registry, float dt);
+    void update(entt::registry& registry, float dt, TrailRenderer* trailRenderer = nullptr);
 
     // Public hit resolver called by ProjectileSystem when a projectile lands
     void resolveHit(entt::registry& reg, entt::entity caster,
@@ -66,8 +69,11 @@ public:
                            float lifetime = -1.0f,
                            uint32_t preHandle = 0);
 
+    CompositeVFXSequencer& getSequencer() { return m_compositeSequencer; }
+
 private:
     VFXEventQueue& m_vfxQueue;
+    CompositeVFXSequencer m_compositeSequencer;
 
     std::unordered_map<std::string, AbilityDefinition> m_defs;
     std::queue<AbilityRequest> m_requests;
@@ -75,7 +81,7 @@ private:
     // ── State machine ──────────────────────────────────────────────────────
     void processRequest(entt::registry& reg, const AbilityRequest& req);
     void tickAbility(entt::registry& reg, entt::entity entity,
-                     AbilityInstance& inst, float dt);
+                     AbilityInstance& inst, float dt, TrailRenderer* trailRenderer);
 
     // ── Validation ────────────────────────────────────────────────────────
     bool validateRequest(entt::registry& reg, const AbilityRequest& req,
@@ -83,13 +89,15 @@ private:
 
     // ── Execution ─────────────────────────────────────────────────────────
     void executeAbility(entt::registry& reg, entt::entity caster,
-                        AbilityInstance& inst);
+                        AbilityInstance& inst, TrailRenderer* trailRenderer);
     void spawnProjectile(entt::registry& reg, entt::entity caster,
                          const AbilityDefinition& def,
-                         const TargetInfo& target);
+                         const TargetInfo& target,
+                         TrailRenderer* trailRenderer);
     void spawnLobProjectile(entt::registry& reg, entt::entity caster,
                             const AbilityDefinition& def,
-                            const TargetInfo& target);
+                            const TargetInfo& target,
+                            TrailRenderer* trailRenderer);
     void resolveInstantEffects(entt::registry& reg, entt::entity caster,
                                const AbilityDefinition& def,
                                const TargetInfo& target);

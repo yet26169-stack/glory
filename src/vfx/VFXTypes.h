@@ -91,6 +91,9 @@ struct EmitterDef {
     // Visual curves
     std::vector<ColorKey> colorOverLifetime;  // Evaluated on GPU if not empty
     std::vector<FloatKey> sizeOverLifetime;   // Not strictly used if sizeEnd is set, but keeping for compatibility
+
+    enum class BlendMode : uint8_t { Alpha, Additive };
+    BlendMode blendMode = BlendMode::Alpha;
 };
 
 // ── VFX Event (game logic → render thread via SPSC queue) ─────────────────

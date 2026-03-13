@@ -1109,6 +1109,22 @@ Model Model::createPyramid(const Device& device, VmaAllocator allocator,
     return model;
 }
 
+Model Model::createUnitQuad(const Device& device, VmaAllocator allocator) {
+    std::vector<Vertex> vertices(4);
+    // Flat quad on XZ plane, centered at origin
+    vertices[0].position = {-1.0f, 0.0f, -1.0f}; vertices[0].texCoord = {0.0f, 0.0f};
+    vertices[1].position = { 1.0f, 0.0f, -1.0f}; vertices[1].texCoord = {1.0f, 0.0f};
+    vertices[2].position = { 1.0f, 0.0f,  1.0f}; vertices[2].texCoord = {1.0f, 1.0f};
+    vertices[3].position = {-1.0f, 0.0f,  1.0f}; vertices[3].texCoord = {0.0f, 1.0f};
+    for(auto& v : vertices) { v.normal = {0,1,0}; v.color = {1,1,1}; }
+
+    std::vector<uint32_t> indices = { 0, 1, 2, 2, 3, 0 };
+
+    Model model;
+    model.m_meshes.emplace_back(device, allocator, vertices, indices);
+    return model;
+}
+
 void Model::draw(VkCommandBuffer cmd) const {
     for (const auto& mesh : m_meshes) {
         mesh.bind(cmd);

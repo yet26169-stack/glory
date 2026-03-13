@@ -37,6 +37,8 @@
     "castVFX": ["vfx_fireball_cast", "vfx_fireball_cast_sparks", "vfx_fireball_cast_glow"],
     "projectileVFX": ["vfx_fireball_projectile", "vfx_fireball_trail_embers"],
     "impactVFX": ["vfx_fireball_explosion", "vfx_fireball_explosion_smoke", "vfx_fireball_explosion_sparks"],
+    "projectileTrailDef": "vfx_fireball_trail",
+    "compositeImpactVFX": "fireball_impact_composite",
     "castSFX": "sfx_fireball_cast",
     "impactSFX": "sfx_fireball_impact",
     "tags": ["damage", "skillshot", "magical"]

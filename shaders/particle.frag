@@ -1,26 +1,50 @@
 #version 450
 
-// ── Particle Fragment Shader ──────────────────────────────────────────────────
-// Samples a shared particle atlas and multiplies by the per-particle color.
-// Alpha-blended with depth test (no depth write) for correct layering.
+// ── Upgraded Particle Fragment Shader (Soft Particles) ────────────────────────
+
+layout(set = 0, binding = 1) uniform sampler2D particleAtlas;
+layout(set = 0, binding = 3) uniform sampler2D depthBuffer; // Scene depth
+
+layout(push_constant) uniform RenderPC {
+    mat4  viewProj;
+    vec4  camRight;
+    vec4  camUp;
+    vec2  screenSize;
+    float nearPlane;
+    float farPlane;
+} pc;
 
 layout(location = 0) in vec4 fragColor;
 layout(location = 1) in vec2 fragUV;
 
-layout(set = 0, binding = 1) uniform sampler2D particleAtlas;
-
 layout(location = 0) out vec4 outColor;
+
+float linearizeDepth(float d) {
+    return pc.nearPlane * pc.farPlane / (pc.farPlane - d * (pc.farPlane - pc.nearPlane));
+}
 
 void main() {
     vec4 tex = texture(particleAtlas, fragUV);
     
-    // Create a soft circle mask from UVs
-    vec2 p = fragUV * 2.0 - 1.0;
-    float dist = length(p);
+    // Procedural circle mask (softens atlas edges)
+    float dist = length(fragUV - 0.5) * 2.0;
     float alphaMask = smoothstep(1.0, 0.8, dist);
     
-    outColor  = tex * fragColor * vec4(1.0, 1.0, 1.0, alphaMask);
+    vec4 color = tex * fragColor * vec4(1.0, 1.0, 1.0, alphaMask);
 
-    // Early discard for nearly transparent pixels (avoids depth buffer writes)
-    if (outColor.a < 0.01) discard;
+    // Soft Particle Depth Fade
+    vec2 screenUV = gl_FragCoord.xy / pc.screenSize;
+    float sceneDepthRaw = texture(depthBuffer, screenUV).r;
+    
+    float sceneZ = linearizeDepth(sceneDepthRaw);
+    float partZ  = linearizeDepth(gl_FragCoord.z);
+    
+    // Fade out over 0.5 units of depth difference
+    float diff = sceneZ - partZ;
+    float softFade = smoothstep(0.0, 0.5, diff);
+    
+    color.a *= softFade;
+
+    if (color.a < 0.01) discard;
+    outColor = color;
 }

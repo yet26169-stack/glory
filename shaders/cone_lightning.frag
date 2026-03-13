@@ -16,13 +16,13 @@ layout(push_constant) uniform ConePC {
     float range;
     float alpha;
     float elapsed;
-    float pad[2];
+    float phase;
+    float pad[1];
 } pc;
 
 void main() {
-    // Each primitive flickers independently using gl_PrimitiveID as a phase offset
-    float phase   = float(gl_PrimitiveID) * 2.39996; // golden-ratio offset
-    float flicker = step(0.2, fract(pc.time * 12.0 + phase));
+    // flicker independently using pc.phase
+    float flicker = step(0.2, fract(pc.time * 12.0 + pc.phase));
 
     // Core colour: bright yellow → pure white at flicker peaks
     vec3  color = mix(vec3(1.0, 0.85, 0.15), vec3(0.95, 0.97, 1.0), flicker * 0.6);

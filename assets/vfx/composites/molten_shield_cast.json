@@ -1,0 +1,7 @@
+{
+  "id": "molten_shield_cast_composite",
+  "layers": [
+    { "delay": 0.0, "type": "PARTICLE",     "effectRef": "vfx_molten_shield_apply", "anchor": "CASTER" },
+    { "delay": 0.0, "type": "GROUND_DECAL", "effectRef": "decal_circle",            "anchor": "CASTER", "scale": 3.0, "color": [1.0, 0.3, 0.0, 0.4] }
+  ]
+}

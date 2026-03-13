@@ -12,13 +12,18 @@ layout(location = 2) in float fragEdge;  // 0 = axis center, 1 = side edges
 layout(location = 0) out vec4 outColor;
 
 layout(push_constant) uniform ConePC {
-    mat4  viewProj;
-    vec3  apex;      float time;
-    vec3  axisDir;   float halfAngleTan;
-    vec3  cameraPos; float range;
-    float alpha;     float elapsed;
-    float pad[2];
-} pc;
+    mat4  viewProj;      // 64 B
+    vec3  apex;          // 12 B
+    float time;          //  4 B
+    vec3  axisDir;       // 12 B
+    float halfAngleTan;  //  4 B
+    vec3  cameraPos;     // 12 B
+    float range;         //  4 B
+    float alpha;         //  4 B
+    float elapsed;       //  4 B
+    float phase;         //  4 B
+    float pad[1];        //  4 B
+} pc;                    // 128 B total
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float noise(vec2 p) {

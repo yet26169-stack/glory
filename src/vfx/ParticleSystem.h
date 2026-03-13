@@ -30,6 +30,8 @@ public:
                    VkDescriptorSetLayout  descLayout,
                    VkDescriptorPool       sharedPool,
                    Texture*               atlas,
+                   VkImageView            depthView,
+                   VkSampler              depthSampler,
                    glm::vec3              worldPosition,
                    glm::vec3              direction,
                    float                  scale,
@@ -48,6 +50,8 @@ public:
     // Writes newly-spawned particles into the persistently-mapped SSBO.
     void update(float dt);
 
+    void updateDepthBuffer(VkDescriptorSetLayout layout, VkImageView depthView, VkSampler sampler);
+
     // Teleport the emitter to a new world position
     void moveTo(glm::vec3 newPos) { m_position = newPos; }
 
@@ -56,16 +60,19 @@ public:
 
     bool  isAlive()   const; // true while any particle is still active
     uint32_t handle() const { return m_handle; }
+    EmitterDef::BlendMode blendMode() const { return m_def ? m_def->blendMode : EmitterDef::BlendMode::Alpha; }
 
     // Accessors needed by VFXRenderer during dispatch / draw
     VkBuffer        ssbo()        const { return m_ssboBuffer.getBuffer(); }
     VkBuffer        emitterUbo()  const { return m_emitterBuffer.getBuffer(); }
+    VkBuffer        indirectBuffer() const { return m_indirectBuffer.getBuffer(); }
     VkDescriptorSet descSet()     const { return m_descSet; }
     uint32_t        maxParticles()const { return m_maxParticles; }
 
 private:
     const Device*      m_device     = nullptr;
     const EmitterDef*  m_def        = nullptr;
+    Texture*           m_atlas      = nullptr;
 
     // GPU SSBO + persistent CPU mapping
     Buffer             m_ssboBuffer;
@@ -75,6 +82,9 @@ private:
     // GPU UBO for emitter parameters
     Buffer             m_emitterBuffer;
     EmitterParams*     m_emitterParams = nullptr;
+
+    // GPU indirect draw buffer
+    Buffer             m_indirectBuffer;
 
     // Descriptor set (shared layout: binding 0 = SSBO, binding 1 = atlas)
     VkDescriptorSet    m_descSet    = VK_NULL_HANDLE;
@@ -95,7 +105,9 @@ private:
 
     void spawnParticle();
     void writeToDescriptorSet(VkDescriptorSetLayout layout,
-                              Texture* atlas);
+                              Texture* atlas,
+                              VkImageView depthView,
+                              VkSampler depthSampler);
     void destroy();
 };
 

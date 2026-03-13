@@ -15,7 +15,8 @@ layout(push_constant) uniform ConePC {
     float range;
     float alpha;
     float elapsed;
-    float pad[2];
+    float phase;
+    float pad[1];
 } pc;
 
 void main() {

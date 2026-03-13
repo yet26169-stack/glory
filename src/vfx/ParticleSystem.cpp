@@ -15,6 +15,8 @@ ParticleSystem::ParticleSystem(const Device&          device,
                                VkDescriptorSetLayout  descLayout,
                                VkDescriptorPool       sharedPool,
                                Texture*               atlas,
+                               VkImageView            depthView,
+                               VkSampler              depthSampler,
                                glm::vec3              worldPosition,
                                glm::vec3              direction,
                                float                  scale,
@@ -22,6 +24,7 @@ ParticleSystem::ParticleSystem(const Device&          device,
                                uint32_t               handle)
     : m_device     (&device)
     , m_def        (&def)
+    , m_atlas      (atlas)
     , m_position   (worldPosition)
     , m_direction  (glm::length(direction) > 0.001f ? glm::normalize(direction) : glm::vec3(0,1,0))
     , m_scale      (scale)
@@ -53,6 +56,12 @@ ParticleSystem::ParticleSystem(const Device&          device,
                              VMA_MEMORY_USAGE_CPU_TO_GPU);
     m_emitterParams = reinterpret_cast<EmitterParams*>(m_emitterBuffer.map());
 
+    // Create Indirect Draw Buffer
+    m_indirectBuffer = Buffer(device.getAllocator(),
+                              sizeof(VkDrawIndirectCommand),
+                              VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                              VMA_MEMORY_USAGE_GPU_ONLY);
+
     // Fill parameters
     m_emitterParams->wind_dt = {def.windDirection * def.windStrength, 0.0f}; // dt set in update/render
     m_emitterParams->phys    = {def.gravity, def.drag, def.alphaCurve, static_cast<float>(m_maxParticles)};
@@ -73,7 +82,7 @@ ParticleSystem::ParticleSystem(const Device&          device,
     allocInfo.pSetLayouts        = &descLayout;
     vkAllocateDescriptorSets(device.getDevice(), &allocInfo, &m_descSet);
 
-    writeToDescriptorSet(descLayout, atlas);
+    writeToDescriptorSet(descLayout, atlas, depthView, depthSampler);
 }
 
 // ── Destructor ────────────────────────────────────────────────────────────────
@@ -103,6 +112,7 @@ ParticleSystem::ParticleSystem(ParticleSystem&& o) noexcept
     , m_maxParticles(o.m_maxParticles)
     , m_emitterBuffer(std::move(o.m_emitterBuffer))
     , m_emitterParams(o.m_emitterParams)
+    , m_indirectBuffer(std::move(o.m_indirectBuffer))
     , m_descSet     (o.m_descSet)
     , m_position    (o.m_position)
     , m_direction   (o.m_direction)
@@ -131,6 +141,7 @@ ParticleSystem& ParticleSystem::operator=(ParticleSystem&& o) noexcept {
         m_maxParticles = o.m_maxParticles;
         m_emitterBuffer= std::move(o.m_emitterBuffer);
         m_emitterParams= o.m_emitterParams;
+        m_indirectBuffer = std::move(o.m_indirectBuffer);
         m_descSet      = o.m_descSet;
         m_position     = o.m_position;
         m_direction    = o.m_direction;
@@ -251,9 +262,17 @@ void ParticleSystem::spawnParticle() {
     }
 }
 
+// ── updateDepthBuffer ──────────────────────────────────────────────────
+void ParticleSystem::updateDepthBuffer(VkDescriptorSetLayout layout, VkImageView depthView, VkSampler sampler) {
+    if (m_descSet == VK_NULL_HANDLE || !m_def) return;
+    writeToDescriptorSet(layout, m_atlas, depthView, sampler);
+}
+
 // ── writeToDescriptorSet ─────────────────────────────────────────────────
 void ParticleSystem::writeToDescriptorSet(VkDescriptorSetLayout /*layout*/,
-                                          Texture* atlas) {
+                                          Texture* atlas,
+                                          VkImageView depthView,
+                                          VkSampler depthSampler) {
     VkDevice dev = m_device->getDevice();
 
     // Binding 0 — storage buffer (SSBO)
@@ -267,7 +286,7 @@ void ParticleSystem::writeToDescriptorSet(VkDescriptorSetLayout /*layout*/,
     uboInfo.offset = 0;
     uboInfo.range  = VK_WHOLE_SIZE;
 
-    VkWriteDescriptorSet writes[3]{};
+    VkWriteDescriptorSet writes[5]{};
     writes[0].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     writes[0].dstSet          = m_descSet;
     writes[0].dstBinding      = 0;
@@ -296,7 +315,33 @@ void ParticleSystem::writeToDescriptorSet(VkDescriptorSetLayout /*layout*/,
     writes[2].descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     writes[2].pBufferInfo     = &uboInfo;
 
-    vkUpdateDescriptorSets(dev, 3, writes, 0, nullptr);
+    // Binding 3 — Depth Buffer
+    VkDescriptorImageInfo depthInfo{};
+    depthInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+    depthInfo.imageView   = depthView;
+    depthInfo.sampler     = depthSampler;
+
+    writes[3].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[3].dstSet          = m_descSet;
+    writes[3].dstBinding      = 3;
+    writes[3].descriptorCount = 1;
+    writes[3].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writes[3].pImageInfo      = &depthInfo;
+
+    // Binding 4 — Indirect Buffer
+    VkDescriptorBufferInfo indirectInfo{};
+    indirectInfo.buffer = m_indirectBuffer.getBuffer();
+    indirectInfo.offset = 0;
+    indirectInfo.range  = VK_WHOLE_SIZE;
+
+    writes[4].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[4].dstSet          = m_descSet;
+    writes[4].dstBinding      = 4;
+    writes[4].descriptorCount = 1;
+    writes[4].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    writes[4].pBufferInfo     = &indirectInfo;
+
+    vkUpdateDescriptorSets(dev, 5, writes, 0, nullptr);
 }
 
 } // namespace glory

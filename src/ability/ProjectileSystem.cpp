@@ -1,5 +1,6 @@
 #include "ability/ProjectileSystem.h"
 #include "ability/AbilitySystem.h"
+#include "vfx/TrailRenderer.h"
 #include "scene/Components.h"
 #include "combat/CombatComponents.h"
 
@@ -20,7 +21,8 @@ void ProjectileSystem::registerAbilityMesh(const std::string& abilityID,
 }
 
 void ProjectileSystem::update(entt::registry& reg, float dt,
-                               VFXEventQueue& vfxQueue, AbilitySystem& abilitySystem) {
+                               VFXEventQueue& vfxQueue, AbilitySystem& abilitySystem,
+                               TrailRenderer* trailRenderer) {
     m_landedPositions.clear();
     std::vector<entt::entity> toDestroy;
 
@@ -53,6 +55,10 @@ void ProjectileSystem::update(entt::registry& reg, float dt,
                 }
             }
 
+            if (pc.trailHandle != 0 && trailRenderer) {
+                trailRenderer->updateHead(pc.trailHandle, tc.position);
+            }
+
             if (t >= 1.0f) {
                 // Landed: AoE hit + explosion VFX + record landing position
                 TargetInfo ti{};
@@ -65,7 +71,7 @@ void ProjectileSystem::update(entt::registry& reg, float dt,
 
                 toDestroy.push_back(entity);
                 destroyProjectile(reg, entity, pc, vfxQueue, &abilitySystem,
-                                  pc.lobTarget, true);
+                                  pc.lobTarget, true, trailRenderer);
             }
             continue;
         }
@@ -113,11 +119,15 @@ void ProjectileSystem::update(entt::registry& reg, float dt,
             vfxQueue.push(mv);
         }
 
+        if (pc.trailHandle != 0 && trailRenderer) {
+            trailRenderer->updateHead(pc.trailHandle, tc.position + glm::vec3(0.f, 0.5f, 0.f));
+        }
+
         // Expired: exceeded max range
         if (pc.traveledDist >= pc.maxRange) {
             toDestroy.push_back(entity);
             destroyProjectile(reg, entity, pc, vfxQueue, nullptr,
-                              tc.position, false);
+                              tc.position, false, trailRenderer);
             continue;
         }
 
@@ -158,7 +168,7 @@ void ProjectileSystem::update(entt::registry& reg, float dt,
         if (hitSomething && (!pc.piercing || pc.hitCount >= pc.maxTargets)) {
             toDestroy.push_back(entity);
             destroyProjectile(reg, entity, pc, vfxQueue, &abilitySystem,
-                              tc.position, true);
+                              tc.position, true, trailRenderer);
         }
     }
 
@@ -172,13 +182,18 @@ void ProjectileSystem::destroyProjectile(entt::registry& reg, entt::entity /*e*/
                                           VFXEventQueue& vfxQueue,
                                           AbilitySystem* abilitySystem,
                                           const glm::vec3& hitPos,
-                                          bool applyHit) {
+                                          bool applyHit,
+                                          TrailRenderer* trailRenderer) {
     // Stop looping trail VFX
     for (auto vfxH : pc.vfxHandles) {
         VFXEvent ev{};
         ev.type   = VFXEventType::Destroy;
         ev.handle = vfxH;
         vfxQueue.push(ev);
+    }
+
+    if (pc.trailHandle != 0 && trailRenderer) {
+        trailRenderer->detach(pc.trailHandle);
     }
 
     // Impact VFX

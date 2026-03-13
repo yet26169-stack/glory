@@ -35,9 +35,11 @@ Renderer::Renderer(Window& window) : m_window(window) {
     m_device    = std::make_unique<Device>(m_context->getInstance(), m_window.getSurface());
     m_swapchain = std::make_unique<Swapchain>(*m_device, m_window.getSurface(), m_window.getExtent());
 
+    m_hdrFB = std::make_unique<HDRFramebuffer>();
+    m_hdrFB->init(*m_device, m_window.getExtent().width, m_window.getExtent().height);
+
     m_descriptors = std::make_unique<Descriptors>(*m_device, Sync::MAX_FRAMES_IN_FLIGHT);
-    // Single forward pass directly to swapchain (no HDR offscreen)
-    m_pipeline = std::make_unique<Pipeline>(*m_device, *m_swapchain, m_descriptors->getLayout());
+    m_pipeline = std::make_unique<Pipeline>(*m_device, *m_swapchain, m_descriptors->getLayout(), m_hdrFB->renderPass());
     m_sync = std::make_unique<Sync>(*m_device, m_swapchain->getImageCount());
 
     // Dummy 1×1 white texture bound to the shadow-map descriptor slot.
@@ -46,17 +48,36 @@ Renderer::Renderer(Window& window) : m_window(window) {
     m_descriptors->updateShadowMap(m_dummyShadow.getImageView(), m_dummyShadow.getSampler());
 
     m_clickIndicatorRenderer = std::make_unique<ClickIndicatorRenderer>(
-        *m_device, m_pipeline->getRenderPass());
+        *m_device, m_hdrFB->renderPass());
+    m_groundDecalRenderer = std::make_unique<GroundDecalRenderer>(
+        *m_device, m_hdrFB->renderPass());
+    // Register basic AoE decal
+    GroundDecalRenderer::DecalDef circleDecal;
+    circleDecal.id = "decal_circle";
+    circleDecal.color = {1.0f, 1.0f, 1.0f, 0.5f};
+    circleDecal.duration = 2.0f;
+    m_groundDecalRenderer->registerDecal(circleDecal);
+
+    m_distortionRenderer = std::make_unique<DistortionRenderer>(
+        *m_device, m_hdrFB->loadRenderPass(), m_hdrFB->colorCopyView(), m_hdrFB->sampler());
+    // Register basic ripple distortion
+    DistortionDef ripple;
+    ripple.id = "vfx_ripple";
+    ripple.duration = 1.0f;
+    ripple.radius = 8.0f;
+    ripple.strength = 1.0f;
+    m_distortionRenderer->registerDef(ripple);
+
     m_shieldBubble = std::make_unique<ShieldBubbleRenderer>();
-    m_shieldBubble->init(*m_device, m_pipeline->getRenderPass());
+    m_shieldBubble->init(*m_device, m_hdrFB->renderPass());
     m_coneEffect = std::make_unique<ConeAbilityRenderer>();
-    m_coneEffect->init(*m_device, m_pipeline->getRenderPass());
+    m_coneEffect->init(*m_device, m_hdrFB->renderPass());
     m_explosionRenderer = std::make_unique<ExplosionRenderer>();
-    m_explosionRenderer->init(*m_device, m_pipeline->getRenderPass());
+    m_explosionRenderer->init(*m_device, m_hdrFB->renderPass());
 
     // Sprite-atlas-based VFX renderer
     m_spriteEffectRenderer = std::make_unique<SpriteEffectRenderer>();
-    m_spriteEffectRenderer->init(*m_device, m_pipeline->getRenderPass());
+    m_spriteEffectRenderer->init(*m_device, m_hdrFB->renderPass());
     m_spriteEffectConeW = m_spriteEffectRenderer->registerEffect(
         "cone_w", std::string(ASSET_DIR) + "textures/cone_w_atlas.png",
         8, 56, 3.5f, true);
@@ -64,7 +85,7 @@ Renderer::Renderer(Window& window) : m_window(window) {
         "explosion_e", std::string(ASSET_DIR) + "textures/explosion_e_atlas.png",
         8, 56, 4.2f, true);
 
-    m_debugRenderer.init(*m_device, m_pipeline->getRenderPass());
+    m_debugRenderer.init(*m_device, m_hdrFB->renderPass());
 
     createInstanceBuffers();
     createGridPipeline();
@@ -73,12 +94,50 @@ Renderer::Renderer(Window& window) : m_window(window) {
     // ── VFX & Ability systems ─────────────────────────────────────────────
     m_vfxQueue      = std::make_unique<VFXEventQueue>();
     m_combatVfxQueue = std::make_unique<VFXEventQueue>(); // separate SPSC for CombatSystem
-    m_vfxRenderer   = std::make_unique<VFXRenderer>(*m_device, m_pipeline->getRenderPass());
+    m_vfxRenderer   = std::make_unique<VFXRenderer>(*m_device, m_hdrFB->renderPass());
+    m_vfxRenderer->setDepthBuffer(m_hdrFB->depthView(), m_hdrFB->sampler());
     m_vfxRenderer->loadEmitterDirectory(std::string(ASSET_DIR) + "vfx/");
+
+    m_trailRenderer = std::make_unique<TrailRenderer>(*m_device, m_hdrFB->renderPass());
+    // Register basic fireball trail
+    TrailDef fireballTrail;
+    fireballTrail.id = "vfx_fireball_trail";
+    fireballTrail.widthStart = 0.6f;
+    fireballTrail.widthEnd = 0.1f;
+    fireballTrail.colorStart = {1.0f, 0.6f, 0.2f, 1.0f};
+    fireballTrail.colorEnd = {1.0f, 0.2f, 0.0f, 0.0f};
+    fireballTrail.fadeSpeed = 4.0f;
+    fireballTrail.emitInterval = 0.01f;
+    m_trailRenderer->registerTrail(fireballTrail);
+
+    m_meshEffectRenderer = std::make_unique<MeshEffectRenderer>(*m_device, m_hdrFB->renderPass());
+    // Register basic slash effect
+    MeshEffectDef slashDef;
+    slashDef.id = "vfx_slash";
+    slashDef.meshPath = std::string(MODEL_DIR) + "models/abiliities_models/q_bolt.glb"; // fallback mesh
+    slashDef.vertShader = "mesh_effect.vert.spv";
+    slashDef.fragShader = "mesh_effect_slash.frag.spv";
+    slashDef.duration = 0.4f;
+    slashDef.scaleStart = 0.5f;
+    slashDef.scaleEnd = 2.0f;
+    slashDef.colorStart = {1.0f, 0.8f, 0.4f, 1.0f};
+    slashDef.colorEnd = {1.0f, 0.4f, 0.0f, 0.0f};
+    m_meshEffectRenderer->registerDef(slashDef);
+
     m_abilitySystem = std::make_unique<AbilitySystem>(*m_vfxQueue);
     m_abilitySystem->loadDirectory(std::string(ASSET_DIR) + "abilities/");
+    m_abilitySystem->getSequencer().loadDirectory(std::string(ASSET_DIR) + "vfx/composites/");
     m_projectileSystem = std::make_unique<ProjectileSystem>();
     m_combatSystem  = std::make_unique<CombatSystem>(*m_combatVfxQueue);
+
+    m_bloom = std::make_unique<BloomPass>();
+    m_bloom->init(*m_device, m_hdrFB->colorView(), m_hdrFB->sampler(), m_window.getExtent().width, m_window.getExtent().height);
+
+    createSwapchainRenderPass();
+    createSwapchainFramebuffers();
+
+    m_toneMap = std::make_unique<ToneMapPass>();
+    m_toneMap->init(*m_device, m_swapchainRenderPass, m_hdrFB->colorView(), m_bloom->bloomResultView(), m_hdrFB->sampler());
 
     m_isoCam.setBounds(glm::vec3(0, 0, 0), glm::vec3(200, 0, 200));
     m_isoCam.setTarget(glm::vec3(100, 0, 100));
@@ -119,7 +178,7 @@ Renderer::Renderer(Window& window) : m_window(window) {
         initInfo.DescriptorPool = m_imguiPool;
         initInfo.MinImageCount  = 2;
         initInfo.ImageCount     = m_swapchain->getImageCount();
-        initInfo.RenderPass     = m_pipeline->getRenderPass();
+        initInfo.RenderPass     = m_swapchainRenderPass;
         ImGui_ImplVulkan_Init(&initInfo);
         // ImGui 1.91.8 auto-uploads fonts on first render — no one-shot buffer needed
     }
@@ -142,14 +201,29 @@ Renderer::~Renderer() {
     m_combatSystem.reset();
     m_input.reset();
     m_clickIndicatorRenderer.reset();
+    m_groundDecalRenderer.reset();
+    m_distortionRenderer.reset();
     m_shieldBubble.reset();
     m_coneEffect.reset();
     m_explosionRenderer.reset();
     m_spriteEffectRenderer.reset();
     m_vfxRenderer.reset();
+    m_trailRenderer.reset();
+    m_meshEffectRenderer.reset();
     m_vfxQueue.reset();
+
     m_combatVfxQueue.reset();
     m_abilitySystem.reset();
+
+    if (m_toneMap) m_toneMap->destroy();
+    m_toneMap.reset();
+    destroySwapchainFramebuffers();
+    destroySwapchainRenderPass();
+    if (m_bloom) m_bloom->destroy();
+    m_bloom.reset();
+    if (m_hdrFB) m_hdrFB->destroy();
+    m_hdrFB.reset();
+
     m_debugRenderer.cleanup();
     destroyInstanceBuffers();
     destroyGridPipeline();
@@ -201,12 +275,38 @@ void Renderer::drawFrame() {
             if (m_combatVfxQueue) m_vfxRenderer->processQueue(*m_combatVfxQueue);
             m_vfxRenderer->update(dt);
         }
+        if (m_trailRenderer) {
+            m_trailRenderer->update(dt);
+        }
+        if (m_groundDecalRenderer) {
+            m_groundDecalRenderer->update(dt);
+        }
+        if (m_meshEffectRenderer) {
+            m_meshEffectRenderer->update(dt);
+        }
+        if (m_distortionRenderer) {
+            m_distortionRenderer->update(dt);
+        }
         if (m_abilitySystem) {
-            m_abilitySystem->update(m_scene.getRegistry(), dt);
+            m_abilitySystem->update(m_scene.getRegistry(), dt, m_trailRenderer.get());
+            
+            if (m_vfxQueue && m_trailRenderer && m_groundDecalRenderer && m_meshEffectRenderer &&
+                m_explosionRenderer && m_coneEffect && m_spriteEffectRenderer && m_distortionRenderer) 
+            {
+                m_abilitySystem->getSequencer().update(dt,
+                    *m_vfxQueue,
+                    *m_trailRenderer,
+                    *m_groundDecalRenderer,
+                    *m_meshEffectRenderer,
+                    *m_explosionRenderer,
+                    *m_coneEffect,
+                    *m_spriteEffectRenderer,
+                    *m_distortionRenderer);
+            }
         }
         if (m_projectileSystem && m_abilitySystem && m_vfxQueue) {
             m_projectileSystem->update(m_scene.getRegistry(), dt,
-                                       *m_vfxQueue, *m_abilitySystem);
+                                       *m_vfxQueue, *m_abilitySystem, m_trailRenderer.get());
             // Collect landing positions from lob projectiles → trigger explosion visuals
             if (m_explosionRenderer) {
                 for (const auto& pos : m_projectileSystem->getLandedPositions()) {
@@ -852,14 +952,14 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
         m_descriptors->updateLightBuffer(m_currentFrame, light);
     }
 
-    // ── Begin render pass ────────────────────────────────────────────────
+    // ── Begin HDR render pass ────────────────────────────────────────────────
     std::array<VkClearValue, 2> clears{};
     clears[0].color        = {{ 0.08f, 0.10f, 0.14f, 1.0f }};
     clears[1].depthStencil = { 1.0f, 0 };
 
     VkRenderPassBeginInfo rp{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
-    rp.renderPass       = m_pipeline->getRenderPass();
-    rp.framebuffer      = m_pipeline->getFramebuffer(imageIndex);
+    rp.renderPass       = m_hdrFB->renderPass();
+    rp.framebuffer      = m_hdrFB->framebuffer();
     rp.renderArea       = { {0, 0}, ext };
     rp.clearValueCount  = static_cast<uint32_t>(clears.size());
     rp.pClearValues     = clears.data();
@@ -965,6 +1065,14 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
             vkCmdDraw(cmd, 6, 1, 0, 0);
         }
 
+        // ── Ground decals (depth test ON, depth write OFF, alpha blend) ──────
+        if (m_groundDecalRenderer) {
+            float aspect = static_cast<float>(ext.width) / static_cast<float>(ext.height);
+            glm::mat4 vp = m_isoCam.getProjectionMatrix(aspect) * m_isoCam.getViewMatrix();
+            float appTime = static_cast<float>(glfwGetTime());
+            m_groundDecalRenderer->render(cmd, vp, appTime);
+        }
+
         // ── Click indicator ───────────────────────────────────────────────────
         if (m_clickAnim && m_clickIndicatorRenderer) {
             float t_norm = m_clickAnim->lifetime / m_clickAnim->maxLife;
@@ -975,14 +1083,44 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
         // ── Debug Renderer (Marquee Box) ──────────────────────────────────────
         glm::mat4 viewProj = m_isoCam.getProjectionMatrix(aspect) * m_isoCam.getViewMatrix();
         m_debugRenderer.render(cmd, viewProj);
+    }
+
+    vkCmdEndRenderPass(cmd);
+
+    // ── Transparent / VFX pass (LOAD_OP_LOAD) ─────────────────────────────
+    if (m_state != AppState::Launcher) {
+        // Copy scene color for distortion effects before rendering transparents over it
+        if (m_distortionRenderer) {
+            m_hdrFB->copyColor(cmd);
+        }
+
+        VkRenderPassBeginInfo loadRP{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
+        loadRP.renderPass  = m_hdrFB->loadRenderPass();
+        loadRP.framebuffer = m_hdrFB->framebuffer();
+        loadRP.renderArea  = { {0, 0}, ext };
+        vkCmdBeginRenderPass(cmd, &loadRP, VK_SUBPASS_CONTENTS_INLINE);
+
+        vkCmdSetViewport(cmd, 0, 1, &vp);
+        vkCmdSetScissor(cmd, 0, 1, &sc);
+
+        glm::mat4 viewProj = m_isoCam.getProjectionMatrix(aspect) * m_isoCam.getViewMatrix();
 
         // ── VFX particle render pass ──────────────────────────────────────────
         if (m_vfxRenderer) {
             const glm::mat4& view = m_isoCam.getViewMatrix();
-            // Extract camera right and up from the view matrix rows
             glm::vec3 camRight{view[0][0], view[1][0], view[2][0]};
             glm::vec3 camUp   {view[0][1], view[1][1], view[2][1]};
-            m_vfxRenderer->render(cmd, viewProj, camRight, camUp);
+            glm::vec2 screenSize(static_cast<float>(ext.width), static_cast<float>(ext.height));
+            m_vfxRenderer->render(cmd, viewProj, camRight, camUp, 
+                                  screenSize, m_isoCam.getNear(), m_isoCam.getFar());
+        }
+
+        // ── Trail ribbon render pass ──────────────────────────────────────────
+        if (m_trailRenderer) {
+            const glm::mat4& view = m_isoCam.getViewMatrix();
+            glm::vec3 camRight{view[0][0], view[1][0], view[2][0]};
+            glm::vec3 camUp   {view[0][1], view[1][1], view[2][1]};
+            m_trailRenderer->render(cmd, viewProj, camRight, camUp);
         }
 
         // ── Glass shield bubble ───────────────────────────────────────────────
@@ -996,7 +1134,6 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
                     float fadeIn   = std::min(elapsed / 0.25f, 1.0f);
                     float fadeOut  = std::min(combat.stateTimer / 0.25f, 1.0f);
                     float alpha    = fadeIn * fadeOut;
-                    // Center at half character world-height (~5 units at scale 0.05 with armature transform)
                     glm::vec3 center    = t.position + glm::vec3(0.0f, 2.5f, 0.0f);
                     glm::vec3 cameraPos = m_isoCam.getPosition();
                     float appTime = static_cast<float>(glfwGetTime());
@@ -1023,17 +1160,48 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
             m_explosionRenderer->render(cmd, viewProj, camPos, appTime);
         }
 
+        if (m_meshEffectRenderer) {
+            float appTime = static_cast<float>(glfwGetTime());
+            m_meshEffectRenderer->render(cmd, viewProj, appTime);
+        }
+
         // ── Sprite-atlas VFX effects (W cone, E explosion) ────────────────────
         if (m_spriteEffectRenderer) {
             glm::vec3 camPos = m_isoCam.getPosition();
             m_spriteEffectRenderer->render(cmd, viewProj, camPos);
         }
+
+        // ── Distortion pass (rendered on top of transparents) ──────────────────
+        if (m_distortionRenderer) {
+            float appTime = static_cast<float>(glfwGetTime());
+            m_distortionRenderer->render(cmd, viewProj, appTime, ext.width, ext.height);
+        }
+
+        vkCmdEndRenderPass(cmd);
     }
+
+    // ═══════════ PHASE 3: BLOOM (outside render pass) ═══════════
+    m_bloom->dispatch(cmd);
+
+    // ═══════════ PHASE 4: TONE-MAP TO SWAPCHAIN ═══════════
+    VkRenderPassBeginInfo swapRP{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
+    swapRP.renderPass  = m_swapchainRenderPass;
+    swapRP.framebuffer = m_swapchainFramebuffers[imageIndex];
+    swapRP.renderArea  = { {0, 0}, ext };
+    std::array<VkClearValue, 1> swapClears{};
+    swapClears[0].color = {{ 0.0f, 0.0f, 0.0f, 1.0f }};
+    swapRP.clearValueCount = static_cast<uint32_t>(swapClears.size());
+    swapRP.pClearValues = swapClears.data();
+
+    vkCmdBeginRenderPass(cmd, &swapRP, VK_SUBPASS_CONTENTS_INLINE);
+
+    m_toneMap->render(cmd, /*exposure=*/1.0f, /*bloomStrength=*/0.3f);
 
     // ── ImGui render draw data (last thing inside render pass) ────────────
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
 
     vkCmdEndRenderPass(cmd);
+
     VK_CHECK(vkEndCommandBuffer(cmd), "End command buffer");
 }
 
@@ -1414,7 +1582,14 @@ void Renderer::recreateSwapchain() {
     }
     vkDeviceWaitIdle(m_device->getDevice());
     m_swapchain->recreate(extent);
-    m_pipeline->recreateFramebuffers(*m_swapchain);
+    m_pipeline->recreateFramebuffers(*m_swapchain); // note: m_ownsRenderPass is false, so this returns early
+    m_hdrFB->recreate(extent.width, extent.height);
+    m_bloom->recreate(m_hdrFB->colorView(), extent.width, extent.height);
+    m_vfxRenderer->setDepthBuffer(m_hdrFB->depthView(), m_hdrFB->sampler());
+    m_distortionRenderer->updateDescriptorSet(m_hdrFB->colorCopyView());
+    destroySwapchainFramebuffers();
+    createSwapchainFramebuffers();
+    m_toneMap->updateDescriptorSets(m_hdrFB->colorView(), m_bloom->bloomResultView());
     m_sync->recreateRenderFinishedSemaphores(m_swapchain->getImageCount());
     spdlog::info("Swapchain recreated ({}×{})", extent.width, extent.height);
 }
@@ -1699,30 +1874,124 @@ void Renderer::destroySkinnedPipeline() {
     if (m_skinnedPipelineLayout) { vkDestroyPipelineLayout(dev, m_skinnedPipelineLayout, nullptr); m_skinnedPipelineLayout = VK_NULL_HANDLE; }
 }
 
+void Renderer::createSwapchainRenderPass() {
+    VkAttachmentDescription colorAttachment{};
+    colorAttachment.format         = m_swapchain->getImageFormat();
+    colorAttachment.samples        = VK_SAMPLE_COUNT_1_BIT;
+    colorAttachment.loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachment.storeOp        = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachment.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    colorAttachment.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
+    colorAttachment.finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+    VkAttachmentReference colorRef{};
+    colorRef.attachment = 0;
+    colorRef.layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkSubpassDescription subpass{};
+    subpass.pipelineBindPoint    = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments    = &colorRef;
+
+    VkSubpassDependency dependency{};
+    dependency.srcSubpass    = VK_SUBPASS_EXTERNAL;
+    dependency.dstSubpass    = 0;
+    dependency.srcStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.srcAccessMask = 0;
+    dependency.dstStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+    VkRenderPassCreateInfo ci{};
+    ci.sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    ci.attachmentCount = 1;
+    ci.pAttachments    = &colorAttachment;
+    ci.subpassCount    = 1;
+    ci.pSubpasses      = &subpass;
+    ci.dependencyCount = 1;
+    ci.pDependencies   = &dependency;
+
+    VK_CHECK(vkCreateRenderPass(m_device->getDevice(), &ci, nullptr, &m_swapchainRenderPass),
+             "Failed to create swapchain render pass");
+}
+
+void Renderer::destroySwapchainRenderPass() {
+    if (m_swapchainRenderPass) {
+        vkDestroyRenderPass(m_device->getDevice(), m_swapchainRenderPass, nullptr);
+        m_swapchainRenderPass = VK_NULL_HANDLE;
+    }
+}
+
+void Renderer::createSwapchainFramebuffers() {
+    const auto& views = m_swapchain->getImageViews();
+    m_swapchainFramebuffers.resize(views.size());
+
+    for (size_t i = 0; i < views.size(); ++i) {
+        VkFramebufferCreateInfo ci{};
+        ci.sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        ci.renderPass      = m_swapchainRenderPass;
+        ci.attachmentCount = 1;
+        ci.pAttachments    = &views[i];
+        ci.width           = m_swapchain->getExtent().width;
+        ci.height          = m_swapchain->getExtent().height;
+        ci.layers          = 1;
+
+        VK_CHECK(vkCreateFramebuffer(m_device->getDevice(), &ci, nullptr, &m_swapchainFramebuffers[i]),
+                 "Failed to create swapchain framebuffer");
+    }
+}
+
+void Renderer::destroySwapchainFramebuffers() {
+    for (auto fb : m_swapchainFramebuffers) {
+        vkDestroyFramebuffer(m_device->getDevice(), fb, nullptr);
+    }
+    m_swapchainFramebuffers.clear();
+}
+
 void Renderer::drawLauncherUI() {
-    auto ext = m_swapchain->getExtent();
-    ImGui::SetNextWindowPos(ImVec2(0, 0));
-    ImGui::SetNextWindowSize(ImVec2(static_cast<float>(ext.width), static_cast<float>(ext.height)));
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(viewport->WorkPos);
+    ImGui::SetNextWindowSize(viewport->WorkSize);
     
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings;
     
+    // Add a dark background
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.1f, 0.1f, 0.12f, 1.0f));
+    
     if (ImGui::Begin("Launcher", nullptr, window_flags)) {
-        // Center the content
         float window_width = ImGui::GetWindowWidth();
         float window_height = ImGui::GetWindowHeight();
         
-        ImGui::SetCursorPos(ImVec2(window_width * 0.5f - 100, window_height * 0.5f - 50));
+        // Centered Logo/Title
+        ImGui::SetCursorPosY(window_height * 0.3f);
+        const char* title = "GLORY ENGINE";
+        float title_width = ImGui::CalcTextSize(title).x;
+        ImGui::SetCursorPosX((window_width - title_width) * 0.5f);
+        ImGui::Text("%s", title);
+
+        ImGui::SetCursorPosY(window_height * 0.35f);
+        const char* sub = "Alpha Client";
+        float sub_width = ImGui::CalcTextSize(sub).x;
+        ImGui::SetCursorPosX((window_width - sub_width) * 0.5f);
+        ImGui::TextDisabled("%s", sub);
+
+        // Centered Button
+        ImVec2 btn_size(240, 80);
+        ImGui::SetCursorPos(ImVec2((window_width - btn_size.x) * 0.5f, (window_height - btn_size.y) * 0.5f));
         
-        if (ImGui::Button("Launch Test Mode", ImVec2(200, 100))) {
+        if (ImGui::Button("LAUNCH TEST MODE", btn_size)) {
             m_state = AppState::TestMode;
             spdlog::info("Transitioning to Test Mode");
         }
         
-        ImGui::SetCursorPosX(window_width * 0.5f - 150);
-        ImGui::SetCursorPosY(window_height * 0.5f + 60);
-        ImGui::Text("Glory Engine - Alpha Client");
+        // Footer
+        const char* footer = "Press TAB in-game for Debug Tools";
+        float footer_width = ImGui::CalcTextSize(footer).x;
+        ImGui::SetCursorPos(ImVec2((window_width - footer_width) * 0.5f, window_height - 40));
+        ImGui::TextDisabled("%s", footer);
     }
     ImGui::End();
+    ImGui::PopStyleColor();
 }
 
 } // namespace glory

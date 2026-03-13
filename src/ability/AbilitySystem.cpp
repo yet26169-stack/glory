@@ -1,5 +1,6 @@
 #include "ability/AbilitySystem.h"
 #include "scene/Components.h"  // TransformComponent
+#include "vfx/TrailRenderer.h"
 
 #include <spdlog/spdlog.h>
 
@@ -95,20 +96,22 @@ void AbilitySystem::enqueueRequest(entt::entity caster, AbilitySlot slot,
     m_requests.push({caster, slot, target});
 }
 
-// ── update ────────────────────────────────────────────────────────────────────
-void AbilitySystem::update(entt::registry& registry, float dt) {
-    // 1. Process incoming requests
+// ── update ──────────────────────────────────────────────────────────────────
+void AbilitySystem::update(entt::registry& registry, float dt, TrailRenderer* trailRenderer) {
+    // 1. Flush incoming requests
     while (!m_requests.empty()) {
         processRequest(registry, m_requests.front());
         m_requests.pop();
     }
 
-    // 2. Tick all ability state machines
+    // 2. Tick all active abilities
     auto view = registry.view<AbilityBookComponent>();
     for (auto entity : view) {
         auto& book = view.get<AbilityBookComponent>(entity);
         for (auto& inst : book.abilities) {
-            if (inst.def) tickAbility(registry, entity, inst, dt);
+            if (inst.level > 0) {
+                tickAbility(registry, entity, inst, dt, trailRenderer);
+            }
         }
     }
 
@@ -162,7 +165,12 @@ void AbilitySystem::processRequest(entt::registry& reg, const AbilityRequest& re
     inst.phaseTimer    = inst.def->castTime;
 
     // Emit cast VFX
-    if (!inst.def->castVFX.empty()) {
+    if (!inst.def->compositeCastVFX.empty()) {
+        glm::vec3 pos{0.f};
+        if (reg.all_of<TransformComponent>(req.casterEntity))
+            pos = reg.get<TransformComponent>(req.casterEntity).position;
+        m_compositeSequencer.trigger(inst.def->compositeCastVFX, pos, req.target.targetPosition, req.target.direction);
+    } else if (!inst.def->castVFX.empty()) {
         glm::vec3 pos{0.f};
         if (reg.all_of<TransformComponent>(req.casterEntity))
             pos = reg.get<TransformComponent>(req.casterEntity).position;
@@ -198,7 +206,7 @@ bool AbilitySystem::validateRequest(entt::registry& reg, const AbilityRequest& r
 
 // ── tickAbility ───────────────────────────────────────────────────────────────
 void AbilitySystem::tickAbility(entt::registry& reg, entt::entity entity,
-                                  AbilityInstance& inst, float dt) {
+                                  AbilityInstance& inst, float dt, TrailRenderer* trailRenderer) {
     switch (inst.currentPhase) {
         case AbilityPhase::READY: break;
 
@@ -212,7 +220,7 @@ void AbilitySystem::tickAbility(entt::registry& reg, entt::entity entity,
                 } else {
                     // → EXECUTING (instant)
                     inst.currentPhase = AbilityPhase::EXECUTING;
-                    executeAbility(reg, entity, inst);
+                    executeAbility(reg, entity, inst, trailRenderer);
                 }
             }
             break;
@@ -221,7 +229,7 @@ void AbilitySystem::tickAbility(entt::registry& reg, entt::entity entity,
             inst.phaseTimer -= dt;
             if (inst.phaseTimer <= 0.0f) {
                 inst.currentPhase = AbilityPhase::EXECUTING;
-                executeAbility(reg, entity, inst);
+                executeAbility(reg, entity, inst, trailRenderer);
             }
             break;
 
@@ -265,7 +273,7 @@ void AbilitySystem::tickAbility(entt::registry& reg, entt::entity entity,
 
 // ── executeAbility ────────────────────────────────────────────────────────────
 void AbilitySystem::executeAbility(entt::registry& reg, entt::entity caster,
-                                    AbilityInstance& inst) {
+                                    AbilityInstance& inst, TrailRenderer* trailRenderer) {
     const AbilityDefinition& def    = *inst.def;
     const TargetInfo&        target = inst.currentTarget;
 
@@ -274,9 +282,9 @@ void AbilitySystem::executeAbility(entt::registry& reg, entt::entity caster,
         casterPos = reg.get<TransformComponent>(caster).position;
 
     if (def.targeting == TargetingType::SKILLSHOT && !def.projectileVFX.empty()) {
-        spawnProjectile(reg, caster, def, target);
+        spawnProjectile(reg, caster, def, target, trailRenderer);
     } else if (def.targeting == TargetingType::POINT && def.projectile.isLob) {
-        spawnLobProjectile(reg, caster, def, target);
+        spawnLobProjectile(reg, caster, def, target, trailRenderer);
     } else {
         resolveInstantEffects(reg, caster, def, target);
     }
@@ -293,7 +301,8 @@ void AbilitySystem::executeAbility(entt::registry& reg, entt::entity caster,
 // ── spawnProjectile ────────────────────────────────────────────────────────────
 void AbilitySystem::spawnProjectile(entt::registry& reg, entt::entity caster,
                                      const AbilityDefinition& def,
-                                     const TargetInfo& target) {
+                                     const TargetInfo& target,
+                                     TrailRenderer* trailRenderer) {
     glm::vec3 origin{0.f};
     if (reg.all_of<TransformComponent>(caster))
         origin = reg.get<TransformComponent>(caster).position;
@@ -327,12 +336,17 @@ void AbilitySystem::spawnProjectile(entt::registry& reg, entt::entity caster,
             emitVFX(def.projectileVFX[i], vfxOrigin, dir, 1.0f, -1.0f, h);
         }
     }
+
+    if (!def.projectileTrailDef.empty() && trailRenderer) {
+        pc.trailHandle = trailRenderer->spawn(def.projectileTrailDef, origin + glm::vec3(0.f, 0.5f, 0.f));
+    }
 }
 
 // ── spawnLobProjectile ─────────────────────────────────────────────────────────
 void AbilitySystem::spawnLobProjectile(entt::registry& reg, entt::entity caster,
                                         const AbilityDefinition& def,
-                                        const TargetInfo& target) {
+                                        const TargetInfo& target,
+                                        TrailRenderer* trailRenderer) {
     glm::vec3 origin{0.f};
     if (reg.all_of<TransformComponent>(caster))
         origin = reg.get<TransformComponent>(caster).position;
@@ -368,6 +382,10 @@ void AbilitySystem::spawnLobProjectile(entt::registry& reg, entt::entity caster,
                     glm::normalize(landPos - spawnPos + glm::vec3(0.f, 0.01f, 0.f)),
                     1.0f, -1.0f, h);
         }
+    }
+
+    if (!def.projectileTrailDef.empty() && trailRenderer) {
+        pc.trailHandle = trailRenderer->spawn(def.projectileTrailDef, spawnPos);
     }
 }
 
@@ -493,6 +511,17 @@ void AbilitySystem::resolveHit(entt::registry& reg, entt::entity caster,
                                 const AbilityDefinition& def,
                                 const TargetInfo& target) {
     resolveInstantEffects(reg, caster, def, target);
+
+    if (!def.compositeImpactVFX.empty()) {
+        glm::vec3 casterPos{0.f};
+        if (reg.all_of<TransformComponent>(caster))
+            casterPos = reg.get<TransformComponent>(caster).position;
+        m_compositeSequencer.trigger(def.compositeImpactVFX, casterPos, target.targetPosition, target.direction);
+    } else {
+        for (const auto& impactID : def.impactVFX) {
+            emitVFX(impactID, target.targetPosition, target.direction);
+        }
+    }
 }
 
 // ── JSON parsing ──────────────────────────────────────────────────────────────
@@ -584,6 +613,10 @@ AbilityDefinition AbilitySystem::parseJSON(const nlohmann::json& j,
     if (j.contains("castVFX"))       def.castVFX       = parseVFX(j["castVFX"]);
     if (j.contains("projectileVFX")) def.projectileVFX = parseVFX(j["projectileVFX"]);
     if (j.contains("impactVFX"))     def.impactVFX     = parseVFX(j["impactVFX"]);
+
+    def.projectileTrailDef = j.value("projectileTrailDef", "");
+    def.compositeCastVFX   = j.value("compositeCastVFX", "");
+    def.compositeImpactVFX = j.value("compositeImpactVFX", "");
 
     def.castSFX       = j.value("castSFX",       "");
     def.impactSFX     = j.value("impactSFX",     "");

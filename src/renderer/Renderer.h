@@ -6,6 +6,8 @@
 #include "camera/Camera.h"
 #include "renderer/Buffer.h"
 #include "renderer/ClickIndicatorRenderer.h"
+#include "renderer/GroundDecalRenderer.h"
+#include "renderer/DistortionRenderer.h"
 #include "renderer/ShieldBubbleRenderer.h"
 #include "renderer/ConeAbilityRenderer.h"
 #include "renderer/ExplosionRenderer.h"
@@ -15,6 +17,9 @@
 #include "renderer/Device.h"
 #include "renderer/Pipeline.h"
 #include "renderer/Swapchain.h"
+#include "renderer/HDRFramebuffer.h"
+#include "renderer/BloomPass.h"
+#include "renderer/ToneMapPass.h"
 #include "renderer/Sync.h"
 #include "renderer/Texture.h"
 #include "input/InputManager.h"
@@ -22,6 +27,8 @@
 #include "terrain/IsometricCamera.h"
 #include "nav/DebugRenderer.h"
 #include "vfx/VFXRenderer.h"
+#include "vfx/TrailRenderer.h"
+#include "vfx/MeshEffectRenderer.h"
 #include "vfx/VFXEventQueue.h"
 #include "ability/AbilitySystem.h"
 #include "ability/ProjectileSystem.h"
@@ -58,10 +65,15 @@ private:
     std::unique_ptr<Sync>        m_sync;
     std::unique_ptr<Descriptors> m_descriptors;
     std::unique_ptr<Pipeline>    m_pipeline;   // forward pass, owns renderpass + FBs
+    std::unique_ptr<HDRFramebuffer> m_hdrFB;
+    std::unique_ptr<BloomPass>      m_bloom;
+    std::unique_ptr<ToneMapPass>    m_toneMap;
     DebugRenderer                m_debugRenderer;
 
     // ── Rendering extras ──────────────────────────────────────────────────
     std::unique_ptr<ClickIndicatorRenderer> m_clickIndicatorRenderer;
+    std::unique_ptr<GroundDecalRenderer>    m_groundDecalRenderer;
+    std::unique_ptr<DistortionRenderer>     m_distortionRenderer;
     std::unique_ptr<ShieldBubbleRenderer>   m_shieldBubble;
     std::unique_ptr<ConeAbilityRenderer>    m_coneEffect;
     std::unique_ptr<ExplosionRenderer>      m_explosionRenderer;
@@ -82,6 +94,8 @@ private:
     std::unique_ptr<VFXEventQueue> m_vfxQueue;        // SPSC bridge game→render (AbilitySystem)
     std::unique_ptr<VFXEventQueue> m_combatVfxQueue;  // SPSC bridge CombatSystem→render
     std::unique_ptr<VFXRenderer>   m_vfxRenderer;     // GPU particle pipeline
+    std::unique_ptr<TrailRenderer> m_trailRenderer;   // connected ribbon trails
+    std::unique_ptr<MeshEffectRenderer> m_meshEffectRenderer; // geometric mesh VFX
     std::unique_ptr<AbilitySystem> m_abilitySystem;   // ability state machine
     std::unique_ptr<ProjectileSystem> m_projectileSystem; // moves projectile entities
     std::unique_ptr<CombatSystem>  m_combatSystem;    // auto-attack / shield / trick
@@ -133,6 +147,9 @@ private:
     VkPipelineLayout m_skinnedPipelineLayout = VK_NULL_HANDLE;
     VkPipeline       m_skinnedPipeline       = VK_NULL_HANDLE;
 
+    VkRenderPass               m_swapchainRenderPass = VK_NULL_HANDLE;
+    std::vector<VkFramebuffer> m_swapchainFramebuffers;
+
     // ── ImGui ─────────────────────────────────────────────────────────────
     VkDescriptorPool m_imguiPool = VK_NULL_HANDLE;
 
@@ -146,6 +163,10 @@ private:
     void destroyGridPipeline();
     void createSkinnedPipeline();
     void destroySkinnedPipeline();
+    void createSwapchainRenderPass();
+    void createSwapchainFramebuffers();
+    void destroySwapchainRenderPass();
+    void destroySwapchainFramebuffers();
     glm::vec3 screenToWorld(float mx, float my) const; // unproject to Y=0 plane
     glm::vec2 worldToScreen(const glm::vec3& worldPos) const; // project world to screen pixels
 

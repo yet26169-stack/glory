@@ -334,6 +334,7 @@ void ConeAbilityRenderer::render(VkCommandBuffer  cmd,
     pc.range        = range;
     pc.alpha        = alpha;
     pc.elapsed      = elapsed;
+    pc.phase        = 0.0f;
 
     const VkDeviceSize zero = 0;
     VkBuffer           vb   = m_coneVB.getBuffer();
@@ -356,19 +357,21 @@ void ConeAbilityRenderer::render(VkCommandBuffer  cmd,
         0, sizeof(ConePC), &pc);
     vkCmdDrawIndexed(cmd, m_coneIndexCount, 1, 0, 0, 0);
 
-    // ── Pass 3: Lightning arcs ────────────────────────────────────────────────
+    // Pass 3: Lightning arcs ────────────────────────────────────────────────
     VkBuffer lvb = m_lightningVB.getBuffer();
     if (lvb != VK_NULL_HANDLE) {
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_lightningPipeline);
-        vkCmdPushConstants(cmd, m_layout,
-            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-            0, sizeof(ConePC), &pc);
         vkCmdBindVertexBuffers(cmd, 0, 1, &lvb, &zero);
         // Each bolt is an independent line strip
         for (int b = 0; b < N_BOLTS; ++b) {
+            pc.phase = float(b) * 2.39996f; // golden-ratio offset
+            vkCmdPushConstants(cmd, m_layout,
+                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                0, sizeof(ConePC), &pc);
             vkCmdDraw(cmd, N_BOLT_SEGS, 1, uint32_t(b * N_BOLT_SEGS), 0);
         }
     }
+
 }
 
 // ── destroy ───────────────────────────────────────────────────────────────────

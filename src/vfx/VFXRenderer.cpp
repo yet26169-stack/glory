@@ -19,6 +19,7 @@ VFXRenderer::VFXRenderer(const Device& device, VkRenderPass renderPass)
 {
     createDescriptorLayoutAndPool();
     createComputePipeline();
+    createCompactPipeline();
     createRenderPipeline(renderPass);
 
     // Default white-pixel atlas (fallback for effects without a texture)
@@ -34,14 +35,21 @@ VFXRenderer::~VFXRenderer() {
     VkDevice dev = m_device.getDevice();
 
     m_effects.clear();   // destroy ParticleSystems before releasing the pool
+    m_graveyard.clear();
 
     m_atlasCache.clear();
     m_defaultAtlas = Texture{};
 
-    if (m_renderPipeline  != VK_NULL_HANDLE)
-        vkDestroyPipeline(dev, m_renderPipeline,  nullptr);
+    if (m_alphaPipeline  != VK_NULL_HANDLE)
+        vkDestroyPipeline(dev, m_alphaPipeline,  nullptr);
+    if (m_additivePipeline != VK_NULL_HANDLE)
+        vkDestroyPipeline(dev, m_additivePipeline, nullptr);
     if (m_renderLayout    != VK_NULL_HANDLE)
         vkDestroyPipelineLayout(dev, m_renderLayout, nullptr);
+    if (m_compactPipeline != VK_NULL_HANDLE)
+        vkDestroyPipeline(dev, m_compactPipeline, nullptr);
+    if (m_compactLayout   != VK_NULL_HANDLE)
+        vkDestroyPipelineLayout(dev, m_compactLayout, nullptr);
     if (m_computePipeline != VK_NULL_HANDLE)
         vkDestroyPipeline(dev, m_computePipeline, nullptr);
     if (m_computeLayout   != VK_NULL_HANDLE)
@@ -59,7 +67,9 @@ void VFXRenderer::createDescriptorLayoutAndPool() {
     // binding 0: SSBO (particle buffer) — compute writes, vertex reads
     // binding 1: combined image sampler (particle atlas) — fragment reads
     // binding 2: UBO (emitter parameters) — compute/vertex reads
-    VkDescriptorSetLayoutBinding bindings[3]{};
+    // binding 3: depth buffer — fragment reads (soft particles)
+    // binding 4: indirect buffer — compute writes (compaction)
+    VkDescriptorSetLayoutBinding bindings[5]{};
 
     bindings[0].binding         = 0;
     bindings[0].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -76,25 +86,39 @@ void VFXRenderer::createDescriptorLayoutAndPool() {
     bindings[2].descriptorCount = 1;
     bindings[2].stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT;
 
+    bindings[3].binding         = 3;
+    bindings[3].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[3].descriptorCount = 1;
+    bindings[3].stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    bindings[4].binding         = 4;
+    bindings[4].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    bindings[4].descriptorCount = 1;
+    bindings[4].stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT;
+
     VkDescriptorSetLayoutCreateInfo layoutCI{};
     layoutCI.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutCI.bindingCount = 3;
+    layoutCI.bindingCount = 5;
     layoutCI.pBindings    = bindings;
     vkCreateDescriptorSetLayout(dev, &layoutCI, nullptr, &m_descLayout);
 
     // Pool — allocate one set per possible concurrent emitter
-    VkDescriptorPoolSize poolSizes[3]{};
+    VkDescriptorPoolSize poolSizes[5]{};
     poolSizes[0].type            = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     poolSizes[0].descriptorCount = MAX_CONCURRENT_EMITTERS;
     poolSizes[1].type            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     poolSizes[1].descriptorCount = MAX_CONCURRENT_EMITTERS;
     poolSizes[2].type            = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[2].descriptorCount = MAX_CONCURRENT_EMITTERS;
+    poolSizes[3].type            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizes[3].descriptorCount = MAX_CONCURRENT_EMITTERS;
+    poolSizes[4].type            = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    poolSizes[4].descriptorCount = MAX_CONCURRENT_EMITTERS;
 
     VkDescriptorPoolCreateInfo poolCI{};
     poolCI.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolCI.maxSets       = MAX_CONCURRENT_EMITTERS;
-    poolCI.poolSizeCount = 3;
+    poolCI.poolSizeCount = 5;
     poolCI.pPoolSizes    = poolSizes;
     // Allow individual free (needed when effects are destroyed out-of-order)
     poolCI.flags         = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
@@ -133,12 +157,43 @@ void VFXRenderer::createComputePipeline() {
     vkDestroyShaderModule(dev, mod, nullptr);
 }
 
+void VFXRenderer::createCompactPipeline() {
+    VkDevice dev = m_device.getDevice();
+
+    VkPushConstantRange pcRange{};
+    pcRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    pcRange.offset     = 0;
+    pcRange.size       = sizeof(CompactPC);
+
+    VkPipelineLayoutCreateInfo layoutCI{};
+    layoutCI.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    layoutCI.setLayoutCount         = 1;
+    layoutCI.pSetLayouts            = &m_descLayout;
+    layoutCI.pushConstantRangeCount = 1;
+    layoutCI.pPushConstantRanges    = &pcRange;
+    vkCreatePipelineLayout(dev, &layoutCI, nullptr, &m_compactLayout);
+
+    auto code = readSPV(std::string(SHADER_DIR) + "particle_compact.comp.spv");
+    VkShaderModule mod = createShaderModule(code);
+
+    VkComputePipelineCreateInfo pipeCI{};
+    pipeCI.sType        = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    pipeCI.layout       = m_compactLayout;
+    pipeCI.stage.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    pipeCI.stage.stage  = VK_SHADER_STAGE_COMPUTE_BIT;
+    pipeCI.stage.module = mod;
+    pipeCI.stage.pName  = "main";
+
+    vkCreateComputePipelines(dev, VK_NULL_HANDLE, 1, &pipeCI, nullptr, &m_compactPipeline);
+    vkDestroyShaderModule(dev, mod, nullptr);
+}
+
 // ── createRenderPipeline ──────────────────────────────────────────────────────
 void VFXRenderer::createRenderPipeline(VkRenderPass renderPass) {
     VkDevice dev = m_device.getDevice();
 
     VkPushConstantRange pcRange{};
-    pcRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    pcRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     pcRange.offset     = 0;
     pcRange.size       = sizeof(RenderPC);
 
@@ -197,20 +252,20 @@ void VFXRenderer::createRenderPipeline(VkRenderPass renderPass) {
     ds.depthCompareOp   = VK_COMPARE_OP_LESS_OR_EQUAL;
 
     // Standard alpha blending: src_alpha * src + (1 - src_alpha) * dst
-    VkPipelineColorBlendAttachmentState cbA{};
-    cbA.blendEnable         = VK_TRUE;
-    cbA.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-    cbA.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-    cbA.colorBlendOp        = VK_BLEND_OP_ADD;
-    cbA.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-    cbA.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-    cbA.alphaBlendOp        = VK_BLEND_OP_ADD;
-    cbA.colorWriteMask      = 0xF;
+    VkPipelineColorBlendAttachmentState cbA_alpha{};
+    cbA_alpha.blendEnable         = VK_TRUE;
+    cbA_alpha.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+    cbA_alpha.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    cbA_alpha.colorBlendOp        = VK_BLEND_OP_ADD;
+    cbA_alpha.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+    cbA_alpha.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+    cbA_alpha.alphaBlendOp        = VK_BLEND_OP_ADD;
+    cbA_alpha.colorWriteMask      = 0xF;
 
-    VkPipelineColorBlendStateCreateInfo cb{};
-    cb.sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    cb.attachmentCount = 1;
-    cb.pAttachments    = &cbA;
+    VkPipelineColorBlendStateCreateInfo cb_alpha{};
+    cb_alpha.sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    cb_alpha.attachmentCount = 1;
+    cb_alpha.pAttachments    = &cbA_alpha;
 
     VkDynamicState dyns[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
     VkPipelineDynamicStateCreateInfo dy{};
@@ -228,13 +283,23 @@ void VFXRenderer::createRenderPipeline(VkRenderPass renderPass) {
     gpCI.pRasterizationState = &rs;
     gpCI.pMultisampleState   = &ms;
     gpCI.pDepthStencilState  = &ds;
-    gpCI.pColorBlendState    = &cb;
+    gpCI.pColorBlendState    = &cb_alpha;
     gpCI.pDynamicState       = &dy;
     gpCI.layout              = m_renderLayout;
     gpCI.renderPass          = renderPass;
     gpCI.subpass             = 0;
 
-    vkCreateGraphicsPipelines(dev, VK_NULL_HANDLE, 1, &gpCI, nullptr, &m_renderPipeline);
+    vkCreateGraphicsPipelines(dev, VK_NULL_HANDLE, 1, &gpCI, nullptr, &m_alphaPipeline);
+
+    // Additive blending: src_alpha * src + 1 * dst
+    VkPipelineColorBlendAttachmentState cbA_additive = cbA_alpha;
+    cbA_additive.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+    
+    VkPipelineColorBlendStateCreateInfo cb_additive = cb_alpha;
+    cb_additive.pAttachments = &cbA_additive;
+    
+    gpCI.pColorBlendState = &cb_additive;
+    vkCreateGraphicsPipelines(dev, VK_NULL_HANDLE, 1, &gpCI, nullptr, &m_additivePipeline);
 
     vkDestroyShaderModule(dev, fMod, nullptr);
     vkDestroyShaderModule(dev, vMod, nullptr);
@@ -254,19 +319,20 @@ void VFXRenderer::processQueue(VFXEventQueue& queue) {
 
 // ── update ────────────────────────────────────────────────────────────────────
 void VFXRenderer::update(float dt) {
+    m_currentDt = dt;
     ++m_frameCount;
 
-    for (auto& ps : m_effects) ps.update(dt);
+    for (auto& ps : m_effects) ps->update(dt);
 
     // Move dead effects to graveyard — DO NOT destroy immediately.
-    // The GPU may still be reading the SSBO in an in-flight command buffer.
-    // We wait GRAVEYARD_DELAY frames before actually destroying them.
-    {
-        auto deadStart = std::partition(m_effects.begin(), m_effects.end(),
-                                        [](const ParticleSystem& ps){ return ps.isAlive(); });
-        for (auto it = deadStart; it != m_effects.end(); ++it)
+    auto it = m_effects.begin();
+    while (it != m_effects.end()) {
+        if (!(*it)->isAlive() || (*it)->handle() == 0) {
             m_graveyard.push_back({ m_frameCount + GRAVEYARD_DELAY, std::move(*it) });
-        m_effects.erase(deadStart, m_effects.end());
+            it = m_effects.erase(it);
+        } else {
+            ++it;
+        }
     }
 
     // Flush graveyard: only destroy entries whose GPU-safe frame has passed
@@ -280,23 +346,56 @@ void VFXRenderer::update(float dt) {
 void VFXRenderer::dispatchCompute(VkCommandBuffer cmd) {
     if (m_effects.empty()) return;
 
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_computePipeline);
-
     for (auto& ps : m_effects) {
-        VkDescriptorSet ds = ps.descSet();
+        // 1. Clear indirect buffer (vertexCount = 0, instanceCount = 1, others 0)
+        VkDrawIndirectCommand clearCmd{};
+        clearCmd.instanceCount = 1;
+        vkCmdUpdateBuffer(cmd, ps->indirectBuffer(), 0, sizeof(VkDrawIndirectCommand), &clearCmd);
+    }
+
+    // Barrier to ensure updateBuffer finishes before compute
+    VkMemoryBarrier barrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &barrier, 0, nullptr, 0, nullptr);
+
+    // 2. Simulation pass
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_computePipeline);
+    for (auto& ps : m_effects) {
+        VkDescriptorSet ds = ps->descSet();
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
                                 m_computeLayout, 0, 1, &ds, 0, nullptr);
 
         SimPC pc{};
-        pc.dt       = 1.0f / 60.0f; // will be overridden; VFXRenderer stores dt from update
+        pc.dt       = m_currentDt; 
         pc.gravity  = 4.0f;
-        pc.count    = ps.maxParticles();
+        pc.count    = ps->maxParticles();
         pc._pad     = 0.f;
 
         vkCmdPushConstants(cmd, m_computeLayout, VK_SHADER_STAGE_COMPUTE_BIT,
                            0, sizeof(SimPC), &pc);
 
-        const uint32_t groups = (ps.maxParticles() + 63) / 64;
+        const uint32_t groups = (ps->maxParticles() + 63) / 64;
+        vkCmdDispatch(cmd, groups, 1, 1);
+    }
+
+    // Barrier between simulation and compaction
+    barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 1, &barrier, 0, nullptr, 0, nullptr);
+
+    // 3. Compaction pass
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_compactPipeline);
+    for (auto& ps : m_effects) {
+        VkDescriptorSet ds = ps->descSet();
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
+                                m_compactLayout, 0, 1, &ds, 0, nullptr);
+
+        CompactPC cpc;
+        cpc.totalCount = ps->maxParticles();
+        vkCmdPushConstants(cmd, m_compactLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(CompactPC), &cpc);
+
+        const uint32_t groups = (ps->maxParticles() + 63) / 64;
         vkCmdDispatch(cmd, groups, 1, 1);
     }
 }
@@ -325,27 +424,59 @@ void VFXRenderer::barrierComputeToGraphics(VkCommandBuffer cmd) {
 void VFXRenderer::render(VkCommandBuffer cmd,
                           const glm::mat4& viewProj,
                           const glm::vec3& camRight,
-                          const glm::vec3& camUp)
+                          const glm::vec3& camUp,
+                          glm::vec2 screenSize,
+                          float nearPlane,
+                          float farPlane)
 {
     if (m_effects.empty()) return;
 
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_renderPipeline);
-
     RenderPC pc{};
-    pc.viewProj = viewProj;
-    pc.camRight = glm::vec4(camRight, 0.0f);
-    pc.camUp    = glm::vec4(camUp,    0.0f);
+    pc.viewProj   = viewProj;
+    pc.camRight   = glm::vec4(camRight, 0.0f);
+    pc.camUp      = glm::vec4(camUp,    0.0f);
+    pc.screenSize = screenSize;
+    pc.nearPlane  = nearPlane;
+    pc.farPlane   = farPlane;
 
-    vkCmdPushConstants(cmd, m_renderLayout, VK_SHADER_STAGE_VERTEX_BIT,
+    vkCmdPushConstants(cmd, m_renderLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
                        0, sizeof(RenderPC), &pc);
 
+    // Pass 1: Alpha-blended particles
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_alphaPipeline);
     for (const auto& ps : m_effects) {
-        VkDescriptorSet ds = ps.descSet();
+        if (ps->blendMode() != EmitterDef::BlendMode::Alpha) continue;
+        
+        VkDescriptorSet ds = ps->descSet();
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                 m_renderLayout, 0, 1, &ds, 0, nullptr);
+        vkCmdDrawIndirect(cmd, ps->indirectBuffer(), 0, 1, sizeof(VkDrawIndirectCommand));
+    }
 
-        // 6 vertices per particle (2 triangles = 1 billboard quad)
-        vkCmdDraw(cmd, ps.maxParticles() * 6, 1, 0, 0);
+    // Pass 2: Additive particles
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_additivePipeline);
+    for (const auto& ps : m_effects) {
+        if (ps->blendMode() != EmitterDef::BlendMode::Additive) continue;
+        
+        VkDescriptorSet ds = ps->descSet();
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                m_renderLayout, 0, 1, &ds, 0, nullptr);
+        vkCmdDrawIndirect(cmd, ps->indirectBuffer(), 0, 1, sizeof(VkDrawIndirectCommand));
+    }
+}
+
+void VFXRenderer::setDepthBuffer(VkImageView depthView, VkSampler sampler) {
+    m_depthView = depthView;
+    m_depthSampler = sampler;
+
+    // Update all active effects immediately
+    for (auto& ps : m_effects) {
+        ps->updateDepthBuffer(m_descLayout, m_depthView, m_depthSampler);
+    }
+    // Graveyard systems also need correct binding if they might still be drawn
+    // (though usually we partition and move to graveyard when they are done being updated/rendered on CPU)
+    for (auto& g : m_graveyard) {
+        g.ps->updateDepthBuffer(m_descLayout, m_depthView, m_depthSampler);
     }
 }
 
@@ -396,6 +527,10 @@ void VFXRenderer::loadEmitterDirectory(const std::string& dirPath) {
             def.drag            = j.value("drag",           0.0f);
             def.alphaCurve      = j.value("alphaCurve",     1.0f);
             def.windStrength    = j.value("windStrength",   0.0f);
+
+            std::string bm = j.value("blendMode", "alpha");
+            if (bm == "additive") def.blendMode = EmitterDef::BlendMode::Additive;
+            else                  def.blendMode = EmitterDef::BlendMode::Alpha;
 
             if (j.contains("windDirection")) {
                 auto& w = j["windDirection"];
@@ -450,16 +585,17 @@ void VFXRenderer::handleSpawn(VFXEvent& ev) {
     const uint32_t handle = (ev.handle != 0) ? ev.handle : m_nextHandle++;
     ev.handle = handle;  // write-back just in case
 
-    m_effects.emplace_back(m_device, def, m_descLayout, m_descPool,
-                           atlas, ev.position, ev.direction,
-                           ev.scale, ev.lifetime, handle);
+    m_effects.push_back(std::make_unique<ParticleSystem>(m_device, def, m_descLayout, m_descPool,
+                           atlas, m_depthView, m_depthSampler,
+                           ev.position, ev.direction,
+                           ev.scale, ev.lifetime, handle));
 }
 
 // ── handleDestroy ─────────────────────────────────────────────────────────────
 void VFXRenderer::handleDestroy(const VFXEvent& ev) {
     for (auto& ps : m_effects) {
-        if (ps.handle() == ev.handle) {
-            ps.stop();
+        if (ps->handle() == ev.handle) {
+            ps->stop();
             return;
         }
     }
@@ -468,8 +604,8 @@ void VFXRenderer::handleDestroy(const VFXEvent& ev) {
 // ── handleMove ────────────────────────────────────────────────────────────────
 void VFXRenderer::handleMove(const VFXEvent& ev) {
     for (auto& ps : m_effects) {
-        if (ps.handle() == ev.handle) {
-            ps.moveTo(ev.position);
+        if (ps->handle() == ev.handle) {
+            ps->moveTo(ev.position);
             return;
         }
     }

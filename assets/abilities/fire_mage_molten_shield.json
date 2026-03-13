@@ -47,7 +47,8 @@
             "duration": 4.0
         }
     ],
-    "castVFX": "vfx_molten_shield_apply",
+    "castVFX": ["vfx_molten_shield_apply"],
+    "compositeCastVFX": "molten_shield_cast_composite",
     "castSFX": "sfx_molten_shield_apply",
     "tags": [
         "shield",

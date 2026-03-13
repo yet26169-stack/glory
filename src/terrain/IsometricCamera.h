@@ -23,6 +23,8 @@ public:
   glm::vec3 getPosition() const { return m_position; }
   glm::vec3 getTarget() const { return m_target; }
   float getZoom() const { return m_zoom; }
+  float getNear() const { return m_nearPlane; }
+  float getFar() const { return m_farPlane; }
 
   void setTarget(const glm::vec3 &target) { m_target = target; }
   void setBounds(const glm::vec3 &min, const glm::vec3 &max) {
