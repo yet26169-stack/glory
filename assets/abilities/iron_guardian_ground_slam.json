@@ -18,5 +18,9 @@
         },
         { "type": "SLOW", "duration": 2.5, "value": 0.40 }
     ],
-    "tags": ["damage", "magical", "slow", "aoe"]
+    "tags": ["damage", "magical", "slow", "aoe"],
+
+    "castVFX":            ["vfx_iron_slam_cast"],
+    "impactVFX":          ["vfx_iron_slam_impact"],
+    "compositeImpactVFX": "iron_slam_impact_composite"
 }

@@ -19,5 +19,10 @@
     "onSelfEffects": [
         { "type": "DASH", "value": 600.0, "duration": 0.4 }
     ],
-    "tags": ["damage", "engage", "physical", "stun", "dash"]
+    "tags": ["damage", "engage", "physical", "stun", "dash"],
+
+    "castVFX":            ["vfx_iron_charge_start"],
+    "projectileVFX":      ["vfx_iron_charge_dust", "vfx_iron_charge_sparks"],
+    "impactVFX":          ["vfx_iron_charge_impact"],
+    "compositeImpactVFX": "iron_charge_impact_composite"
 }

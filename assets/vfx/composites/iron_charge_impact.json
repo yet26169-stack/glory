@@ -1,0 +1,10 @@
+{
+    "id": "iron_charge_impact_composite",
+    "layers": [
+        { "delay": 0.0,  "type": "PARTICLE",     "effectRef": "vfx_iron_charge_impact",        "anchor": "TARGET" },
+        { "delay": 0.0,  "type": "PARTICLE",     "effectRef": "vfx_iron_charge_impact_sparks",  "anchor": "TARGET" },
+        { "delay": 0.1,  "type": "PARTICLE",     "effectRef": "vfx_iron_charge_stun_stars",     "anchor": "TARGET" },
+        { "delay": 0.0,  "type": "SHOCKWAVE",    "effectRef": "default",                        "anchor": "TARGET" },
+        { "delay": 0.1,  "type": "GROUND_DECAL", "effectRef": "decal_circle",                   "anchor": "TARGET", "scale": 4.0, "color": [0.3, 0.25, 0.15, 0.6] }
+    ]
+}

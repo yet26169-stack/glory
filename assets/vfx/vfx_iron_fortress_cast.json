@@ -1,0 +1,28 @@
+{
+    "id":              "vfx_iron_fortress_cast",
+    "maxParticles":    128,
+    "emitRate":        0.0,
+    "burstCount":      80.0,
+    "looping":         false,
+    "duration":        0.8,
+    "lifetimeMin":     0.4,
+    "lifetimeMax":     0.8,
+    "initialSpeedMin": 10.0,
+    "initialSpeedMax": 20.0,
+    "sizeMin":         0.5,
+    "sizeMax":         1.5,
+    "sizeEnd":         0.2,
+    "rotationSpeedMin": -360.0,
+    "rotationSpeedMax": 360.0,
+    "drag":            3.0,
+    "alphaCurve":      2.0,
+    "spreadAngle":     180.0,
+    "gravity":         -8.0,
+    "blendMode":       "alpha",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [0.4, 0.3, 0.15, 0.9]},
+        {"time": 0.3, "color": [0.6, 0.45, 0.25, 1.0]},
+        {"time": 0.6, "color": [1.0, 0.85, 0.3, 0.6]},
+        {"time": 1.0, "color": [1.0, 0.75, 0.2, 0.0]}
+    ]
+}

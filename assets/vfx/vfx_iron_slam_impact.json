@@ -1,0 +1,28 @@
+{
+    "id":              "vfx_iron_slam_impact",
+    "maxParticles":    256,
+    "emitRate":        0.0,
+    "burstCount":      150.0,
+    "looping":         false,
+    "duration":        1.2,
+    "lifetimeMin":     0.4,
+    "lifetimeMax":     1.2,
+    "initialSpeedMin": 10.0,
+    "initialSpeedMax": 25.0,
+    "sizeMin":         0.1,
+    "sizeMax":         1.0,
+    "sizeEnd":         0.05,
+    "rotationSpeedMin": -720.0,
+    "rotationSpeedMax": 720.0,
+    "drag":            4.0,
+    "alphaCurve":      2.0,
+    "spreadAngle":     180.0,
+    "gravity":         6.0,
+    "blendMode":       "alpha",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [0.6, 0.45, 0.25, 1.0]},
+        {"time": 0.3, "color": [0.8, 0.7, 0.5, 0.8]},
+        {"time": 0.6, "color": [0.5, 0.5, 0.5, 0.5]},
+        {"time": 1.0, "color": [0.4, 0.4, 0.4, 0.0]}
+    ]
+}

@@ -21,5 +21,11 @@
     "onHitEffects": [
         { "type": "TAUNT", "duration": 1.25 }
     ],
-    "tags": ["defense", "taunt", "shield", "aoe"]
+    "tags": ["defense", "taunt", "shield", "aoe"],
+
+    "castVFX":            ["vfx_iron_shield_cast"],
+    "compositeCastVFX":   "iron_shield_cast_composite",
+    "persistVFX":         ["vfx_iron_shield_persist"],
+    "impactVFX":          ["vfx_iron_shield_taunt_ring"],
+    "endVFX":             ["vfx_iron_shield_break"]
 }

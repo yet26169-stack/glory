@@ -1,0 +1,28 @@
+{
+    "id":              "vfx_iron_fortress_ground_glow",
+    "maxParticles":    64,
+    "emitRate":        8.0,
+    "burstCount":      0.0,
+    "looping":         true,
+    "duration":        8.0,
+    "lifetimeMin":     1.5,
+    "lifetimeMax":     3.0,
+    "initialSpeedMin": 0.1,
+    "initialSpeedMax": 0.5,
+    "sizeMin":         3.0,
+    "sizeMax":         5.0,
+    "sizeEnd":         6.0,
+    "rotationSpeedMin": -15.0,
+    "rotationSpeedMax": 15.0,
+    "drag":            1.0,
+    "alphaCurve":      1.0,
+    "spreadAngle":     180.0,
+    "gravity":         0.5,
+    "blendMode":       "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [1.0, 0.9, 0.4, 0.0]},
+        {"time": 0.2, "color": [1.0, 0.85, 0.3, 0.2]},
+        {"time": 0.7, "color": [1.0, 0.85, 0.3, 0.15]},
+        {"time": 1.0, "color": [1.0, 0.85, 0.3, 0.0]}
+    ]
+}

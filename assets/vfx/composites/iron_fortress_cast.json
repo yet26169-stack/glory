@@ -1,0 +1,13 @@
+{
+    "id": "iron_fortress_cast_composite",
+    "layers": [
+        { "delay": 0.0,  "type": "PARTICLE",     "effectRef": "vfx_iron_fortress_cast",          "anchor": "CASTER" },
+        { "delay": 0.0,  "type": "PARTICLE",     "effectRef": "vfx_iron_fortress_cast_flash",     "anchor": "CASTER" },
+        { "delay": 0.3,  "type": "PARTICLE",     "effectRef": "vfx_iron_fortress_knockup",        "anchor": "CASTER" },
+        { "delay": 0.3,  "type": "PARTICLE",     "effectRef": "vfx_iron_fortress_knockup_dust",   "anchor": "CASTER" },
+        { "delay": 0.3,  "type": "SHOCKWAVE",    "effectRef": "default",                          "anchor": "CASTER" },
+        { "delay": 0.3,  "type": "DISTORTION",   "effectRef": "vfx_ripple",                       "anchor": "CASTER" },
+        { "delay": 0.2,  "type": "SHIELD",       "effectRef": "default",                          "anchor": "CASTER" },
+        { "delay": 0.1,  "type": "GROUND_DECAL", "effectRef": "decal_circle",                     "anchor": "CASTER", "scale": 7.0, "color": [1.0, 0.85, 0.3, 0.4] }
+    ]
+}

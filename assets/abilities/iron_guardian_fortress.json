@@ -35,5 +35,11 @@
         },
         { "type": "KNOCKUP", "duration": 1.0 }
     ],
-    "tags": ["defense", "shield", "knockup", "aoe", "ultimate"]
+    "tags": ["defense", "shield", "knockup", "aoe", "ultimate"],
+
+    "castVFX":            ["vfx_iron_fortress_cast", "vfx_iron_fortress_cast_flash"],
+    "compositeCastVFX":   "iron_fortress_cast_composite",
+    "impactVFX":          ["vfx_iron_fortress_knockup"],
+    "persistVFX":         ["vfx_iron_fortress_dome", "vfx_iron_fortress_rocks", "vfx_iron_fortress_ground_glow"],
+    "endVFX":             ["vfx_iron_fortress_end"]
 }

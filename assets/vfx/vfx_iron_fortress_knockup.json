@@ -1,0 +1,28 @@
+{
+    "id":              "vfx_iron_fortress_knockup",
+    "maxParticles":    256,
+    "emitRate":        0.0,
+    "burstCount":      100.0,
+    "looping":         false,
+    "duration":        0.8,
+    "lifetimeMin":     0.3,
+    "lifetimeMax":     0.8,
+    "initialSpeedMin": 20.0,
+    "initialSpeedMax": 35.0,
+    "sizeMin":         0.3,
+    "sizeMax":         1.2,
+    "sizeEnd":         0.1,
+    "rotationSpeedMin": -720.0,
+    "rotationSpeedMax": 720.0,
+    "drag":            5.0,
+    "alphaCurve":      2.0,
+    "spreadAngle":     180.0,
+    "gravity":         5.0,
+    "blendMode":       "alpha",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [1.0, 0.85, 0.3, 1.0]},
+        {"time": 0.2, "color": [0.6, 0.45, 0.25, 0.9]},
+        {"time": 0.6, "color": [0.8, 0.7, 0.5, 0.5]},
+        {"time": 1.0, "color": [0.4, 0.3, 0.15, 0.0]}
+    ]
+}

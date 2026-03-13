@@ -1,0 +1,28 @@
+{
+    "id":              "vfx_iron_shield_break",
+    "maxParticles":    64,
+    "emitRate":        0.0,
+    "burstCount":      40.0,
+    "looping":         false,
+    "duration":        0.6,
+    "lifetimeMin":     0.3,
+    "lifetimeMax":     0.6,
+    "initialSpeedMin": 8.0,
+    "initialSpeedMax": 15.0,
+    "sizeMin":         0.3,
+    "sizeMax":         0.6,
+    "sizeEnd":         0.1,
+    "rotationSpeedMin": -540.0,
+    "rotationSpeedMax": 540.0,
+    "drag":            3.0,
+    "alphaCurve":      2.0,
+    "spreadAngle":     180.0,
+    "gravity":         4.0,
+    "blendMode":       "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [1.0, 0.95, 0.7, 1.0]},
+        {"time": 0.3, "color": [1.0, 0.85, 0.3, 0.8]},
+        {"time": 0.7, "color": [1.0, 0.75, 0.2, 0.4]},
+        {"time": 1.0, "color": [0.8, 0.6, 0.1, 0.0]}
+    ]
+}

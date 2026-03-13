@@ -1,0 +1,28 @@
+{
+    "id":              "vfx_iron_charge_impact_sparks",
+    "maxParticles":    128,
+    "emitRate":        0.0,
+    "burstCount":      60.0,
+    "looping":         false,
+    "duration":        0.5,
+    "lifetimeMin":     0.1,
+    "lifetimeMax":     0.4,
+    "initialSpeedMin": 15.0,
+    "initialSpeedMax": 30.0,
+    "sizeMin":         0.05,
+    "sizeMax":         0.2,
+    "sizeEnd":         0.01,
+    "rotationSpeedMin": -1080.0,
+    "rotationSpeedMax": 1080.0,
+    "drag":            8.0,
+    "alphaCurve":      3.0,
+    "spreadAngle":     180.0,
+    "gravity":         4.0,
+    "blendMode":       "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [1.0, 1.0, 0.9, 1.0]},
+        {"time": 0.2, "color": [1.0, 0.95, 0.7, 1.0]},
+        {"time": 0.5, "color": [1.0, 0.85, 0.3, 0.7]},
+        {"time": 1.0, "color": [1.0, 0.75, 0.2, 0.0]}
+    ]
+}
