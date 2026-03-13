@@ -1,0 +1,7 @@
+{
+  "id": "melee_attack_composite",
+  "layers": [
+    { "delay": 0.0,  "type": "PARTICLE", "effectRef": "vfx_melee_slash", "anchor": "TARGET" },
+    { "delay": 0.02, "type": "PARTICLE", "effectRef": "vfx_melee_hit",   "anchor": "TARGET" }
+  ]
+}

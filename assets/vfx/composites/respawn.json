@@ -1,0 +1,9 @@
+{
+  "id": "respawn_composite",
+  "layers": [
+    { "delay": 0.0, "type": "PARTICLE",     "effectRef": "vfx_respawn_beam",     "anchor": "CASTER" },
+    { "delay": 0.3, "type": "PARTICLE",     "effectRef": "vfx_respawn_landing",  "anchor": "CASTER" },
+    { "delay": 0.3, "type": "PARTICLE",     "effectRef": "vfx_respawn_sparkles", "anchor": "CASTER" },
+    { "delay": 0.1, "type": "GROUND_DECAL", "effectRef": "decal_circle",         "anchor": "CASTER", "scale": 3.0, "color": [1.0, 0.9, 0.5, 0.3] }
+  ]
+}

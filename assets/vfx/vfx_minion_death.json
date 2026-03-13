@@ -1,0 +1,22 @@
+{
+    "id":              "vfx_minion_death",
+    "maxParticles":    32,
+    "emitRate":        0.0,
+    "burstCount":      25.0,
+    "looping":         false,
+    "duration":        0.5,
+    "lifetimeMin":     0.2,
+    "lifetimeMax":     0.5,
+    "initialSpeedMin": 3.0,
+    "initialSpeedMax": 7.0,
+    "sizeMin":         0.15,
+    "sizeMax":         0.4,
+    "spreadAngle":     120.0,
+    "gravity":         3.0,
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [0.6, 0.55, 0.45, 0.8]},
+        {"time": 0.3, "color": [0.55, 0.5, 0.4, 0.6]},
+        {"time": 0.7, "color": [0.45, 0.4, 0.35, 0.3]},
+        {"time": 1.0, "color": [0.35, 0.3, 0.25, 0.0]}
+    ]
+}

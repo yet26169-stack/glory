@@ -1,23 +1,24 @@
 {
     "id":              "vfx_auto_attack",
-    "maxParticles":    64,
+    "maxParticles":    96,
     "emitRate":        0.0,
-    "burstCount":      48.0,
+    "burstCount":      64.0,
     "looping":         false,
     "duration":        0.4,
     "lifetimeMin":     0.15,
     "lifetimeMax":     0.35,
-    "initialSpeedMin": 3.0,
-    "initialSpeedMax": 8.0,
+    "initialSpeedMin": 5.0,
+    "initialSpeedMax": 12.0,
     "sizeMin":         0.08,
     "sizeMax":         0.25,
     "spreadAngle":     15.0,
     "gravity":         0.0,
     "colorOverLifetime": [
         {"time": 0.0, "color": [1.0,  1.0,  1.0,  1.0]},
-        {"time": 0.2, "color": [0.4,  0.7,  1.0,  0.9]},
-        {"time": 0.5, "color": [0.3,  0.3,  1.0,  0.7]},
-        {"time": 0.8, "color": [0.6,  0.2,  0.9,  0.4]},
+        {"time": 0.15, "color": [0.9,  0.95, 1.0,  0.95]},
+        {"time": 0.35, "color": [0.4,  0.7,  1.0,  0.85]},
+        {"time": 0.6, "color": [0.3,  0.3,  1.0,  0.6]},
+        {"time": 0.8, "color": [0.6,  0.2,  0.9,  0.3]},
         {"time": 1.0, "color": [0.5,  0.1,  0.8,  0.0]}
     ]
 }

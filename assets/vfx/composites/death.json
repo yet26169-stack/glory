@@ -1,0 +1,9 @@
+{
+  "id": "death_composite",
+  "layers": [
+    { "delay": 0.0, "type": "PARTICLE",     "effectRef": "vfx_death_flash",    "anchor": "TARGET" },
+    { "delay": 0.0, "type": "PARTICLE",     "effectRef": "vfx_death_collapse",  "anchor": "TARGET" },
+    { "delay": 0.1, "type": "PARTICLE",     "effectRef": "vfx_death_soul",      "anchor": "TARGET" },
+    { "delay": 0.1, "type": "GROUND_DECAL", "effectRef": "decal_circle",        "anchor": "TARGET", "scale": 2.0, "color": [0.3, 0.05, 0.05, 0.4] }
+  ]
+}

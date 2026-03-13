@@ -1,0 +1,10 @@
+{
+  "id": "levelup_composite",
+  "layers": [
+    { "delay": 0.0, "type": "PARTICLE",     "effectRef": "vfx_levelup_flash",    "anchor": "CASTER" },
+    { "delay": 0.0, "type": "PARTICLE",     "effectRef": "vfx_levelup_pillar",   "anchor": "CASTER" },
+    { "delay": 0.0, "type": "PARTICLE",     "effectRef": "vfx_levelup_ring",     "anchor": "CASTER" },
+    { "delay": 0.05, "type": "PARTICLE",    "effectRef": "vfx_levelup_sparkles", "anchor": "CASTER" },
+    { "delay": 0.1, "type": "GROUND_DECAL", "effectRef": "decal_circle",         "anchor": "CASTER", "scale": 3.0, "color": [1.0, 0.85, 0.3, 0.3] }
+  ]
+}

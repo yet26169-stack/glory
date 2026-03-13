@@ -1,0 +1,23 @@
+{
+    "id":              "vfx_melee_slash",
+    "maxParticles":    32,
+    "emitRate":        0.0,
+    "burstCount":      20.0,
+    "looping":         false,
+    "duration":        0.15,
+    "lifetimeMin":     0.08,
+    "lifetimeMax":     0.15,
+    "initialSpeedMin": 10.0,
+    "initialSpeedMax": 18.0,
+    "sizeMin":         0.1,
+    "sizeMax":         0.2,
+    "spreadAngle":     8.0,
+    "gravity":         0.0,
+    "drag":            10.0,
+    "blendMode":       "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [1.0, 1.0, 1.0, 1.0]},
+        {"time": 0.4, "color": [0.7, 0.8, 1.0, 0.8]},
+        {"time": 1.0, "color": [0.5, 0.6, 1.0, 0.0]}
+    ]
+}

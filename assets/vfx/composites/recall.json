@@ -1,0 +1,8 @@
+{
+  "id": "recall_composite",
+  "layers": [
+    { "delay": 0.0, "type": "PARTICLE",     "effectRef": "vfx_recall_spiral",      "anchor": "CASTER" },
+    { "delay": 0.0, "type": "PARTICLE",     "effectRef": "vfx_recall_ground_glow", "anchor": "CASTER" },
+    { "delay": 0.0, "type": "GROUND_DECAL", "effectRef": "decal_circle",           "anchor": "CASTER", "scale": 2.5, "color": [0.2, 0.4, 1.0, 0.4] }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+    "id":              "vfx_melee_hit",
+    "maxParticles":    64,
+    "emitRate":        0.0,
+    "burstCount":      40.0,
+    "looping":         false,
+    "duration":        0.3,
+    "lifetimeMin":     0.1,
+    "lifetimeMax":     0.3,
+    "initialSpeedMin": 8.0,
+    "initialSpeedMax": 15.0,
+    "sizeMin":         0.05,
+    "sizeMax":         0.2,
+    "spreadAngle":     30.0,
+    "gravity":         1.0,
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [1.0, 1.0, 1.0, 1.0]},
+        {"time": 0.3, "color": [1.0, 0.9, 0.6, 0.9]},
+        {"time": 0.6, "color": [1.0, 0.8, 0.3, 0.5]},
+        {"time": 1.0, "color": [0.8, 0.6, 0.1, 0.0]}
+    ]
+}

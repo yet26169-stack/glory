@@ -1,0 +1,23 @@
+{
+    "id":              "vfx_critical_hit",
+    "maxParticles":    64,
+    "emitRate":        0.0,
+    "burstCount":      30.0,
+    "looping":         false,
+    "duration":        0.4,
+    "lifetimeMin":     0.15,
+    "lifetimeMax":     0.4,
+    "initialSpeedMin": 10.0,
+    "initialSpeedMax": 20.0,
+    "sizeMin":         0.3,
+    "sizeMax":         0.6,
+    "spreadAngle":     120.0,
+    "gravity":         0.0,
+    "blendMode":       "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [1.0, 1.0, 1.0, 1.0]},
+        {"time": 0.2, "color": [1.0, 0.95, 0.7, 0.9]},
+        {"time": 0.5, "color": [1.0, 0.85, 0.4, 0.6]},
+        {"time": 1.0, "color": [0.9, 0.7, 0.2, 0.0]}
+    ]
+}
