@@ -145,7 +145,7 @@ void DebugRenderer::createPipeline(const Device &device, VkRenderPass renderPass
   ms.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
   VkPipelineDepthStencilStateCreateInfo ds{VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
-  ds.depthTestEnable = VK_TRUE; ds.depthWriteEnable = VK_TRUE; ds.depthCompareOp = VK_COMPARE_OP_LESS;
+  ds.depthTestEnable = VK_TRUE; ds.depthWriteEnable = VK_TRUE; ds.depthCompareOp = VK_COMPARE_OP_GREATER;
 
   VkPipelineColorBlendAttachmentState cbA{};
   cbA.colorWriteMask = 0xF;

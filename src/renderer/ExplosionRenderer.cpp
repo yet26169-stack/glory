@@ -187,7 +187,7 @@ VkPipeline ExplosionRenderer::createPipeline(VkRenderPass       renderPass,
         VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
     ds.depthTestEnable  = VK_TRUE;
     ds.depthWriteEnable = VK_FALSE;
-    ds.depthCompareOp   = VK_COMPARE_OP_LESS_OR_EQUAL;
+    ds.depthCompareOp   = VK_COMPARE_OP_GREATER_OR_EQUAL;
 
     VkPipelineColorBlendAttachmentState cbA{};
     cbA.blendEnable         = VK_TRUE;

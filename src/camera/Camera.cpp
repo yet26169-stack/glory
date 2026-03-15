@@ -15,7 +15,10 @@ glm::mat4 Camera::getViewMatrix() const {
 }
 
 glm::mat4 Camera::getProjectionMatrix(float aspectRatio) const {
-    auto proj = glm::perspective(glm::radians(m_fov), aspectRatio, m_nearPlane, m_farPlane);
+    // Reversed-Z: swap near/far so near→1.0 and far→0.0 in NDC.
+    // Requires depth clear = 0.0 and compare op GREATER.  This aligns IEEE 754
+    // float precision with the depth range, eliminating Z-fighting on distant geo.
+    auto proj = glm::perspective(glm::radians(m_fov), aspectRatio, m_farPlane, m_nearPlane);
     proj[1][1] *= -1.0f; // Vulkan Y-axis is inverted vs OpenGL
     return proj;
 }

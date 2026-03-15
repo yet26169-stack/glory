@@ -15,9 +15,12 @@ layout(push_constant) uniform DecalPC {
     float elapsed;   //  4B
     float appTime;   //  4B
     vec4  color;     // 16B
-} pc;
+    vec2  fowMapMin; //  8B
+    vec2  fowMapMax; //  8B
+} pc;                // Total: 128B
 
 layout(location = 0) out vec2 fragUV;
+layout(location = 1) out vec3 fragWorldPos;
 
 void main() {
     // Standard unit quad: vertices should be roughly (-1, 0, -1) to (1, 0, 1) or similar.
@@ -33,6 +36,7 @@ void main() {
     // Scale to radius and place at center, slightly above ground (Y=0.02) to avoid Z-fighting
     vec3 worldPos = pc.center + vec3(rotated.x * pc.radius, 0.02, rotated.y * pc.radius);
     
-    gl_Position = pc.viewProj * vec4(worldPos, 1.0);
-    fragUV = inUV;
+    gl_Position  = pc.viewProj * vec4(worldPos, 1.0);
+    fragUV       = inUV;
+    fragWorldPos = worldPos;
 }

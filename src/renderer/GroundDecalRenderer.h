@@ -41,6 +41,11 @@ public:
     // Render BEFORE transparent VFX, AFTER opaque geometry.
     void render(VkCommandBuffer cmd, const glm::mat4& viewProj, float appTime);
 
+    // Provide FoW texture so decals fade in unexplored areas.
+    // Call once after FogOfWarRenderer is ready. Clears cached descriptor sets.
+    void setFogOfWar(VkImageView fowView, VkSampler fowSampler,
+                     glm::vec2 fowMapMin, glm::vec2 fowMapMax);
+
     void destroy(uint32_t handle);
     void destroyAll();
 
@@ -58,15 +63,17 @@ private:
     };
 
     struct DecalPC {
-        glm::mat4 viewProj;  // 64B
-        glm::vec3 center;    // 12B
-        float     radius;    //  4B
-        float     rotation;  //  4B
-        float     alpha;     //  4B
-        float     elapsed;   //  4B
-        float     appTime;   //  4B
-        glm::vec4 color;     // 16B
-    }; // Total: 112B (Fits in 128B limit)
+        glm::mat4 viewProj;     // 64B
+        glm::vec3 center;       // 12B
+        float     radius;       //  4B
+        float     rotation;     //  4B
+        float     alpha;        //  4B
+        float     elapsed;      //  4B
+        float     appTime;      //  4B
+        glm::vec4 color;        // 16B
+        glm::vec2 fowMapMin;    //  8B
+        glm::vec2 fowMapMax;    //  8B
+    }; // Total: 128B (fits Vulkan minimum push constant limit)
 
     const Device& m_device;
     VkRenderPass m_renderPass;
@@ -83,7 +90,13 @@ private:
     std::unordered_map<std::string, DecalDef> m_defs;
     std::unordered_map<std::string, std::unique_ptr<Texture>> m_textureCache;
     std::vector<DecalInstance> m_activeDecals;
-    std::unordered_map<uint32_t, VkDescriptorSet> m_descSets;
+    std::unordered_map<uint64_t, VkDescriptorSet> m_descSets; // keyed by decalTex imageView handle
+
+    // FoW state — set via setFogOfWar()
+    VkImageView m_fowView    = VK_NULL_HANDLE;
+    VkSampler   m_fowSampler = VK_NULL_HANDLE;
+    glm::vec2   m_fowMapMin  = {-100.0f, -100.0f};
+    glm::vec2   m_fowMapMax  = { 100.0f,  100.0f};
 
     uint32_t m_nextHandle = 1;
 

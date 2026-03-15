@@ -87,8 +87,9 @@ glm::mat4 IsometricCamera::getViewMatrix() const {
 }
 
 glm::mat4 IsometricCamera::getProjectionMatrix(float aspect) const {
+  // Reversed-Z: near→1.0, far→0.0. Depth clear = 0.0, compare = GREATER.
   glm::mat4 proj =
-      glm::perspective(glm::radians(m_fov), aspect, m_nearPlane, m_farPlane);
+      glm::perspective(glm::radians(m_fov), aspect, m_farPlane, m_nearPlane);
   proj[1][1] *= -1.0f; // Vulkan Y-flip
   return proj;
 }
@@ -112,9 +113,9 @@ void IsometricCamera::screenToWorldRay(float mouseX, float mouseY,
   float ndcX = (2.0f * mouseX / windowW) - 1.0f;
   float ndcY = -((2.0f * mouseY / windowH) - 1.0f);
 
-  // Near and far points in NDC (Vulkan NDC z: 0 to 1)
-  glm::vec4 nearNDC(ndcX, ndcY, 0.0f, 1.0f);
-  glm::vec4 farNDC(ndcX, ndcY, 1.0f, 1.0f);
+  // Reversed-Z NDC: near plane is at z=1.0, far plane is at z=0.0.
+  glm::vec4 nearNDC(ndcX, ndcY, 1.0f, 1.0f);
+  glm::vec4 farNDC(ndcX, ndcY, 0.0f, 1.0f);
 
   glm::vec4 nearWorld = invVP * nearNDC;
   glm::vec4 farWorld = invVP * farNDC;

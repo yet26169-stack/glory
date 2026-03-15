@@ -24,6 +24,20 @@ struct TransformComponent {
   glm::vec3 rotation{0.0f}; // Euler angles in radians
   glm::vec3 scale{1.0f};
 
+  glm::vec3 prevPosition{0.0f};
+  glm::vec3 prevRotation{0.0f};
+
+  glm::mat4 getInterpolatedModelMatrix(float alpha) const {
+    glm::vec3 ipos = glm::mix(prevPosition, position, alpha);
+    glm::vec3 irot = glm::mix(prevRotation, rotation, alpha);
+    glm::mat4 m = glm::translate(glm::mat4(1.0f), ipos);
+    m = glm::rotate(m, irot.y, glm::vec3(0, 1, 0));
+    m = glm::rotate(m, irot.x, glm::vec3(1, 0, 0));
+    m = glm::rotate(m, irot.z, glm::vec3(0, 0, 1));
+    m = glm::scale(m, scale);
+    return m;
+  }
+
   glm::mat4 getModelMatrix() const {
     glm::mat4 m = glm::translate(glm::mat4(1.0f), position);
     // Y-X-Z rotation order: yaw (Y) is applied first in world space,

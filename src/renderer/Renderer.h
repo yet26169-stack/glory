@@ -60,7 +60,8 @@ public:
     Renderer(const Renderer&)            = delete;
     Renderer& operator=(const Renderer&) = delete;
 
-    void drawFrame();
+    void simulateStep(float dt);
+    void renderFrame(float alpha);
     void waitIdle();
 
 private:
@@ -125,7 +126,8 @@ private:
     uint32_t  m_currentFrame  = 0;
     float     m_lastFrameTime = 0.0f;
     float     m_gameTime      = 0.0f;
-    float     m_currentDt     = 0.0f;   // dt for the current frame (set in drawFrame)
+    float     m_currentDt     = 0.0f;   // dt for the current sim step (set in simulateStep)
+    float     m_renderAlpha   = 0.0f;   // interpolation factor for current render frame
     bool      m_showGrid      = false;
     bool      m_wireframe     = false;
     bool      m_showDebugUI   = false;   // Tab-toggled ImGui debug overlay

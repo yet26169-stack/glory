@@ -48,6 +48,7 @@ struct LightUBO {
     alignas(4)  float     appTime           = 0.0f;       // elapsed game time for animation
     alignas(4)  float     toonRampSharpness = 0.45f;      // 0=soft LoL look, 1=hard cel-shade
     alignas(4)  float     shadowWarmth      = 0.3f;       // warm/cool shadow tinting weight
+    alignas(4)  float     shadowBiasScale   = 1.5f;       // normal-offset bias multiplier (tune to taste)
     alignas(16) glm::vec3 shadowTint{0.15f, 0.12f, 0.25f}; // cool purple shadow tint (LoL style)
     alignas(8) glm::vec2 fowMapMin{-100.0f, -100.0f};    // world-space FoW min bounds
     alignas(8) glm::vec2 fowMapMax{ 100.0f,  100.0f};    // world-space FoW max bounds
@@ -75,6 +76,7 @@ static_assert(offsetof(LightUBO, rimIntensity)        == 204, "std140: rimIntens
 static_assert(offsetof(LightUBO, appTime)             == 208, "std140: appTime@208");
 static_assert(offsetof(LightUBO, toonRampSharpness)   == 212, "std140: toonRampSharpness@212");
 static_assert(offsetof(LightUBO, shadowWarmth)        == 216, "std140: shadowWarmth@216");
+static_assert(offsetof(LightUBO, shadowBiasScale)     == 220, "std140: shadowBiasScale@220");
 static_assert(offsetof(LightUBO, shadowTint)          == 224, "std140: shadowTint@224");
 static_assert(offsetof(LightUBO, fowMapMin)           == 240, "std140: fowMapMin@240");
 static_assert(offsetof(LightUBO, fowMapMax)           == 248, "std140: fowMapMax@248");

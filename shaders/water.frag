@@ -96,5 +96,6 @@ void main() {
     // Ambient fill
     waterColor += vec3(0.03, 0.05, 0.09) * lightData.ambientStrength;
 
-    outColor = vec4(waterColor + waterSpec, 0.7);
+    float waterAlpha = mix(0.45, 0.85, fresnel); // Face-on=transparent, glancing=opaque
+    outColor = vec4(waterColor + waterSpec, waterAlpha);
 }

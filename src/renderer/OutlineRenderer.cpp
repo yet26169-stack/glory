@@ -165,8 +165,7 @@ void OutlineRenderer::createPipelines(VkRenderPass renderPass) {
         VkPipelineDepthStencilStateCreateInfo dsCI{ VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
         dsCI.depthTestEnable       = VK_TRUE;
         dsCI.depthWriteEnable      = VK_TRUE;
-        dsCI.depthCompareOp        = VK_COMPARE_OP_LESS;
-        dsCI.stencilTestEnable     = VK_TRUE;
+        dsCI.depthCompareOp        = VK_COMPARE_OP_GREATER;        dsCI.stencilTestEnable     = VK_TRUE;
         dsCI.front                 = stencilOp;
         dsCI.back                  = stencilOp;
 
@@ -236,8 +235,7 @@ void OutlineRenderer::createPipelines(VkRenderPass renderPass) {
         VkPipelineDepthStencilStateCreateInfo dsCI{ VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
         dsCI.depthTestEnable       = VK_TRUE;
         dsCI.depthWriteEnable      = VK_FALSE; // outline doesn't occlude scene
-        dsCI.depthCompareOp        = VK_COMPARE_OP_LESS_OR_EQUAL;
-        dsCI.stencilTestEnable     = VK_TRUE;
+        dsCI.depthCompareOp        = VK_COMPARE_OP_GREATER_OR_EQUAL;        dsCI.stencilTestEnable     = VK_TRUE;
         dsCI.front                 = stencilOp;
         dsCI.back                  = stencilOp;
 

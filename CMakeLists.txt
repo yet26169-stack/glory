@@ -5,6 +5,36 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# ── Sanitizer support ─────────────────────────────────────────────────────────
+# Usage: cmake -B build -DGLORY_ASAN=ON -DGLORY_UBSAN=ON
+#         cmake -B build -DGLORY_TSAN=ON   (ASAN and TSAN are mutually exclusive)
+option(GLORY_ASAN  "Enable AddressSanitizer"          OFF)
+option(GLORY_TSAN  "Enable ThreadSanitizer"            OFF)
+option(GLORY_UBSAN "Enable UndefinedBehaviorSanitizer" OFF)
+
+if(GLORY_ASAN AND GLORY_TSAN)
+    message(FATAL_ERROR "GLORY_ASAN and GLORY_TSAN are mutually exclusive — enable only one.")
+endif()
+
+add_library(glory_sanitizers INTERFACE)
+if(GLORY_ASAN)
+    target_compile_options(glory_sanitizers INTERFACE -fsanitize=address -fno-omit-frame-pointer -g)
+    target_link_options   (glory_sanitizers INTERFACE -fsanitize=address)
+    message(STATUS "Glory: AddressSanitizer ENABLED")
+endif()
+if(GLORY_TSAN)
+    target_compile_options(glory_sanitizers INTERFACE -fsanitize=thread -fno-omit-frame-pointer -g)
+    target_link_options   (glory_sanitizers INTERFACE -fsanitize=thread)
+    message(STATUS "Glory: ThreadSanitizer ENABLED")
+endif()
+if(GLORY_UBSAN)
+    target_compile_options(glory_sanitizers INTERFACE -fsanitize=undefined -fno-omit-frame-pointer -g)
+    target_link_options   (glory_sanitizers INTERFACE -fsanitize=undefined)
+    message(STATUS "Glory: UndefinedBehaviorSanitizer ENABLED")
+endif()
+
+enable_testing()
+
 # ── Dependencies ─────────────────────────────────────────────────────────────
 find_package(Vulkan REQUIRED)
 find_package(glfw3 REQUIRED)
@@ -88,6 +118,26 @@ endforeach()
 
 add_custom_target(Shaders ALL DEPENDS ${SPV_SHADERS})
 
+# ── Tracy profiler (optional, default OFF) ────────────────────────────────────
+# Enable with:  cmake -DGLORY_TRACY=ON ..
+# Requires internet access on first configure to fetch the Tracy source.
+option(GLORY_TRACY "Enable Tracy real-time profiler instrumentation" OFF)
+if(GLORY_TRACY)
+    include(FetchContent)
+    FetchContent_Declare(
+        tracy
+        GIT_REPOSITORY https://github.com/wolfpld/tracy.git
+        GIT_TAG        v0.11.1
+        GIT_SHALLOW    TRUE
+    )
+    # Tell Tracy's own CMakeLists to compile the client with profiling on.
+    set(TRACY_ENABLE ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(tracy)
+    message(STATUS "Glory: Tracy profiler ENABLED (v0.11.1)")
+else()
+    message(STATUS "Glory: Tracy profiler disabled  (pass -DGLORY_TRACY=ON to enable)")
+endif()
+
 # ── meshoptimizer ─────────────────────────────────────────────────────────────
 file(GLOB MESHOPT_SOURCES ${CMAKE_SOURCE_DIR}/extern/meshoptimizer/src/*.cpp)
 add_library(meshoptimizer STATIC ${MESHOPT_SOURCES})
@@ -98,7 +148,9 @@ set(SOURCES
     src/main.cpp
     src/core/Log.cpp
     src/core/Application.cpp
+    src/core/FramePacer.cpp
     src/core/SimulationLoop.cpp
+    src/physics/PhysicsSystem.cpp
     src/window/Window.cpp
     src/camera/Camera.cpp
     src/input/InputManager.cpp
@@ -196,7 +248,19 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     glm::glm
     spdlog::spdlog
     meshoptimizer
+    glory_sanitizers
 )
+
+# Platform-specific libs for FramePacer
+if(WIN32)
+    target_link_libraries(${PROJECT_NAME} PRIVATE winmm)
+endif()
+
+# Tracy client (only when GLORY_TRACY=ON)
+if(GLORY_TRACY)
+    target_link_libraries(${PROJECT_NAME} PRIVATE TracyClient)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE TRACY_ENABLE)
+endif()
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     GLFW_INCLUDE_VULKAN
@@ -225,20 +289,24 @@ add_dependencies(${PROJECT_NAME} copy_assets)
 # ── Map / terrain tests (lightweight, no Vulkan) ─────────────────────────────
 add_executable(test_mirror tests/test_mirror.cpp)
 target_include_directories(test_mirror PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(test_mirror PRIVATE glm::glm)
+target_link_libraries(test_mirror PRIVATE glm::glm glory_sanitizers)
 target_compile_definitions(test_mirror PRIVATE GLM_FORCE_RADIANS GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
 add_executable(test_maploader tests/test_maploader.cpp src/map/MapLoader.cpp)
 target_include_directories(test_maploader PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/extern)
-target_link_libraries(test_maploader PRIVATE glm::glm)
+target_link_libraries(test_maploader PRIVATE glm::glm glory_sanitizers)
 target_compile_definitions(test_maploader PRIVATE
     GLM_FORCE_RADIANS GLM_FORCE_DEPTH_ZERO_TO_ONE
     MAP_DATA_DIR="${CMAKE_SOURCE_DIR}/assets/maps/")
 
 add_executable(test_terrain tests/test_terrain.cpp src/terrain/IsometricCamera.cpp)
 target_include_directories(test_terrain PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(test_terrain PRIVATE glm::glm)
+target_link_libraries(test_terrain PRIVATE glm::glm glory_sanitizers)
 target_compile_definitions(test_terrain PRIVATE GLM_FORCE_RADIANS GLM_FORCE_DEPTH_ZERO_TO_ONE)
+
+add_test(NAME mirror    COMMAND test_mirror)
+add_test(NAME maploader COMMAND test_maploader)
+add_test(NAME terrain   COMMAND test_terrain)
 
 # ── Asset cook tool ───────────────────────────────────────────────────────────
 add_executable(asset_cook tools/asset_cook.cpp)

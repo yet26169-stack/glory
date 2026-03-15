@@ -5,6 +5,7 @@
 #include "renderer/StaticSkinnedMesh.h"
 #include "renderer/Frustum.h"
 #include "core/SimulationLoop.h"
+#include "core/Profiler.h"
 #include "scene/Components.h"
 #include "combat/CombatComponents.h"
 #include "ability/AbilityComponents.h"
@@ -290,100 +291,78 @@ Renderer::~Renderer() {
 
 void Renderer::waitIdle() { vkDeviceWaitIdle(m_device->getDevice()); }
 
-// ── drawFrame ────────────────────────────────────────────────────────────────
-void Renderer::drawFrame() {
-    float currentTime = static_cast<float>(glfwGetTime());
-    // Cap dt to 50 ms (20 fps floor) so CPU stall spikes don't cause the
-    // animation system to jump forward a large fraction of the cycle in a
-    // single frame, which manifests as a visible stagger/skip.
-    float dt = std::min(currentTime - m_lastFrameTime, 0.05f);
-    m_lastFrameTime = currentTime;
+// ── simulateStep ─────────────────────────────────────────────────────────────
+void Renderer::simulateStep(float dt) {
+    GLORY_ZONE_N("SimulateStep");
+    if (m_state == AppState::Launcher) return;
+
+    // Clear debug draws at start of each physics step
+    m_debugRenderer.clear();
+
+    // Save previous transforms for interpolation
+    {
+        auto view = m_scene.getRegistry().view<TransformComponent>();
+        for (auto [e, t] : view.each()) {
+            t.prevPosition = t.position;
+            t.prevRotation = t.rotation;
+        }
+    }
+
     m_gameTime += dt;
     m_currentDt = dt;
 
-    if (m_state == AppState::Launcher) {
-        ImGui_ImplVulkan_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-        
-        drawLauncherUI();
-    } else {
-        // ── Simulation tick (gameplay + VFX updates, decoupled from rendering) ─
-        {
-            SimulationContext simCtx{
-                .registry       = m_scene.getRegistry(),
-                .dt             = dt,
-                .abilities      = m_abilitySystem.get(),
-                .projectiles    = m_projectileSystem.get(),
-                .combat         = m_combatSystem.get(),
-                .vfxRenderer    = m_vfxRenderer.get(),
-                .vfxQueue       = m_vfxQueue.get(),
-                .combatVfxQueue = m_combatVfxQueue.get(),
-                .trailRenderer  = m_trailRenderer.get(),
-                .groundDecals   = m_groundDecalRenderer.get(),
-                .meshEffects    = m_meshEffectRenderer.get(),
-                .distortion     = m_distortionRenderer.get(),
-                .explosions     = m_explosionRenderer.get(),
-                .coneEffect     = m_coneEffect.get(),
-                .spriteEffects  = m_spriteEffectRenderer.get(),
-                .coneEffectTimer = m_coneEffectTimer,
-                .coneDuration    = CONE_DURATION,
-                .coneHalfAngle   = CONE_HALF_ANGLE,
-                .coneRange       = CONE_RANGE,
-                .coneApex        = m_coneApex,
-                .coneDirection   = m_coneDirection,
-            };
-            SimulationLoop::tick(simCtx);
-            m_coneEffectTimer = simCtx.coneEffectTimer;
+    // ── Simulation tick (gameplay + VFX updates, decoupled from rendering) ─
+    {
+        SimulationContext simCtx{
+            .registry       = m_scene.getRegistry(),
+            .dt             = dt,
+            .abilities      = m_abilitySystem.get(),
+            .projectiles    = m_projectileSystem.get(),
+            .combat         = m_combatSystem.get(),
+            .vfxRenderer    = m_vfxRenderer.get(),
+            .vfxQueue       = m_vfxQueue.get(),
+            .combatVfxQueue = m_combatVfxQueue.get(),
+            .trailRenderer  = m_trailRenderer.get(),
+            .groundDecals   = m_groundDecalRenderer.get(),
+            .meshEffects    = m_meshEffectRenderer.get(),
+            .distortion     = m_distortionRenderer.get(),
+            .explosions     = m_explosionRenderer.get(),
+            .coneEffect     = m_coneEffect.get(),
+            .spriteEffects  = m_spriteEffectRenderer.get(),
+            .coneEffectTimer = m_coneEffectTimer,
+            .coneDuration    = CONE_DURATION,
+            .coneHalfAngle   = CONE_HALF_ANGLE,
+            .coneRange       = CONE_RANGE,
+            .coneApex        = m_coneApex,
+            .coneDirection   = m_coneDirection,
+        };
+        SimulationLoop::tick(simCtx);
+        m_coneEffectTimer = simCtx.coneEffectTimer;
 
-            // ── Fog of War vision update ──────────────────────────────────
-            if (m_fogOfWar) {
-                auto& reg = m_scene.getRegistry();
-                std::vector<VisionEntity> visionEnts;
-                visionEnts.reserve(32);
+        // ── Fog of War vision update ──────────────────────────────────
+        if (m_fogOfWar) {
+            auto& reg = m_scene.getRegistry();
+            std::vector<VisionEntity> visionEnts;
+            visionEnts.reserve(32);
 
-                // Friendly (PLAYER team) units reveal the map.
-                // The player's champion gets a larger personal sight range.
-                auto view = reg.view<TransformComponent, TeamComponent>();
-                for (auto [ent, tf, team] : view.each()) {
-                    if (team.team != Team::PLAYER) continue;
-                    float range = (ent == m_playerEntity) ? 18.0f : 10.0f;
-                    visionEnts.push_back({ tf.position, range });
-                }
-
-                m_fogSystem.update(visionEnts);
-                m_fogOfWar->updateVisibility(
-                    m_fogSystem.getVisibilityBuffer().data(), 128, 128);
+            // Friendly (PLAYER team) units reveal the map.
+            // The player's champion gets a larger personal sight range.
+            auto view = reg.view<TransformComponent, TeamComponent>();
+            for (auto [ent, tf, team] : view.each()) {
+                if (team.team != Team::PLAYER) continue;
+                float range = (ent == m_playerEntity) ? 18.0f : 10.0f;
+                visionEnts.push_back({ tf.position, range });
             }
+
+            m_fogSystem.update(visionEnts);
+            m_fogOfWar->updateVisibility(
+                m_fogSystem.getVisibilityBuffer().data(), 128, 128);
         }
-
-        // ── ImGui new frame (before any UI building) ─────────────────────────
-        ImGui_ImplVulkan_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
     }
-    
-    // ── Standard frame loop: Wait for GPU ─────────────────────────────────
-    VkDevice dev = m_device->getDevice();
-    VkFence fence = m_sync->getInFlightFence(m_currentFrame);
-    vkWaitForFences(dev, 1, &fence, VK_TRUE, UINT64_MAX);
 
-    uint32_t imageIndex = 0;
-    VkSemaphore imgSem = m_sync->getImageAvailableSemaphore(m_currentFrame);
-    VkResult result = vkAcquireNextImageKHR(dev, m_swapchain->getSwapchain(),
-                                             UINT64_MAX, imgSem, VK_NULL_HANDLE, &imageIndex);
-    if (result == VK_ERROR_OUT_OF_DATE_KHR) { recreateSwapchain(); return; }
-    if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
-        throw std::runtime_error("Failed to acquire swapchain image");
-
-    vkResetFences(dev, 1, &fence);
-    
-    m_debugRenderer.clear();
-
-    if (m_state != AppState::Launcher) {
-        // ── Input ────────────────────────────────────────────────────────────
-        auto ext = m_swapchain->getExtent();
-        float aspect = static_cast<float>(ext.width) / static_cast<float>(ext.height);
+    // ── Input ────────────────────────────────────────────────────────────
+    auto ext = m_swapchain->getExtent();
+    float aspect = static_cast<float>(ext.width) / static_cast<float>(ext.height);
 
     int winW, winH;
     glfwGetWindowSize(m_window.getHandle(), &winW, &winH);
@@ -464,7 +443,7 @@ void Renderer::drawFrame() {
         if (target != entt::null && m_combatSystem) {
             // Target enemy for auto-attack (will chase if out of range)
             combat.targetEntity = target;
-            
+
             // Animation canceling: interrupt windup if a new target is clicked
             if (combat.state == CombatState::ATTACK_WINDUP || combat.state == CombatState::ATTACK_WINDDOWN) {
                 combat.state = CombatState::IDLE;
@@ -551,7 +530,7 @@ void Renderer::drawFrame() {
     if (glfwGetKey(m_window.getHandle(), GLFW_KEY_X) == GLFW_PRESS && m_spawnTimer <= 0.0f) {
         glm::vec2 mpos = m_input->getMousePos();
         glm::vec3 worldPos = screenToWorld(mpos.x, mpos.y);
-        
+
         auto minion = m_scene.createEntity("MeleeMinion");
         auto& t = m_scene.getRegistry().get<TransformComponent>(minion);
         t.position = worldPos;
@@ -594,28 +573,28 @@ void Renderer::drawFrame() {
             m_selection.dragStart = m_input->getMousePos();
         }
         m_selection.dragEnd = m_input->getMousePos();
-        
+
         // Draw Marquee Box using DebugRenderer on the ground plane
         glm::vec3 tl = screenToWorld(m_selection.dragStart.x, m_selection.dragStart.y);
         glm::vec3 tr = screenToWorld(m_selection.dragEnd.x, m_selection.dragStart.y);
         glm::vec3 br = screenToWorld(m_selection.dragEnd.x, m_selection.dragEnd.y);
         glm::vec3 bl = screenToWorld(m_selection.dragStart.x, m_selection.dragEnd.y);
-        
+
         // Offset slightly above ground to prevent z-fighting
         tl.y = tr.y = br.y = bl.y = 0.05f;
-        
+
         glm::vec4 color(0.2f, 1.0f, 0.4f, 1.0f);
         m_debugRenderer.drawLine(tl, tr, color);
         m_debugRenderer.drawLine(tr, br, color);
         m_debugRenderer.drawLine(br, bl, color);
         m_debugRenderer.drawLine(bl, tl, color);
-        
+
     } else {
         if (m_selection.isDragging) {
             m_selection.isDragging = false;
             glm::vec2 start = m_selection.dragStart;
             glm::vec2 end   = m_selection.dragEnd;
-            
+
             float dist = glm::distance(start, end);
             bool isClick = dist < 5.0f;
 
@@ -649,7 +628,7 @@ void Renderer::drawFrame() {
                     // Clicked on ground -> move selected units
                     glm::vec3 targetWorld = screenToWorld(end.x, end.y);
                     auto unitView = m_scene.getRegistry().view<SelectableComponent, CharacterComponent, UnitComponent>();
-                    
+
                     int numSelected = 0;
                     for (auto e : unitView) {
                         if (unitView.get<SelectableComponent>(e).isSelected) numSelected++;
@@ -661,7 +640,7 @@ void Renderer::drawFrame() {
                         if (s.isSelected) {
                             auto& c = unitView.get<CharacterComponent>(e);
                             auto& u = unitView.get<UnitComponent>(e);
-                            
+
                             // Calculate simple circular formation offset
                             glm::vec3 offset(0.0f);
                             if (numSelected > 1) {
@@ -833,7 +812,6 @@ void Renderer::drawFrame() {
     // ── Update animations ─────────────────────────────────────────────────
     auto animView = m_scene.getRegistry()
         .view<SkeletonComponent, AnimationComponent, GPUSkinnedMeshComponent, TransformComponent>();
-    uint32_t currentBoneSlot = 0;
     for (auto&& [e, skel, anim, ssm, t] : animView.each()) {
         // Switch clip based on movement/combat state
         // (0=idle, 1=walk, 2=attack)
@@ -843,11 +821,11 @@ void Renderer::drawFrame() {
 
             if (m_scene.getRegistry().all_of<CombatComponent>(e)) {
                 auto& combat = m_scene.getRegistry().get<CombatComponent>(e);
-                if (combat.state == CombatState::ATTACK_WINDUP || 
+                if (combat.state == CombatState::ATTACK_WINDUP ||
                     combat.state == CombatState::ATTACK_FIRE ||
                     combat.state == CombatState::ATTACK_WINDDOWN) {
                     targetClip = 2; // attack
-                    
+
                     // Face the target while attacking
                     if (m_scene.getRegistry().valid(combat.targetEntity) &&
                         m_scene.getRegistry().all_of<TransformComponent>(combat.targetEntity)) {
@@ -881,9 +859,6 @@ void Renderer::drawFrame() {
             // Scale animation speed
             if (anim.activeClipIndex == 2 && m_scene.getRegistry().all_of<CombatComponent>(e)) {
                 // Attack: scale so the clip spans exactly one full attack cycle.
-                // timeScale = clipDuration * attackSpeed ensures the animation
-                // finishes at the same moment the combat cycle ends, regardless
-                // of the clip's authored length.
                 auto& combat = m_scene.getRegistry().get<CombatComponent>(e);
                 const auto& attackClip = anim.clips[anim.activeClipIndex];
                 float clipDuration = (attackClip.duration > 0.0f) ? attackClip.duration : 1.0f;
@@ -912,17 +887,56 @@ void Renderer::drawFrame() {
         }
         anim.player.refreshSkeleton(&skel.skeleton);
         anim.player.update(dt);
-        const auto& matrices = anim.player.getSkinningMatrices();
-        m_descriptors->writeBoneSlot(m_currentFrame, currentBoneSlot, matrices);
-        ssm.boneSlot = currentBoneSlot++;
     }
-    // Flush the bone SSBO once after all slots are written instead of once
-    // per character.  writeBoneSlot no longer flushes internally; this single
-    // call makes all per-frame bone data visible to the GPU in one coherency
-    // operation, avoiding N redundant VK_WHOLE_SIZE flushes per frame.
-    if (currentBoneSlot > 0)
-        m_descriptors->flushBones(m_currentFrame);
-    } // end if (m_state != AppState::Launcher)
+}
+
+// ── renderFrame ──────────────────────────────────────────────────────────────
+void Renderer::renderFrame(float alpha) {
+    GLORY_ZONE_N("RenderFrame");
+    m_renderAlpha = alpha;
+
+    // Compute real per-render-frame dt for FPS display and click anim
+    float currentTimeSec = static_cast<float>(glfwGetTime());
+    float realDt = std::min(currentTimeSec - m_lastFrameTime, 0.05f);
+    m_lastFrameTime = currentTimeSec;
+
+    // ImGui new frame (once per rendered frame, for both Launcher and gameplay)
+    ImGui_ImplVulkan_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+    if (m_state == AppState::Launcher) {
+        drawLauncherUI();
+    }
+
+    // ── GPU: wait + acquire swapchain image ─────────────────────────────────
+    VkDevice dev = m_device->getDevice();
+    VkFence fence = m_sync->getInFlightFence(m_currentFrame);
+    vkWaitForFences(dev, 1, &fence, VK_TRUE, UINT64_MAX);
+
+    uint32_t imageIndex = 0;
+    VkSemaphore imgSem = m_sync->getImageAvailableSemaphore(m_currentFrame);
+    VkResult result = vkAcquireNextImageKHR(dev, m_swapchain->getSwapchain(),
+                                             UINT64_MAX, imgSem, VK_NULL_HANDLE, &imageIndex);
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) { recreateSwapchain(); return; }
+    if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
+        throw std::runtime_error("Failed to acquire swapchain image");
+
+    vkResetFences(dev, 1, &fence);
+
+    // ── Bone SSBO write (safe after fence — GPU done with this frame's SSBO) ──
+    if (m_state != AppState::Launcher) {
+        auto animView = m_scene.getRegistry()
+            .view<SkeletonComponent, AnimationComponent, GPUSkinnedMeshComponent, TransformComponent>();
+        uint32_t currentBoneSlot = 0;
+        for (auto&& [e, skel, anim, ssm, t] : animView.each()) {
+            const auto& matrices = anim.player.getSkinningMatrices();
+            m_descriptors->writeBoneSlot(m_currentFrame, currentBoneSlot, matrices);
+            ssm.boneSlot = currentBoneSlot++;
+        }
+        if (currentBoneSlot > 0)
+            m_descriptors->flushBones(m_currentFrame);
+    }
 
     // ── Debug UI (ImGui) ─────────────────────────────────────────────────
     if (m_showDebugUI && m_state != AppState::Launcher) {
@@ -937,7 +951,7 @@ void Renderer::drawFrame() {
         ImGui::Checkbox("Fog Enabled", &m_fogEnabled);
 
         ImGui::Separator();
-        ImGui::Text("FPS: %.1f", dt > 0.0f ? 1.0f / dt : 0.0f);
+        ImGui::Text("FPS: %.1f", realDt > 0.0f ? 1.0f / realDt : 0.0f);
         ImGui::Text("Game Time: %.1f", m_gameTime);
 
         if (m_playerEntity != entt::null && m_scene.getRegistry().all_of<CombatComponent>(m_playerEntity)) {
@@ -962,14 +976,14 @@ void Renderer::drawFrame() {
 
     // ── Click animation ───────────────────────────────────────────────────
     if (m_clickAnim) {
-        m_clickAnim->lifetime += dt;
+        m_clickAnim->lifetime += realDt;
         if (m_clickAnim->lifetime >= m_clickAnim->maxLife)
             m_clickAnim.reset();
     }
 
     VkCommandBuffer cmd = m_sync->getCommandBuffer(m_currentFrame);
     vkResetCommandBuffer(cmd, 0);
-    recordCommandBuffer(cmd, imageIndex, dt);
+    recordCommandBuffer(cmd, imageIndex, realDt);
 
     VkSemaphore     waitSems[]   = { imgSem };
     VkPipelineStageFlags stages[]= { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
@@ -1004,7 +1018,6 @@ void Renderer::drawFrame() {
 
     m_currentFrame = (m_currentFrame + 1) % Sync::MAX_FRAMES_IN_FLIGHT;
 }
-
 // ── recordCommandBuffer ──────────────────────────────────────────────────────
 void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, float /*dt*/) {
     VkCommandBufferBeginInfo bi{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
@@ -1074,7 +1087,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
                     entt::exclude<GPUSkinnedMeshComponent>);
             for (auto&& [e, t, mc, mat] : staticView.each()) {
                 if (instanceIndex >= MAX_INSTANCES) break;
-                instances[instanceIndex].model = t.getModelMatrix();
+                instances[instanceIndex].model = t.getInterpolatedModelMatrix(m_renderAlpha);
 
                 VkBuffer     instBuf    = m_instanceBuffers[m_currentFrame].getBuffer();
                 VkDeviceSize instOffset = instanceIndex * sizeof(InstanceData);
@@ -1084,14 +1097,17 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
             }
         };
 
-        m_shadowPass.recordCommands(cmd, drawStaticShadows, nullptr);
+        {
+            GLORY_ZONE_N("ShadowPass");
+            m_shadowPass.recordCommands(cmd, drawStaticShadows, nullptr);
+        }
     }
 
     // ── Begin HDR render pass ────────────────────────────────────────────────
     std::array<VkClearValue, 3> clears{};
     clears[0].color        = {{ 0.08f, 0.10f, 0.14f, 1.0f }};
-    clears[1].depthStencil = { 1.0f, 0 };
-    clears[2].color        = {{ 1.0f, 0.0f, 0.0f, 0.0f }};  // charDepth: clear to far (1.0)
+    clears[1].depthStencil = { 0.0f, 0 };                    // reversed-Z: far = 0.0
+    clears[2].color        = {{ 0.0f, 0.0f, 0.0f, 0.0f }};  // charDepth: reversed-Z far = 0.0
 
     VkRenderPassBeginInfo rp{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
     rp.renderPass       = m_hdrFB->renderPass();
@@ -1123,7 +1139,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
                 entt::exclude<GPUSkinnedMeshComponent>);
         for (auto&& [e, t, mc, mat] : staticView.each()) {
             if (instanceIndex >= MAX_INSTANCES) break;
-            glm::mat4 model = t.getModelMatrix();
+            glm::mat4 model = t.getInterpolatedModelMatrix(m_renderAlpha);
             instances[instanceIndex].model        = model;
             instances[instanceIndex].normalMatrix = glm::transpose(glm::inverse(model));
 
@@ -1166,7 +1182,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
                 .view<TransformComponent, MaterialComponent, GPUSkinnedMeshComponent>();
             for (auto&& [e, t, mat, ssm] : skinnedView.each()) {
                 if (instanceIndex >= MAX_INSTANCES) break;
-                glm::mat4 model = t.getModelMatrix();
+                glm::mat4 model = t.getInterpolatedModelMatrix(m_renderAlpha);
                 instances[instanceIndex].model        = model;
                 instances[instanceIndex].normalMatrix = glm::transpose(glm::inverse(model));
 
@@ -1487,6 +1503,12 @@ void Renderer::buildScene() {
 
     if (m_fogOfWar) {
         m_descriptors->writeFogOfWar(m_fogOfWar->getVisibilityView(), m_fogOfWar->getSampler());
+        if (m_groundDecalRenderer) {
+            // Decals sample FoW so ability indicators fade in unexplored areas
+            m_groundDecalRenderer->setFogOfWar(
+                m_fogOfWar->getVisibilityView(), m_fogOfWar->getSampler(),
+                glm::vec2(-100.0f, -100.0f), glm::vec2(100.0f, 100.0f));
+        }
     }
 
     // ── Flat map removed for testing (replaced by lane tiles) ─────────────
@@ -2123,11 +2145,10 @@ void Renderer::createGridPipeline() {
     ms.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
     VkPipelineDepthStencilStateCreateInfo ds{ VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
-    ds.depthTestEnable = VK_TRUE; ds.depthWriteEnable = VK_FALSE; ds.depthCompareOp = VK_COMPARE_OP_LESS;
+    ds.depthTestEnable = VK_TRUE; ds.depthWriteEnable = VK_FALSE; ds.depthCompareOp = VK_COMPARE_OP_GREATER;
 
     VkPipelineColorBlendAttachmentState blend{};
     blend.blendEnable         = VK_TRUE;
-    blend.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
     blend.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
     blend.colorBlendOp        = VK_BLEND_OP_ADD;
     blend.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
@@ -2236,7 +2257,7 @@ void Renderer::createSkinnedPipeline() {
     ms.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
     VkPipelineDepthStencilStateCreateInfo ds{ VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
-    ds.depthTestEnable = VK_TRUE; ds.depthWriteEnable = VK_TRUE; ds.depthCompareOp = VK_COMPARE_OP_LESS;
+    ds.depthTestEnable = VK_TRUE; ds.depthWriteEnable = VK_TRUE; ds.depthCompareOp = VK_COMPARE_OP_GREATER;
 
     VkPipelineColorBlendAttachmentState blendAttach{};
     blendAttach.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |

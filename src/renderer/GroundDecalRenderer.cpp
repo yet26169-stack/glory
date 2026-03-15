@@ -26,8 +26,8 @@ GroundDecalRenderer::GroundDecalRenderer(const Device& device, VkRenderPass rend
     createDescriptorLayout();
     createPipelines();
 
-    // Pool for decal descriptor sets (one per unique texture)
-    VkDescriptorPoolSize poolSize{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 32 };
+    // Pool for decal descriptor sets: 2 samplers per set (binding 0 = decal tex, binding 1 = FoW)
+    VkDescriptorPoolSize poolSize{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 64 };
     VkDescriptorPoolCreateInfo poolCI{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
     poolCI.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     poolCI.maxSets = 32;
@@ -96,14 +96,16 @@ void GroundDecalRenderer::render(VkCommandBuffer cmd, const glm::mat4& viewProj,
         alpha = std::clamp(alpha, 0.0f, 1.0f);
 
         DecalPC pc;
-        pc.viewProj = viewProj;
-        pc.center = inst.center;
-        pc.radius = inst.radius;
-        pc.rotation = inst.rotation;
-        pc.alpha = alpha;
-        pc.elapsed = inst.elapsed;
-        pc.appTime = appTime;
-        pc.color = inst.def->color;
+        pc.viewProj  = viewProj;
+        pc.center    = inst.center;
+        pc.radius    = inst.radius;
+        pc.rotation  = inst.rotation;
+        pc.alpha     = alpha;
+        pc.elapsed   = inst.elapsed;
+        pc.appTime   = appTime;
+        pc.color     = inst.def->color;
+        pc.fowMapMin = m_fowMapMin;
+        pc.fowMapMax = m_fowMapMax;
 
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, inst.def->additive ? m_additivePipeline : m_alphaPipeline);
         
@@ -126,15 +128,21 @@ void GroundDecalRenderer::destroyAll() {
 }
 
 void GroundDecalRenderer::createDescriptorLayout() {
-    VkDescriptorSetLayoutBinding binding{};
-    binding.binding = 0;
-    binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    binding.descriptorCount = 1;
-    binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    VkDescriptorSetLayoutBinding bindings[2] = {};
+    // binding 0: decal texture
+    bindings[0].binding         = 0;
+    bindings[0].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[0].descriptorCount = 1;
+    bindings[0].stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
+    // binding 1: Fog of War visibility texture
+    bindings[1].binding         = 1;
+    bindings[1].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[1].descriptorCount = 1;
+    bindings[1].stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
 
     VkDescriptorSetLayoutCreateInfo layoutCI{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-    layoutCI.bindingCount = 1;
-    layoutCI.pBindings = &binding;
+    layoutCI.bindingCount = 2;
+    layoutCI.pBindings = bindings;
     VK_CHECK(vkCreateDescriptorSetLayout(m_device.getDevice(), &layoutCI, nullptr, &m_descLayout), "Create Decal Layout");
 }
 
@@ -191,7 +199,7 @@ void GroundDecalRenderer::createPipelines() {
     msCI.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
     VkPipelineDepthStencilStateCreateInfo dsCI{ VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
-    dsCI.depthTestEnable = VK_TRUE; dsCI.depthWriteEnable = VK_FALSE; dsCI.depthCompareOp = VK_COMPARE_OP_LESS;
+    dsCI.depthTestEnable = VK_TRUE; dsCI.depthWriteEnable = VK_FALSE; dsCI.depthCompareOp = VK_COMPARE_OP_GREATER;
 
     VkPipelineColorBlendAttachmentState blend{};
     blend.blendEnable = VK_TRUE;
@@ -263,37 +271,66 @@ Texture* GroundDecalRenderer::getOrLoadTexture(const std::string& path) {
 }
 
 VkDescriptorSet GroundDecalRenderer::getOrCreateDescriptorSet(Texture* tex) {
-    uint64_t key = (uint64_t)tex->getImageView();
-    // Use texture image view handle as key for descriptor set
-    // Simplified for now: one set per unique texture view
-    static std::unordered_map<uint64_t, VkDescriptorSet> cachedSets;
-    
-    if (cachedSets.count(key)) return cachedSets[key];
+    uint64_t key = reinterpret_cast<uint64_t>(tex->getImageView());
+
+    auto it = m_descSets.find(key);
+    if (it != m_descSets.end()) return it->second;
 
     VkDescriptorSetAllocateInfo allocInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-    allocInfo.descriptorPool = m_descPool;
+    allocInfo.descriptorPool     = m_descPool;
     allocInfo.descriptorSetCount = 1;
-    allocInfo.pSetLayouts = &m_descLayout;
-    
+    allocInfo.pSetLayouts        = &m_descLayout;
+
     VkDescriptorSet ds;
     VK_CHECK(vkAllocateDescriptorSets(m_device.getDevice(), &allocInfo, &ds), "Alloc Decal Desc Set");
 
-    VkDescriptorImageInfo imgInfo{};
-    imgInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    imgInfo.imageView = tex->getImageView();
-    imgInfo.sampler = tex->getSampler();
+    // Binding 0: decal texture
+    VkDescriptorImageInfo decalImg{};
+    decalImg.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    decalImg.imageView   = tex->getImageView();
+    decalImg.sampler     = tex->getSampler();
 
-    VkWriteDescriptorSet write{};
-    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    write.dstSet = ds;
-    write.dstBinding = 0;
-    write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    write.descriptorCount = 1;
-    write.pImageInfo = &imgInfo;
+    // Binding 1: FoW texture (fall back to default white if not yet set)
+    VkDescriptorImageInfo fowImg{};
+    fowImg.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    fowImg.imageView   = (m_fowView   != VK_NULL_HANDLE) ? m_fowView   : m_defaultTexture->getImageView();
+    fowImg.sampler     = (m_fowSampler!= VK_NULL_HANDLE) ? m_fowSampler: m_defaultTexture->getSampler();
 
-    vkUpdateDescriptorSets(m_device.getDevice(), 1, &write, 0, nullptr);
-    cachedSets[key] = ds;
+    VkWriteDescriptorSet writes[2] = {};
+    writes[0].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[0].dstSet          = ds;
+    writes[0].dstBinding      = 0;
+    writes[0].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writes[0].descriptorCount = 1;
+    writes[0].pImageInfo      = &decalImg;
+    writes[1].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[1].dstSet          = ds;
+    writes[1].dstBinding      = 1;
+    writes[1].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writes[1].descriptorCount = 1;
+    writes[1].pImageInfo      = &fowImg;
+
+    vkUpdateDescriptorSets(m_device.getDevice(), 2, writes, 0, nullptr);
+    m_descSets[key] = ds;
     return ds;
+}
+
+void GroundDecalRenderer::setFogOfWar(VkImageView fowView, VkSampler fowSampler,
+                                      glm::vec2 fowMapMin, glm::vec2 fowMapMax) {
+    m_fowView    = fowView;
+    m_fowSampler = fowSampler;
+    m_fowMapMin  = fowMapMin;
+    m_fowMapMax  = fowMapMax;
+    // Clear cached descriptor sets so they're rebuilt with the correct FoW binding
+    if (!m_descSets.empty()) {
+        vkDeviceWaitIdle(m_device.getDevice());
+        std::vector<VkDescriptorSet> sets;
+        sets.reserve(m_descSets.size());
+        for (auto& kv : m_descSets) sets.push_back(kv.second);
+        vkFreeDescriptorSets(m_device.getDevice(), m_descPool,
+                             static_cast<uint32_t>(sets.size()), sets.data());
+        m_descSets.clear();
+    }
 }
 
 } // namespace glory

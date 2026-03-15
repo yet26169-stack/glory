@@ -3,6 +3,7 @@
 #include "ability/AbilitySystem.h"
 #include "ability/ProjectileSystem.h"
 #include "combat/CombatSystem.h"
+#include "physics/PhysicsSystem.h"
 #include "vfx/VFXRenderer.h"
 #include "vfx/VFXEventQueue.h"
 #include "vfx/TrailRenderer.h"
@@ -79,6 +80,15 @@ void SimulationLoop::tick(SimulationContext& ctx) {
     if (ctx.combat) {
         ctx.combat->update(ctx.registry, dt);
     }
+
+    // ── 8. Rigid-body physics ─────────────────────────────────────────────
+    // Step order matters for correctness:
+    //   a) integrate:              gravity + semi-implicit Euler (no sleep check yet)
+    //   b) resolveCollisionsAndWake: iterative progressive positional correction
+    //   c) updateSleep:            sleep check AFTER solver settles bodies
+    PhysicsSystem::integrate(ctx.registry, dt);
+    PhysicsSystem::resolveCollisionsAndWake(ctx.registry);
+    PhysicsSystem::updateSleep(ctx.registry, dt);
 }
 
 } // namespace glory

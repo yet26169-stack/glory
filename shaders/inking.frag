@@ -1,5 +1,11 @@
 #version 450
 
+// ── Inking pass: depth-only Sobel edge detection ─────────────────────────────
+// TODO (Prompt 10): Add normal discontinuity detection for SC2-style inner-edge
+// inking (arm/torso creases, etc.). Requires a world-normal G-buffer pass written
+// before this shader runs. Planned: add binding 1 sampler2D normalTex, run the
+// same 3×3 Sobel on .rgb, combine: float G = max(depthG, normalG * normalWeight).
+// ─────────────────────────────────────────────────────────────────────────────
 layout(binding = 0) uniform sampler2D depthTex;
 
 layout(push_constant) uniform PC {

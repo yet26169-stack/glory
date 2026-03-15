@@ -25,6 +25,7 @@ layout(binding = 2) uniform LightUBO {
     float appTime;
     float toonRampSharpness;
     float shadowWarmth;
+    float shadowBiasScale;  // normal-offset bias multiplier (default 1.5, tune to taste)
     vec3  shadowTint;
     vec2  fowMapMin;
     vec2  fowMapMax;
@@ -81,7 +82,34 @@ mat3 cotangentFrame(vec3 N, vec3 p, vec2 uv) {
 // The shadow atlas is 3*TILE wide × TILE tall, with cascades laid out horizontally.
 const int CASCADE_COUNT = 3;
 
-float sampleShadowCascade(vec3 proj, int cascadeIndex) {
+// Directional shadow light direction (world-space, pointing toward the light).
+// Matches the C++ hardcoded value in Renderer.cpp: normalize(vec3(100, 60, 100)).
+const vec3  kShadowLightDir = normalize(vec3(100.0, 60.0, 100.0));
+const float kShadowMapRes   = 2048.0; // matches ShadowPass::SHADOW_MAP_SIZE
+
+// Returns the light-view-projection matrix for the given cascade index.
+mat4 getLightVP(int cascade) {
+    if (cascade == 0) return ubo.lightSpaceMatrix;
+    if (cascade == 1) return ubo.lightSpaceMatrix1;
+    return ubo.lightSpaceMatrix2;
+}
+
+float sampleShadowCascade(vec3 worldPos, vec3 worldNormal, int cascadeIndex) {
+    // ── Normal Offset Bias ────────────────────────────────────────────────────
+    // Instead of subtracting a constant from the depth comparison, we shift the
+    // world-space sampling point along the surface normal.  The shift is largest
+    // on surfaces nearly perpendicular to the light (slopeScale→1) and zero on
+    // surfaces facing the light directly (nDotL→1).
+    float texelSize  = 2.0 / kShadowMapRes;
+    float nDotL      = max(dot(worldNormal, kShadowLightDir), 0.0);
+    float slopeScale = clamp(1.0 - nDotL, 0.0, 1.0);
+    vec3  offsetPos  = worldPos + worldNormal * texelSize * lightData.shadowBiasScale * slopeScale;
+
+    // Project the offset position into light clip space for this cascade.
+    vec4 lsPos = getLightVP(cascadeIndex) * vec4(offsetPos, 1.0);
+    vec3 proj  = lsPos.xyz / lsPos.w;
+    proj.xy    = proj.xy * 0.5 + 0.5;
+
     // Map X into the correct cascade tile (0..1 → cascadeIndex/3 .. (cascadeIndex+1)/3)
     float tileU = (proj.x + float(cascadeIndex)) / float(CASCADE_COUNT);
     vec2 uv = vec2(tileU, proj.y);
@@ -101,51 +129,39 @@ float sampleShadowCascade(vec3 proj, int cascadeIndex) {
         vec2( 0.19984126,  0.78641367), vec2( 0.14383161, -0.14100790)
     );
 
-    float shadow = 0.0;
-    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
-    float bias = 0.002;
-    float spread = 1.5;
+    float shadow  = 0.0;
+    vec2  uvTexel = 1.0 / textureSize(shadowMap, 0);
+    float spread  = 1.5;
 
     for (int i = 0; i < 16; ++i) {
-        float depth = texture(shadowMap, uv + poissonDisk[i] * texelSize * spread).r;
-        shadow += (proj.z - bias > depth) ? 0.0 : 1.0;
+        float depth = texture(shadowMap, uv + poissonDisk[i] * uvTexel * spread).r;
+        shadow += (proj.z > depth) ? 0.0 : 1.0; // no constant bias — normal offset handles acne
     }
     shadow /= 16.0;
 
     // Fade at cascade tile boundaries
-    vec2 edgeDist = min(vec2(proj.x, proj.y), 1.0 - vec2(proj.x, proj.y));
-    float minEdge = min(edgeDist.x, edgeDist.y);
+    vec2  edgeDist = min(vec2(proj.x, proj.y), 1.0 - vec2(proj.x, proj.y));
+    float minEdge  = min(edgeDist.x, edgeDist.y);
     float edgeFade = smoothstep(0.0, 0.05, minEdge);
     return mix(1.0, shadow, edgeFade);
 }
 
-float calcShadow(vec4 lsPos0, vec4 lsPos1, vec4 lsPos2, float viewDepth) {
+float calcShadow(vec3 worldPos, vec3 worldNormal, float viewDepth) {
     // Select cascade based on view-space depth
-    vec4 lsPos;
     int cascade;
-    if (viewDepth < ubo.cascadeSplits.x) {
-        lsPos = lsPos0; cascade = 0;
-    } else if (viewDepth < ubo.cascadeSplits.y) {
-        lsPos = lsPos1; cascade = 1;
-    } else {
-        lsPos = lsPos2; cascade = 2;
-    }
+    if      (viewDepth < ubo.cascadeSplits.x) cascade = 0;
+    else if (viewDepth < ubo.cascadeSplits.y) cascade = 1;
+    else                                       cascade = 2;
 
-    vec3 proj = lsPos.xyz / lsPos.w;
-    proj.xy = proj.xy * 0.5 + 0.5;
-
-    float shadow = sampleShadowCascade(proj, cascade);
+    float shadow = sampleShadowCascade(worldPos, worldNormal, cascade);
 
     // Blend between cascades in the overlap region for smooth transitions
     float blendRegion = 2.0; // world units of blend overlap
     if (cascade < CASCADE_COUNT - 1) {
-        float splitDist = (cascade == 0) ? ubo.cascadeSplits.x : ubo.cascadeSplits.y;
+        float splitDist   = (cascade == 0) ? ubo.cascadeSplits.x : ubo.cascadeSplits.y;
         float blendFactor = smoothstep(splitDist - blendRegion, splitDist, viewDepth);
         if (blendFactor > 0.0) {
-            vec4 nextLsPos = (cascade == 0) ? lsPos1 : lsPos2;
-            vec3 nextProj = nextLsPos.xyz / nextLsPos.w;
-            nextProj.xy = nextProj.xy * 0.5 + 0.5;
-            float nextShadow = sampleShadowCascade(nextProj, cascade + 1);
+            float nextShadow = sampleShadowCascade(worldPos, worldNormal, cascade + 1);
             shadow = mix(shadow, nextShadow, blendFactor);
         }
     }
@@ -213,7 +229,7 @@ void main() {
     // Clamp roughness to avoid divide-by-zero
     roughness = clamp(roughness, 0.04, 1.0);
 
-    float shadow = calcShadow(fragLightSpacePos, fragLightSpacePos1, fragLightSpacePos2, fragViewDepth);
+    float shadow = calcShadow(fragWorldPos, fragWorldNormal, fragViewDepth);
 
     // ── Stylized (LoL/SC2) lighting model ────────────────────────────────────
     vec3 litColor = vec3(0.0);
@@ -275,7 +291,7 @@ void main() {
     vec3 dNdx = dFdx(N);
     vec3 dNdy = dFdy(N);
     float curvature = length(dNdx) + length(dNdy);
-    float microAO = 1.0 - clamp(curvature * 3.0, 0.0, 0.4);
+    float microAO = 1.0 - clamp(curvature * 1.5, 0.0, 0.2);
     result *= microAO;
 
     // ── Fog of War (LoL/SC2 style) ──────────────────────────────────────────

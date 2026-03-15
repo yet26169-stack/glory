@@ -235,7 +235,7 @@ void WaterRenderer::createPipeline(VkRenderPass renderPass,
     VkPipelineDepthStencilStateCreateInfo ds{ VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
     ds.depthTestEnable  = VK_TRUE;
     ds.depthWriteEnable = VK_FALSE;
-    ds.depthCompareOp   = VK_COMPARE_OP_LESS;
+    ds.depthCompareOp   = VK_COMPARE_OP_GREATER;
 
     // Attachment 0 (HDR color): standard alpha blend
     VkPipelineColorBlendAttachmentState blendHDR{};

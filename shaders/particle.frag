@@ -19,8 +19,10 @@ layout(location = 1) in vec2 fragUV;
 
 layout(location = 0) out vec4 outColor;
 
+// Reversed-Z: depth buffer stores 1.0 at near and 0.0 at far.
+// Derived: z_eye = near * far / (near * (1.0 - d) + far * d)
 float linearizeDepth(float d) {
-    return pc.nearPlane * pc.farPlane / (pc.farPlane - d * (pc.farPlane - pc.nearPlane));
+    return pc.nearPlane * pc.farPlane / (pc.nearPlane * (1.0 - d) + pc.farPlane * d);
 }
 
 void main() {
