@@ -56,7 +56,11 @@ void main() {
 
     // ── Inflate in local (skinned) space before world transform ───────────────
     // Inflating before inModel avoids non-uniform scale distorting the shell.
-    vec3 inflated = skinnedPos.xyz + normalize(skinnedNormal) * pc.outlineScale;
+    // Scale inflation by clip-space W so outline stays constant screen-space
+    // width regardless of camera distance (LoL/SC2 style).
+    vec4 tempClip = ubo.proj * ubo.view * inModel * skinnedPos;
+    float distScale = tempClip.w * 0.005; // 0.005 tuned for typical MOBA zoom range
+    vec3 inflated = skinnedPos.xyz + normalize(skinnedNormal) * pc.outlineScale * distScale;
     vec4 worldPos = inModel * vec4(inflated, 1.0);
     gl_Position   = ubo.proj * ubo.view * worldPos;
 

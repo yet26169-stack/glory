@@ -197,7 +197,8 @@ void InkingPass::render(VkCommandBuffer cmd, float threshold, float thickness,
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout,
                             0, 1, &m_descSet, 0, nullptr);
     InkPC pc{ inkColor, threshold, thickness };
-    vkCmdPushConstants(cmd, m_pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
+    vkCmdPushConstants(cmd, m_pipelineLayout,
+                       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
                        0, sizeof(InkPC), &pc);
     vkCmdDraw(cmd, 3, 1, 0, 0);
 }

@@ -194,9 +194,10 @@ void Device::createLogicalDevice() {
     baseQuery.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
     vkGetPhysicalDeviceFeatures2(m_physicalDevice, &baseQuery);
 
-    features.samplerAnisotropy = VK_TRUE;
-    features.fillModeNonSolid  = baseQuery.features.fillModeNonSolid;
-    features.multiDrawIndirect = baseQuery.features.multiDrawIndirect;
+    features.samplerAnisotropy  = VK_TRUE;
+    features.fillModeNonSolid   = baseQuery.features.fillModeNonSolid;
+    features.multiDrawIndirect  = baseQuery.features.multiDrawIndirect;
+    features.independentBlend   = baseQuery.features.independentBlend;
 
     // Query which Vulkan 1.2 features are actually available on this device
     // before enabling them — some (e.g. drawIndirectCount) are not supported

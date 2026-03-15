@@ -4,6 +4,7 @@
 #include <vk_mem_alloc.h>
 #include <glm/glm.hpp>
 
+#include <cstddef>
 #include <vector>
 #include "renderer/Buffer.h"
 
@@ -51,6 +52,33 @@ struct LightUBO {
     alignas(8) glm::vec2 fowMapMin{-100.0f, -100.0f};    // world-space FoW min bounds
     alignas(8) glm::vec2 fowMapMax{ 100.0f,  100.0f};    // world-space FoW max bounds
 };
+
+// ── std140 layout verification ────────────────────────────────────────────────
+// Each static_assert confirms C++ offsets match GLSL std140 offsets exactly.
+// PointLightData: 32 bytes (vec3@0 + 4-pad + vec3@16 + 4-pad)
+static_assert(sizeof(PointLightData)                  ==  32, "PointLightData must be 32 bytes");
+static_assert(offsetof(PointLightData, position)      ==   0, "std140: position@0");
+static_assert(offsetof(PointLightData, color)         ==  16, "std140: color@16");
+// LightUBO: lights[4] at 0–127, then packed fields
+static_assert(offsetof(LightUBO, lights)              ==   0, "std140: lights@0");
+static_assert(offsetof(LightUBO, viewPos)             == 128, "std140: viewPos@128");
+static_assert(offsetof(LightUBO, lightCount)          == 140, "std140: lightCount@140 (packs after vec3)");
+static_assert(offsetof(LightUBO, ambientStrength)     == 144, "std140: ambientStrength@144");
+static_assert(offsetof(LightUBO, specularStrength)    == 148, "std140: specularStrength@148");
+static_assert(offsetof(LightUBO, shininess)           == 152, "std140: shininess@152");
+static_assert(offsetof(LightUBO, fogColor)            == 160, "std140: fogColor@160");
+static_assert(offsetof(LightUBO, fogDensity)          == 172, "std140: fogDensity@172 (packs after vec3)");
+static_assert(offsetof(LightUBO, fogStart)            == 176, "std140: fogStart@176");
+static_assert(offsetof(LightUBO, fogEnd)              == 180, "std140: fogEnd@180");
+static_assert(offsetof(LightUBO, rimColor)            == 192, "std140: rimColor@192");
+static_assert(offsetof(LightUBO, rimIntensity)        == 204, "std140: rimIntensity@204 (packs after vec3)");
+static_assert(offsetof(LightUBO, appTime)             == 208, "std140: appTime@208");
+static_assert(offsetof(LightUBO, toonRampSharpness)   == 212, "std140: toonRampSharpness@212");
+static_assert(offsetof(LightUBO, shadowWarmth)        == 216, "std140: shadowWarmth@216");
+static_assert(offsetof(LightUBO, shadowTint)          == 224, "std140: shadowTint@224");
+static_assert(offsetof(LightUBO, fowMapMin)           == 240, "std140: fowMapMin@240");
+static_assert(offsetof(LightUBO, fowMapMax)           == 248, "std140: fowMapMax@248");
+static_assert(sizeof(LightUBO)                        == 256, "LightUBO must be 256 bytes");
 
 class Descriptors {
 public:

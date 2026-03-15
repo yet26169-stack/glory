@@ -32,10 +32,7 @@ void main() {
 
     vec3 mapped = ACESFilm(combined);
 
-    // Gamma correction (assuming swapchain is UNORM)
-    mapped = pow(mapped, vec3(1.0 / 2.2));
-
-    // ── LoL/SC2 Color Grading (warm highlights / cool shadows split) ──────────
+    // ── LoL/SC2 Color Grading — LINEAR space (Rec.709 luminance is valid here) ─
     if (pc.enableColorGrade != 0u) {
         float luminance = dot(mapped, vec3(0.2126, 0.7152, 0.0722));
         // Shadows push toward cool purple-blue (LoL shadow palette)
@@ -47,7 +44,11 @@ void main() {
         mapped = mix(mapped, colorGrade, 0.4); // 40% grade intensity
     }
 
-    // ── Vignette (LoL center-focus dark frame) ────────────────────────────────
+    // ── Saturation Boost — LINEAR space (SC2 midtone punch, mild 12%) ─────────
+    float gray = dot(mapped, vec3(0.2126, 0.7152, 0.0722));
+    mapped = mix(vec3(gray), mapped, 1.12);
+
+    // ── Vignette — LINEAR space, before gamma for consistent darkening ─────────
     if (pc.enableVignette != 0u) {
         vec2  vignetteUV   = uv - 0.5;
         float vignetteDist = length(vignetteUV);
@@ -55,9 +56,8 @@ void main() {
         mapped *= vignette;
     }
 
-    // ── Saturation Boost (SC2 midtone punch — always active, mild 12%) ────────
-    float gray = dot(mapped, vec3(0.2126, 0.7152, 0.0722));
-    mapped = mix(vec3(gray), mapped, 1.12);
+    // ── Gamma correction LAST (swapchain is UNORM) ────────────────────────────
+    mapped = pow(mapped, vec3(1.0 / 2.2));
 
     outColor = vec4(mapped, 1.0);
 }

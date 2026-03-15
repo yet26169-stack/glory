@@ -283,21 +283,20 @@ void main() {
     fowUV = clamp(fowUV, 0.0, 1.0);
     float visibility = texture(fowTexture, fowUV).r;
 
-    // Three-state visibility (unexplored / previously seen / currently visible)
-    if (visibility < 0.1) {
-        // Unexplored: near-black with slight blue tint
-        result = vec3(0.02, 0.02, 0.05);
-    } else if (visibility < 0.6) {
-        // Previously explored: desaturate 70%, darken 50%, blue-gray tint
-        float lum = dot(result, vec3(0.2126, 0.7152, 0.0722));
-        vec3 desat = vec3(lum);
-        result = mix(result, desat, 0.7) * 0.5;
-        result = mix(result, vec3(0.08, 0.09, 0.14), 0.3); // SC2 blue-gray FoW tint
-    }
-    // visibility >= 0.6: fully visible, no modification
-    // Use smoothstep for soft zone transitions
-    float fowEdge = smoothstep(0.05, 0.15, visibility);
-    float fowMid  = smoothstep(0.45, 0.65, visibility);
+    // Smooth transition factors
+    float fowEdge = smoothstep(0.05, 0.15, visibility);  // 0→1 as unexplored→seen
+    float fowMid  = smoothstep(0.45, 0.65, visibility);  // 0→1 as seen→visible
+
+    // Unexplored: near-black with slight blue tint
+    vec3 unexploredColor = vec3(0.02, 0.02, 0.05);
+
+    // Previously explored: desaturate 70%, darken 50%, blue-gray tint
+    float lum = dot(result, vec3(0.2126, 0.7152, 0.0722));
+    vec3 desatResult = mix(result, vec3(lum), 0.7) * 0.5;
+    vec3 prevSeenColor = mix(desatResult, vec3(0.08, 0.09, 0.14), 0.3);
+
+    // Blend: unexplored → previously seen → fully visible
+    result = mix(unexploredColor, mix(prevSeenColor, result, fowMid), fowEdge);
 
     // Exponential distance fog
     float fogDist   = length(lightData.viewPos - fragWorldPos);

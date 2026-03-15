@@ -49,9 +49,9 @@ void main() {
     outColor = color;
 
     // ── LoL/SC2 VFX readability boost ─────────────────────────────────────────
-    // Slight gamma lift makes particles pop against the desaturated FoW world.
-    outColor.rgb = pow(outColor.rgb, vec3(0.8));
-    // Opaque particles get an additional 30% brightness so they glow through
-    // the stylized toon lighting (SC2 approach).
-    if (outColor.a > 0.3) outColor.rgb *= 1.3;
+    // Smooth gamma lift for particle pop (less aggressive to avoid double-gamma)
+    outColor.rgb = pow(outColor.rgb, vec3(0.85));
+    // Gradual brightness boost instead of hard threshold
+    float brightBoost = smoothstep(0.2, 0.5, outColor.a) * 0.3;
+    outColor.rgb *= 1.0 + brightBoost;
 }

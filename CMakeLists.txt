@@ -209,8 +209,18 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
 )
 
 # ── Asset copy ────────────────────────────────────────────────────────────────
+# Configure-time copy (ensures assets exist on first build)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/assets)
 file(COPY ${CMAKE_SOURCE_DIR}/assets/ DESTINATION ${CMAKE_BINARY_DIR}/assets)
+
+# Build-time copy (keeps build/assets in sync with source/assets on every build)
+add_custom_target(copy_assets ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/assets
+        ${CMAKE_BINARY_DIR}/assets
+    COMMENT "Syncing assets to build directory"
+)
+add_dependencies(${PROJECT_NAME} copy_assets)
 
 # ── Map / terrain tests (lightweight, no Vulkan) ─────────────────────────────
 add_executable(test_mirror tests/test_mirror.cpp)
