@@ -1,6 +1,7 @@
 #pragma once
 
 #include "renderer/Buffer.h"
+#include "renderer/RenderFormats.h"
 
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
@@ -26,7 +27,7 @@ public:
     ExplosionRenderer()  = default;
     ~ExplosionRenderer() { destroy(); }
 
-    void init(const Device& device, VkRenderPass renderPass);
+    void init(const Device& device, const RenderFormats& formats);
 
     // Trigger a new explosion at the given world position.
     void addExplosion(glm::vec3 center);
@@ -93,7 +94,7 @@ private:
     void generateDiskMesh(const Device& device);
     void generateSphereMesh(const Device& device);
 
-    VkPipeline createPipeline(VkRenderPass        renderPass,
+    VkPipeline createPipeline(const RenderFormats&   formats,
                               const std::string&  vertSpv,
                               const std::string&  fragSpv,
                               VkCullModeFlags     cullMode,

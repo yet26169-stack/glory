@@ -4,6 +4,7 @@
 #include "renderer/Buffer.h"
 #include "renderer/Texture.h"
 #include "renderer/Descriptors.h"
+#include "renderer/RenderFormats.h"
 
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
@@ -36,7 +37,7 @@ public:
     // descriptors  — used to register water textures in the bindless array
     // baseSlot     — first available slot in the bindless texture array
     void init(const Device&       device,
-              VkRenderPass        renderPass,
+              const RenderFormats& formats,
               VkDescriptorSetLayout mainLayout,
               Descriptors&        descriptors,
               uint32_t            baseSlot);
@@ -86,7 +87,7 @@ private:
     void createMesh();
     void createTextures(const Device& device,
                         Descriptors& descriptors, uint32_t baseSlot);
-    void createPipeline(VkRenderPass renderPass, VkDescriptorSetLayout mainLayout);
+    void createPipeline(const RenderFormats& formats, VkDescriptorSetLayout mainLayout);
 };
 
 } // namespace glory

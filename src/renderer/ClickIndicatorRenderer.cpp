@@ -10,12 +10,12 @@ struct IndicatorVertex {
     glm::vec2 uv;
 };
 
-ClickIndicatorRenderer::ClickIndicatorRenderer(const Device& device, VkRenderPass renderPass)
+ClickIndicatorRenderer::ClickIndicatorRenderer(const Device& device, const RenderFormats& formats)
     : m_device(device) {
     m_texture = std::make_unique<Texture>(device, std::string(ASSET_DIR) + "textures/click_indicator_atlas.png");
     
     createDescriptorSet();
-    createPipeline(renderPass);
+    createPipeline(formats);
     createVertexBuffer();
     
     spdlog::info("ClickIndicatorRenderer initialized");
@@ -78,7 +78,7 @@ void ClickIndicatorRenderer::createDescriptorSet() {
     vkUpdateDescriptorSets(dev, 1, &write, 0, nullptr);
 }
 
-void ClickIndicatorRenderer::createPipeline(VkRenderPass renderPass) {
+void ClickIndicatorRenderer::createPipeline(const RenderFormats& formats) {
     VkDevice dev = m_device.getDevice();
     
     VkPushConstantRange pcRange{};
@@ -183,7 +183,10 @@ void ClickIndicatorRenderer::createPipeline(VkRenderPass renderPass) {
     gpCI.stageCount = 2; gpCI.pStages = stages; gpCI.pVertexInputState = &vi;
     gpCI.pInputAssemblyState = &ia; gpCI.pViewportState = &vp; gpCI.pRasterizationState = &rs;
     gpCI.pMultisampleState = &ms; gpCI.pDepthStencilState = &ds; gpCI.pColorBlendState = &cb;
-    gpCI.pDynamicState = &dy; gpCI.layout = m_pipelineLayout; gpCI.renderPass = renderPass;
+    gpCI.pDynamicState = &dy; gpCI.layout = m_pipelineLayout;
+    VkPipelineRenderingCreateInfo fmtCI = formats.pipelineRenderingCI();
+    gpCI.pNext = &fmtCI;
+    gpCI.renderPass = VK_NULL_HANDLE;
     
     vkCreateGraphicsPipelines(dev, VK_NULL_HANDLE, 1, &gpCI, nullptr, &m_pipeline);
     

@@ -18,8 +18,8 @@ static std::vector<char> readFile(const std::string& filepath) {
     return buffer;
 }
 
-TrailRenderer::TrailRenderer(const Device& device, VkRenderPass renderPass)
-    : m_device(device), m_renderPass(renderPass) 
+TrailRenderer::TrailRenderer(const Device& device, const RenderFormats& formats)
+    : m_device(device), m_formats(formats) 
 {
     m_whiteTexture = std::make_unique<Texture>(Texture::createDefault(device));
     createDescriptorLayout();
@@ -339,7 +339,9 @@ void TrailRenderer::createPipelines() {
     pipeCI.pColorBlendState = &cbCI;
     pipeCI.pDynamicState = &dynCI;
     pipeCI.layout = m_pipelineLayout;
-    pipeCI.renderPass = m_renderPass;
+    VkPipelineRenderingCreateInfo fmtCI = m_formats.pipelineRenderingCI();
+    pipeCI.pNext     = &fmtCI;
+    pipeCI.renderPass = VK_NULL_HANDLE;
 
     VK_CHECK(vkCreateGraphicsPipelines(dev, VK_NULL_HANDLE, 1, &pipeCI, nullptr, &m_alphaPipeline), "Alpha Trail Pipe");
 

@@ -3,6 +3,7 @@
 #include "renderer/Device.h"
 #include "renderer/Texture.h"
 #include "renderer/Mesh.h"
+#include "renderer/RenderFormats.h"
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
 #include <string>
@@ -27,7 +28,7 @@ public:
         bool additive = false;
     };
 
-    GroundDecalRenderer(const Device& device, VkRenderPass renderPass);
+    GroundDecalRenderer(const Device& device, const RenderFormats& formats);
     ~GroundDecalRenderer();
 
     void registerDecal(const DecalDef& def);
@@ -76,7 +77,7 @@ private:
     }; // Total: 128B (fits Vulkan minimum push constant limit)
 
     const Device& m_device;
-    VkRenderPass m_renderPass;
+    RenderFormats m_formats;
 
     VkDescriptorSetLayout m_descLayout = VK_NULL_HANDLE;
     VkDescriptorPool      m_descPool   = VK_NULL_HANDLE;

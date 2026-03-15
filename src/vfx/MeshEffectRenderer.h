@@ -3,6 +3,7 @@
 #include "vfx/MeshEffect.h"
 #include "renderer/Device.h"
 #include "renderer/Model.h"
+#include "renderer/RenderFormats.h"
 #include <vulkan/vulkan.h>
 #include <memory>
 #include <vector>
@@ -12,7 +13,7 @@ namespace glory {
 
 class MeshEffectRenderer {
 public:
-    MeshEffectRenderer(const Device& device, VkRenderPass renderPass);
+    MeshEffectRenderer(const Device& device, const RenderFormats& formats);
     ~MeshEffectRenderer();
 
     void registerDef(const MeshEffectDef& def);
@@ -28,7 +29,7 @@ public:
 
 private:
     const Device& m_device;
-    VkRenderPass m_renderPass;
+    RenderFormats m_formats;
 
     struct MeshData {
         std::unique_ptr<Model> model;

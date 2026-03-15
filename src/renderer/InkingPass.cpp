@@ -16,12 +16,12 @@ static std::vector<char> readFile(const std::string& filepath) {
     return buffer;
 }
 
-void InkingPass::init(const Device& device, VkRenderPass renderPass,
+void InkingPass::init(const Device& device, const RenderFormats& formats,
                       VkImageView characterDepthView, VkSampler sampler) {
     m_device  = &device;
     m_sampler = sampler;
     createDescriptorSet(characterDepthView);
-    createPipeline(renderPass);
+    createPipeline(formats);
 }
 
 void InkingPass::destroy() {
@@ -81,7 +81,7 @@ void InkingPass::updateInput(VkImageView characterDepthView) {
     vkUpdateDescriptorSets(m_device->getDevice(), 1, &write, 0, nullptr);
 }
 
-void InkingPass::createPipeline(VkRenderPass renderPass) {
+void InkingPass::createPipeline(const RenderFormats& formats) {
     VkDevice dev = m_device->getDevice();
 
     VkPushConstantRange pcRange{};
@@ -171,9 +171,10 @@ void InkingPass::createPipeline(VkRenderPass renderPass) {
     pipeCI.pDepthStencilState  = &dsCI;
     pipeCI.pColorBlendState    = &cbCI;
     pipeCI.pDynamicState       = &dynCI;
+    VkPipelineRenderingCreateInfo fmtCI = formats.pipelineRenderingCI();
+    pipeCI.pNext               = &fmtCI;
     pipeCI.layout              = m_pipelineLayout;
-    pipeCI.renderPass          = renderPass;
-    pipeCI.subpass             = 0;
+    pipeCI.renderPass          = VK_NULL_HANDLE;
 
     VK_CHECK(vkCreateGraphicsPipelines(dev, VK_NULL_HANDLE, 1, &pipeCI, nullptr, &m_pipeline), "Create Inking Pipeline");
 

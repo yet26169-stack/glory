@@ -1,6 +1,7 @@
 #pragma once
 
 #include "renderer/Device.h"
+#include "renderer/RenderFormats.h"
 #include "renderer/StaticSkinnedMesh.h"
 
 #include <vulkan/vulkan.h>
@@ -39,7 +40,7 @@ public:
     // mainLayout is the VkDescriptorSetLayout used by the skinned pipeline so
     // the same descriptor sets can be re-bound.
     void init(const Device& device,
-              VkRenderPass  renderPass,
+              const RenderFormats& formats,
               VkDescriptorSetLayout mainLayout);
 
     // Render one selected entity's outline.
@@ -71,7 +72,7 @@ private:
     VkPipeline       m_outlineDrawPipeline    = VK_NULL_HANDLE;
 
     void createPipelineLayout(VkDescriptorSetLayout mainLayout);
-    void createPipelines(VkRenderPass renderPass);
+    void createPipelines(const RenderFormats& formats);
 };
 
 } // namespace glory

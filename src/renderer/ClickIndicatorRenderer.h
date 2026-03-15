@@ -8,6 +8,7 @@
 
 #include "renderer/Texture.h"
 #include "renderer/Buffer.h"
+#include "renderer/RenderFormats.h"
 
 namespace glory {
 
@@ -15,7 +16,7 @@ class Device;
 
 class ClickIndicatorRenderer {
 public:
-    ClickIndicatorRenderer(const Device& device, VkRenderPass renderPass);
+    ClickIndicatorRenderer(const Device& device, const RenderFormats& formats);
     ~ClickIndicatorRenderer();
 
     void render(VkCommandBuffer cmd, const glm::mat4& viewProj, 
@@ -47,7 +48,7 @@ private:
     };
     
     void createDescriptorSet();
-    void createPipeline(VkRenderPass renderPass);
+    void createPipeline(const RenderFormats& formats);
     void createVertexBuffer();
 };
 

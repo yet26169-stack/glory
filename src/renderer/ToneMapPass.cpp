@@ -7,10 +7,10 @@
 
 namespace glory {
 
-void ToneMapPass::init(const Device& device, VkRenderPass swapchainRenderPass,
+void ToneMapPass::init(const Device& device, const RenderFormats& formats,
                       VkImageView hdrView, VkImageView bloomView, VkSampler sampler) {
     m_device = &device;
-    m_swapchainRenderPass = swapchainRenderPass;
+    m_formats = formats;
     m_hdrView = hdrView;
     m_bloomView = bloomView;
     m_sampler = sampler;
@@ -226,8 +226,9 @@ void ToneMapPass::createPipeline() {
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.pDynamicState = &dynamicState;
     pipelineInfo.layout = m_pipelineLayout;
-    pipelineInfo.renderPass = m_swapchainRenderPass;
-    pipelineInfo.subpass = 0;
+    VkPipelineRenderingCreateInfo fmtCI = m_formats.pipelineRenderingCI();
+    pipelineInfo.pNext     = &fmtCI;
+    pipelineInfo.renderPass = VK_NULL_HANDLE;
 
     VK_CHECK(vkCreateGraphicsPipelines(m_device->getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline),
              "Create ToneMap pipeline");

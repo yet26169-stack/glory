@@ -1,6 +1,7 @@
 #pragma once
 
 #include "renderer/Buffer.h"
+#include "renderer/RenderFormats.h"
 
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
@@ -28,7 +29,7 @@ public:
     ~ConeAbilityRenderer() { destroy(); }
 
     // Call once during engine init.
-    void init(const Device& device, VkRenderPass renderPass);
+    void init(const Device& device, const RenderFormats& formats);
 
     // Tick lightning jitter (~20 Hz internally). Call each frame while active.
     void update(float dt,
@@ -109,7 +110,7 @@ private:
                              float range);
 
     // Generic pipeline factory.
-    VkPipeline createPipeline(VkRenderPass        renderPass,
+    VkPipeline createPipeline(const RenderFormats&    formats,
                               const std::string&  vertSpv,
                               const std::string&  fragSpv,
                               VkPrimitiveTopology topology,

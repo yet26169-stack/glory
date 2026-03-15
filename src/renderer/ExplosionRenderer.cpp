@@ -120,7 +120,7 @@ void ExplosionRenderer::generateSphereMesh(const Device& device) {
 }
 
 // ── Pipeline factory ──────────────────────────────────────────────────────────
-VkPipeline ExplosionRenderer::createPipeline(VkRenderPass       renderPass,
+VkPipeline ExplosionRenderer::createPipeline(const RenderFormats&   formats,
                                               const std::string& vertSpv,
                                               const std::string& fragSpv,
                                               VkCullModeFlags    cullMode,
@@ -223,7 +223,9 @@ VkPipeline ExplosionRenderer::createPipeline(VkRenderPass       renderPass,
     gpCI.pColorBlendState    = &cb;
     gpCI.pDynamicState       = &dy;
     gpCI.layout              = m_layout;
-    gpCI.renderPass          = renderPass;
+    VkPipelineRenderingCreateInfo fmtCI = formats.pipelineRenderingCI();
+    gpCI.pNext               = &fmtCI;
+    gpCI.renderPass          = VK_NULL_HANDLE;
 
     VkPipeline pipeline = VK_NULL_HANDLE;
     vkCreateGraphicsPipelines(m_dev, VK_NULL_HANDLE, 1, &gpCI, nullptr, &pipeline);
@@ -235,7 +237,7 @@ VkPipeline ExplosionRenderer::createPipeline(VkRenderPass       renderPass,
 }
 
 // ── init ──────────────────────────────────────────────────────────────────────
-void ExplosionRenderer::init(const Device& device, VkRenderPass renderPass) {
+void ExplosionRenderer::init(const Device& device, const RenderFormats& formats) {
     m_dev       = device.getDevice();
     m_allocator = device.getAllocator();
 
@@ -256,14 +258,14 @@ void ExplosionRenderer::init(const Device& device, VkRenderPass renderPass) {
     const std::string sd = std::string(SHADER_DIR);
 
     // Pass 1: Shockwave disk (both faces, alpha-blend)
-    m_shockwavePipeline = createPipeline(renderPass,
+    m_shockwavePipeline = createPipeline(formats,
         sd + "explosion_disk.vert.spv",
         sd + "explosion_shockwave.frag.spv",
         VK_CULL_MODE_NONE,
         VK_BLEND_FACTOR_SRC_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA);
 
     // Pass 2: Fireball sphere (both faces, additive)
-    m_fireballPipeline = createPipeline(renderPass,
+    m_fireballPipeline = createPipeline(formats,
         sd + "explosion_sphere.vert.spv",
         sd + "explosion_fireball.frag.spv",
         VK_CULL_MODE_NONE,

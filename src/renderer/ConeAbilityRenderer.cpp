@@ -133,7 +133,7 @@ void ConeAbilityRenderer::regenerateLightning(const glm::vec3& apex,
 }
 
 // ── Pipeline factory ──────────────────────────────────────────────────────────
-VkPipeline ConeAbilityRenderer::createPipeline(VkRenderPass        renderPass,
+VkPipeline ConeAbilityRenderer::createPipeline(const RenderFormats&    formats,
                                                 const std::string&  vertSpv,
                                                 const std::string&  fragSpv,
                                                 VkPrimitiveTopology topology,
@@ -238,7 +238,9 @@ VkPipeline ConeAbilityRenderer::createPipeline(VkRenderPass        renderPass,
     gpCI.pColorBlendState    = &cb;
     gpCI.pDynamicState       = &dy;
     gpCI.layout              = m_layout;
-    gpCI.renderPass          = renderPass;
+    VkPipelineRenderingCreateInfo fmtCI = formats.pipelineRenderingCI();
+    gpCI.pNext               = &fmtCI;
+    gpCI.renderPass          = VK_NULL_HANDLE;
 
     VkPipeline pipeline = VK_NULL_HANDLE;
     vkCreateGraphicsPipelines(m_dev, VK_NULL_HANDLE, 1, &gpCI, nullptr, &pipeline);
@@ -250,7 +252,7 @@ VkPipeline ConeAbilityRenderer::createPipeline(VkRenderPass        renderPass,
 }
 
 // ── init ──────────────────────────────────────────────────────────────────────
-void ConeAbilityRenderer::init(const Device& device, VkRenderPass renderPass) {
+void ConeAbilityRenderer::init(const Device& device, const RenderFormats& formats) {
     m_dev       = device.getDevice();
     m_allocator = device.getAllocator();
 
@@ -271,21 +273,21 @@ void ConeAbilityRenderer::init(const Device& device, VkRenderPass renderPass) {
     const std::string sd = std::string(SHADER_DIR);
 
     // Pass 1: Interior energy (both faces, additive)
-    m_energyPipeline = createPipeline(renderPass,
+    m_energyPipeline = createPipeline(formats,
         sd + "cone_ability.vert.spv", sd + "cone_energy.frag.spv",
         VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
         VK_CULL_MODE_NONE,
         VK_BLEND_FACTOR_SRC_ALPHA, VK_BLEND_FACTOR_ONE);
 
     // Pass 2: Surface grid overlay (both faces, additive)
-    m_gridPipeline = createPipeline(renderPass,
+    m_gridPipeline = createPipeline(formats,
         sd + "cone_ability.vert.spv", sd + "cone_grid.frag.spv",
         VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
         VK_CULL_MODE_NONE,
         VK_BLEND_FACTOR_SRC_ALPHA, VK_BLEND_FACTOR_ONE);
 
     // Pass 3: Lightning arcs (line strip, fully additive)
-    m_lightningPipeline = createPipeline(renderPass,
+    m_lightningPipeline = createPipeline(formats,
         sd + "cone_lightning.vert.spv", sd + "cone_lightning.frag.spv",
         VK_PRIMITIVE_TOPOLOGY_LINE_STRIP,
         VK_CULL_MODE_NONE,

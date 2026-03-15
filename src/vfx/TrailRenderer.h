@@ -3,6 +3,7 @@
 #include "vfx/TrailTypes.h"
 #include "renderer/Buffer.h"
 #include "renderer/Texture.h"
+#include "renderer/RenderFormats.h"
 #include <vulkan/vulkan.h>
 #include <memory>
 #include <unordered_map>
@@ -14,7 +15,7 @@ class Device;
 
 class TrailRenderer {
 public:
-    TrailRenderer(const Device& device, VkRenderPass renderPass);
+    TrailRenderer(const Device& device, const RenderFormats& formats);
     ~TrailRenderer();
 
     void registerTrail(const TrailDef& def);
@@ -52,7 +53,7 @@ private:
     };
 
     const Device& m_device;
-    VkRenderPass m_renderPass;
+    RenderFormats m_formats;
 
     VkDescriptorSetLayout m_descLayout = VK_NULL_HANDLE;
     VkDescriptorPool      m_descPool   = VK_NULL_HANDLE;

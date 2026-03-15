@@ -1,5 +1,6 @@
 #include "renderer/OutlineRenderer.h"
 #include "renderer/Buffer.h"
+#include "renderer/RenderFormats.h"
 #include "renderer/StaticSkinnedMesh.h"
 #include "renderer/VkCheck.h"
 
@@ -59,11 +60,11 @@ static void buildSkinnedVertexInput(
 
 // ── Init / Destroy ────────────────────────────────────────────────────────────
 void OutlineRenderer::init(const Device& device,
-                           VkRenderPass  renderPass,
+                           const RenderFormats& formats,
                            VkDescriptorSetLayout mainLayout) {
     m_device = &device;
     createPipelineLayout(mainLayout);
-    createPipelines(renderPass);
+    createPipelines(formats);
 }
 
 void OutlineRenderer::destroy() {
@@ -99,7 +100,7 @@ void OutlineRenderer::createPipelineLayout(VkDescriptorSetLayout mainLayout) {
 }
 
 // ── Pipeline creation ─────────────────────────────────────────────────────────
-void OutlineRenderer::createPipelines(VkRenderPass renderPass) {
+void OutlineRenderer::createPipelines(const RenderFormats& formats) {
     VkDevice dev = m_device->getDevice();
 
     // ── Shared: vertex input (skinned mesh + per-instance data) ──────────────
@@ -186,9 +187,10 @@ void OutlineRenderer::createPipelines(VkRenderPass renderPass) {
         pci.pDepthStencilState  = &dsCI;
         pci.pColorBlendState    = &cbCI;
         pci.pDynamicState       = &dynCI;
+        VkPipelineRenderingCreateInfo fmtCI = formats.pipelineRenderingCI();
+        pci.pNext               = &fmtCI;
         pci.layout              = m_outlineLayout;
-        pci.renderPass          = renderPass;
-        pci.subpass             = 0;
+        pci.renderPass          = VK_NULL_HANDLE;
 
         VK_CHECK(vkCreateGraphicsPipelines(dev, VK_NULL_HANDLE, 1, &pci, nullptr, &m_stencilWritePipeline),
                  "Create stencil-write pipeline");
@@ -261,9 +263,10 @@ void OutlineRenderer::createPipelines(VkRenderPass renderPass) {
         pci.pDepthStencilState  = &dsCI;
         pci.pColorBlendState    = &cbCI;
         pci.pDynamicState       = &dynCI;
+        VkPipelineRenderingCreateInfo fmtCI2 = formats.pipelineRenderingCI();
+        pci.pNext               = &fmtCI2;
         pci.layout              = m_outlineLayout;
-        pci.renderPass          = renderPass;
-        pci.subpass             = 0;
+        pci.renderPass          = VK_NULL_HANDLE;
 
         VK_CHECK(vkCreateGraphicsPipelines(dev, VK_NULL_HANDLE, 1, &pci, nullptr, &m_outlineDrawPipeline),
                  "Create outline draw pipeline");

@@ -157,7 +157,7 @@ void WaterRenderer::createTextures(const Device& device,
 
 // ── Pipeline ──────────────────────────────────────────────────────────────────
 
-void WaterRenderer::createPipeline(VkRenderPass renderPass,
+void WaterRenderer::createPipeline(const RenderFormats& formats,
                                    VkDescriptorSetLayout mainLayout) {
     VkDevice dev = m_device->getDevice();
 
@@ -281,8 +281,10 @@ void WaterRenderer::createPipeline(VkRenderPass renderPass,
     pci.pDepthStencilState  = &ds;
     pci.pColorBlendState    = &cb;
     pci.pDynamicState       = &dyn;
+    VkPipelineRenderingCreateInfo fmtCI = formats.pipelineRenderingCI();
+    pci.pNext               = &fmtCI;
     pci.layout              = m_pipelineLayout;
-    pci.renderPass          = renderPass;
+    pci.renderPass          = VK_NULL_HANDLE;
     VK_CHECK(vkCreateGraphicsPipelines(dev, VK_NULL_HANDLE, 1, &pci, nullptr, &m_pipeline),
              "water pipeline");
 
@@ -294,14 +296,14 @@ void WaterRenderer::createPipeline(VkRenderPass renderPass,
 // ── Public interface ──────────────────────────────────────────────────────────
 
 void WaterRenderer::init(const Device& device,
-                         VkRenderPass renderPass,
+                         const RenderFormats& formats,
                          VkDescriptorSetLayout mainLayout,
                          Descriptors& descriptors,
                          uint32_t baseSlot) {
     m_device = &device;
     createMesh();
     createTextures(device, descriptors, baseSlot);
-    createPipeline(renderPass, mainLayout);
+    createPipeline(formats, mainLayout);
 }
 
 void WaterRenderer::render(VkCommandBuffer cmd, VkDescriptorSet mainSet,

@@ -10,6 +10,7 @@
 
 #include "renderer/Texture.h"
 #include "renderer/Buffer.h"
+#include "renderer/RenderFormats.h"
 
 namespace glory {
 
@@ -24,7 +25,7 @@ public:
     SpriteEffectRenderer() = default;
     ~SpriteEffectRenderer();
 
-    void init(const Device& device, VkRenderPass renderPass);
+    void init(const Device& device, const RenderFormats& formats);
     void destroy();
 
     /// Register a new effect type backed by a texture atlas.
@@ -93,7 +94,7 @@ private:
     std::vector<Instance>   m_active;
 
     void createDescriptorResources();
-    void createPipelines(VkRenderPass renderPass);
+    void createPipelines(const RenderFormats& formats);
     void createVertexBuffer();
     VkDescriptorSet allocateDescSetForTexture(const Texture& tex);
 };

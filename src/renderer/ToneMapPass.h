@@ -1,6 +1,7 @@
 #pragma once
 
 #include "renderer/Device.h"
+#include "renderer/RenderFormats.h"
 
 #include <vulkan/vulkan.h>
 #include <vector>
@@ -9,7 +10,7 @@ namespace glory {
 
 class ToneMapPass {
 public:
-    void init(const Device& device, VkRenderPass swapchainRenderPass,
+    void init(const Device& device, const RenderFormats& formats,
               VkImageView hdrView, VkImageView bloomView, VkSampler sampler);
 
     void render(VkCommandBuffer cmd, float exposure, float bloomStrength,
@@ -20,7 +21,7 @@ public:
 
 private:
     const Device* m_device = nullptr;
-    VkRenderPass m_swapchainRenderPass = VK_NULL_HANDLE;
+    RenderFormats m_formats;
     VkImageView m_hdrView = VK_NULL_HANDLE;
     VkImageView m_bloomView = VK_NULL_HANDLE;
     VkSampler m_sampler = VK_NULL_HANDLE;

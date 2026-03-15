@@ -16,10 +16,10 @@ struct SpriteVertex {
 
 SpriteEffectRenderer::~SpriteEffectRenderer() { destroy(); }
 
-void SpriteEffectRenderer::init(const Device& device, VkRenderPass renderPass) {
+void SpriteEffectRenderer::init(const Device& device, const RenderFormats& formats) {
     m_device = &device;
     createDescriptorResources();
-    createPipelines(renderPass);
+    createPipelines(formats);
     createVertexBuffer();
     spdlog::info("SpriteEffectRenderer initialized");
 }
@@ -118,7 +118,7 @@ static std::vector<char> readFile(const std::string& path) {
     return buf;
 }
 
-void SpriteEffectRenderer::createPipelines(VkRenderPass renderPass) {
+void SpriteEffectRenderer::createPipelines(const RenderFormats& formats) {
     VkDevice dev = m_device->getDevice();
 
     // Push constant range
@@ -239,7 +239,9 @@ void SpriteEffectRenderer::createPipelines(VkRenderPass renderPass) {
         gpCI.pColorBlendState    = &cbCI;
         gpCI.pDynamicState       = &dy;
         gpCI.layout              = m_pipelineLayout;
-        gpCI.renderPass          = renderPass;
+        VkPipelineRenderingCreateInfo fmtCI = formats.pipelineRenderingCI();
+        gpCI.pNext               = &fmtCI;
+        gpCI.renderPass          = VK_NULL_HANDLE;
         vkCreateGraphicsPipelines(dev, VK_NULL_HANDLE, 1, &gpCI, nullptr, &m_alphaPipeline);
     }
 
@@ -284,7 +286,9 @@ void SpriteEffectRenderer::createPipelines(VkRenderPass renderPass) {
         gpCI.pColorBlendState    = &cbCI;
         gpCI.pDynamicState       = &dy;
         gpCI.layout              = m_pipelineLayout;
-        gpCI.renderPass          = renderPass;
+        VkPipelineRenderingCreateInfo fmtCI2 = formats.pipelineRenderingCI();
+        gpCI.pNext               = &fmtCI2;
+        gpCI.renderPass          = VK_NULL_HANDLE;
         vkCreateGraphicsPipelines(dev, VK_NULL_HANDLE, 1, &gpCI, nullptr, &m_additivePipeline);
     }
 

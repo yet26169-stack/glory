@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "renderer/Buffer.h"
+#include "renderer/RenderFormats.h"
 
 namespace glory {
 
@@ -21,7 +22,7 @@ public:
     ShieldBubbleRenderer() = default;
     ~ShieldBubbleRenderer() { destroy(); }
 
-    void init(const Device& device, VkRenderPass renderPass);
+    void init(const Device& device, const RenderFormats& formats);
 
     // Call once per frame, inside the active render pass, after all opaque draws.
     // alpha  [0,1] — master opacity; fade-in/out is the caller's responsibility.
@@ -59,7 +60,7 @@ private:
     VkPipeline       m_frontfacePipeline = VK_NULL_HANDLE;  // pass 2: Fresnel glow
 
     void       generateSphere(const Device& device);
-    VkPipeline createPipeline(VkRenderPass renderPass,
+    VkPipeline createPipeline(const RenderFormats& formats,
                               VkCullModeFlags cullMode,
                               VkBlendFactor   srcColorFactor,
                               VkBlendFactor   dstColorFactor);

@@ -83,7 +83,7 @@ VkShaderModule ShieldBubbleRenderer::loadShaderModule(VkDevice dev, const char* 
 
 // ── Pipeline creation ─────────────────────────────────────────────────────────
 
-VkPipeline ShieldBubbleRenderer::createPipeline(VkRenderPass renderPass,
+VkPipeline ShieldBubbleRenderer::createPipeline(const RenderFormats& formats,
                                                   VkCullModeFlags cullMode,
                                                   VkBlendFactor   srcColorFactor,
                                                   VkBlendFactor   dstColorFactor) {
@@ -181,7 +181,9 @@ VkPipeline ShieldBubbleRenderer::createPipeline(VkRenderPass renderPass,
     gpCI.pColorBlendState    = &cb;
     gpCI.pDynamicState       = &dy;
     gpCI.layout              = m_pipelineLayout;
-    gpCI.renderPass          = renderPass;
+    VkPipelineRenderingCreateInfo fmtCI = formats.pipelineRenderingCI();
+    gpCI.pNext               = &fmtCI;
+    gpCI.renderPass          = VK_NULL_HANDLE;
 
     VkPipeline pipeline = VK_NULL_HANDLE;
     vkCreateGraphicsPipelines(m_dev, VK_NULL_HANDLE, 1, &gpCI, nullptr, &pipeline);
@@ -194,7 +196,7 @@ VkPipeline ShieldBubbleRenderer::createPipeline(VkRenderPass renderPass,
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
-void ShieldBubbleRenderer::init(const Device& device, VkRenderPass renderPass) {
+void ShieldBubbleRenderer::init(const Device& device, const RenderFormats& formats) {
     m_dev = device.getDevice();
 
     generateSphere(device);
@@ -212,13 +214,13 @@ void ShieldBubbleRenderer::init(const Device& device, VkRenderPass renderPass) {
     vkCreatePipelineLayout(m_dev, &layoutCI, nullptr, &m_pipelineLayout);
 
     // Back-face pass: standard alpha blend (soft inner glass tint)
-    m_backfacePipeline = createPipeline(renderPass,
+    m_backfacePipeline = createPipeline(formats,
         VK_CULL_MODE_FRONT_BIT,
         VK_BLEND_FACTOR_SRC_ALPHA,
         VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA);
 
     // Front-face pass: additive blend (Fresnel rim glows bright)
-    m_frontfacePipeline = createPipeline(renderPass,
+    m_frontfacePipeline = createPipeline(formats,
         VK_CULL_MODE_BACK_BIT,
         VK_BLEND_FACTOR_SRC_ALPHA,
         VK_BLEND_FACTOR_ONE);

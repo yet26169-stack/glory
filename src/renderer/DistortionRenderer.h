@@ -3,6 +3,7 @@
 #include "renderer/Device.h"
 #include "renderer/Texture.h"
 #include "renderer/Model.h"
+#include "renderer/RenderFormats.h"
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
 #include <string>
@@ -27,7 +28,7 @@ struct DistortionInstance {
 
 class DistortionRenderer {
 public:
-    DistortionRenderer(const Device& device, VkRenderPass renderPass, VkImageView sceneColorCopy, VkSampler sampler);
+    DistortionRenderer(const Device& device, const RenderFormats& formats, VkImageView sceneColorCopy, VkSampler sampler);
     ~DistortionRenderer();
 
     void registerDef(const DistortionDef& def);
@@ -41,7 +42,7 @@ public:
 
 private:
     const Device& m_device;
-    VkRenderPass m_renderPass;
+    RenderFormats m_formats;
     VkImageView m_sceneColorCopy;
     VkSampler m_sampler;
 

@@ -4,6 +4,7 @@
 #include "vfx/VFXEventQueue.h"
 #include "vfx/ParticleSystem.h"
 #include "renderer/Texture.h"
+#include "renderer/RenderFormats.h"
 
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
@@ -32,7 +33,7 @@ class Device;
 //
 class VFXRenderer {
 public:
-    VFXRenderer(const Device& device, VkRenderPass renderPass);
+    VFXRenderer(const Device& device, const RenderFormats& formats);
     ~VFXRenderer();
 
     VFXRenderer(const VFXRenderer&)            = delete;
@@ -145,7 +146,7 @@ private:
     void createDescriptorLayoutAndPool();
     void createComputePipeline();
     void createCompactPipeline();
-    void createRenderPipeline(VkRenderPass renderPass);
+    void createRenderPipeline(const RenderFormats& formats);
 
     // Returns existing or loaded atlas texture for a given path
     Texture* getOrLoadAtlas(const std::string& texturePath);

@@ -16,8 +16,8 @@ static std::vector<char> readFile(const std::string& filepath) {
     return buffer;
 }
 
-DistortionRenderer::DistortionRenderer(const Device& device, VkRenderPass renderPass, VkImageView sceneColorCopy, VkSampler sampler)
-    : m_device(device), m_renderPass(renderPass), m_sceneColorCopy(sceneColorCopy), m_sampler(sampler) 
+DistortionRenderer::DistortionRenderer(const Device& device, const RenderFormats& formats, VkImageView sceneColorCopy, VkSampler sampler)
+    : m_device(device), m_formats(formats), m_sceneColorCopy(sceneColorCopy), m_sampler(sampler) 
 {
     m_sphereMesh = std::make_unique<Model>(Model::createSphere(device, device.getAllocator(), 16, 32));
     createDescriptorSet();
@@ -214,7 +214,9 @@ void DistortionRenderer::createPipeline() {
     pipeCI.pColorBlendState = &cbCI;
     pipeCI.pDynamicState = &dynCI;
     pipeCI.layout = m_pipelineLayout;
-    pipeCI.renderPass = m_renderPass;
+    VkPipelineRenderingCreateInfo fmtCI = m_formats.pipelineRenderingCI();
+    pipeCI.pNext     = &fmtCI;
+    pipeCI.renderPass = VK_NULL_HANDLE;
 
     VK_CHECK(vkCreateGraphicsPipelines(dev, VK_NULL_HANDLE, 1, &pipeCI, nullptr, &m_pipeline), "Create Distort Pipe");
 

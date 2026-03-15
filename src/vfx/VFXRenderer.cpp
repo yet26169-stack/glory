@@ -14,13 +14,13 @@
 namespace glory {
 
 // ── Constructor ──────────────────────────────────────────────────────────────
-VFXRenderer::VFXRenderer(const Device& device, VkRenderPass renderPass)
+VFXRenderer::VFXRenderer(const Device& device, const RenderFormats& formats)
     : m_device(device)
 {
     createDescriptorLayoutAndPool();
     createComputePipeline();
     createCompactPipeline();
-    createRenderPipeline(renderPass);
+    createRenderPipeline(formats);
 
     // Default white-pixel atlas (fallback for effects without a texture)
     m_defaultAtlas = Texture::createDefault(device);
@@ -189,7 +189,7 @@ void VFXRenderer::createCompactPipeline() {
 }
 
 // ── createRenderPipeline ──────────────────────────────────────────────────────
-void VFXRenderer::createRenderPipeline(VkRenderPass renderPass) {
+void VFXRenderer::createRenderPipeline(const RenderFormats& formats) {
     VkDevice dev = m_device.getDevice();
 
     VkPushConstantRange pcRange{};
@@ -287,8 +287,9 @@ void VFXRenderer::createRenderPipeline(VkRenderPass renderPass) {
     gpCI.pColorBlendState    = &cb_alpha;
     gpCI.pDynamicState       = &dy;
     gpCI.layout              = m_renderLayout;
-    gpCI.renderPass          = renderPass;
-    gpCI.subpass             = 0;
+    VkPipelineRenderingCreateInfo fmtCI = formats.pipelineRenderingCI();
+    gpCI.pNext               = &fmtCI;
+    gpCI.renderPass          = VK_NULL_HANDLE;
 
     vkCreateGraphicsPipelines(dev, VK_NULL_HANDLE, 1, &gpCI, nullptr, &m_alphaPipeline);
 

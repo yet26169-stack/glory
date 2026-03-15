@@ -17,8 +17,8 @@ static std::vector<char> readFile(const std::string& filepath) {
     return buffer;
 }
 
-MeshEffectRenderer::MeshEffectRenderer(const Device& device, VkRenderPass renderPass)
-    : m_device(device), m_renderPass(renderPass) {}
+MeshEffectRenderer::MeshEffectRenderer(const Device& device, const RenderFormats& formats)
+    : m_device(device), m_formats(formats) {}
 
 MeshEffectRenderer::~MeshEffectRenderer() {
     VkDevice dev = m_device.getDevice();
@@ -186,7 +186,9 @@ void MeshEffectRenderer::createPipeline(const PipelineKey& key) {
     pipeCI.pColorBlendState = &cbCI;
     pipeCI.pDynamicState = &dynCI;
     pipeCI.layout = layout;
-    pipeCI.renderPass = m_renderPass;
+    VkPipelineRenderingCreateInfo fmtCI = m_formats.pipelineRenderingCI();
+    pipeCI.pNext     = &fmtCI;
+    pipeCI.renderPass = VK_NULL_HANDLE;
 
     VkPipeline pipeline;
     VK_CHECK(vkCreateGraphicsPipelines(dev, VK_NULL_HANDLE, 1, &pipeCI, nullptr, &pipeline), "Create MeshEffect Pipe");

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "renderer/Device.h"
+#include "renderer/RenderFormats.h"
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
 #include <vector>
@@ -9,7 +10,7 @@ namespace glory {
 
 class InkingPass {
 public:
-    void init(const Device& device, VkRenderPass renderPass,
+    void init(const Device& device, const RenderFormats& formats,
               VkImageView characterDepthView, VkSampler sampler);
 
     ~InkingPass() { destroy(); }
@@ -38,7 +39,7 @@ private:
     };
 
     void createDescriptorSet(VkImageView characterDepthView);
-    void createPipeline(VkRenderPass renderPass);
+    void createPipeline(const RenderFormats& formats);
     VkShaderModule createShaderModule(const std::vector<char>& code);
 };
 
