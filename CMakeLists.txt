@@ -165,6 +165,7 @@ set(SOURCES
     src/renderer/Material.cpp
     src/renderer/Texture.cpp
     src/renderer/Descriptors.cpp
+    src/renderer/BindlessDescriptors.cpp
     src/renderer/Pipeline.cpp
     src/renderer/Sync.cpp
     src/renderer/ClickIndicatorRenderer.cpp

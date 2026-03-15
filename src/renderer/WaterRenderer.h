@@ -3,7 +3,7 @@
 #include "renderer/Device.h"
 #include "renderer/Buffer.h"
 #include "renderer/Texture.h"
-#include "renderer/Descriptors.h"
+#include "renderer/BindlessDescriptors.h"
 #include "renderer/RenderFormats.h"
 
 #include <vulkan/vulkan.h>
@@ -34,13 +34,12 @@ public:
 
     // renderPass   — main HDR render pass (3 attachments, stencil format)
     // mainLayout   — descriptor set layout for the main frame descriptors
-    // descriptors  — used to register water textures in the bindless array
-    // baseSlot     — first available slot in the bindless texture array
+    // bindless     — used to register water textures in the bindless array
     void init(const Device&       device,
               const RenderFormats& formats,
               VkDescriptorSetLayout mainLayout,
-              Descriptors&        descriptors,
-              uint32_t            baseSlot);
+              VkDescriptorSetLayout bindlessLayout,
+              BindlessDescriptors& bindless);
 
     // cmd      — active command buffer (must be inside the main render pass)
     // mainSet  — descriptor set for the current frame
@@ -48,6 +47,7 @@ public:
     // model    — world transform of the water plane
     void render(VkCommandBuffer    cmd,
                 VkDescriptorSet    mainSet,
+                VkDescriptorSet    bindlessSet,
                 float              time,
                 const glm::mat4&   model);
 
@@ -86,8 +86,10 @@ private:
 
     void createMesh();
     void createTextures(const Device& device,
-                        Descriptors& descriptors, uint32_t baseSlot);
-    void createPipeline(const RenderFormats& formats, VkDescriptorSetLayout mainLayout);
+                        BindlessDescriptors& bindless);
+    void createPipeline(const RenderFormats& formats,
+                        VkDescriptorSetLayout mainLayout,
+                        VkDescriptorSetLayout bindlessLayout);
 };
 
 } // namespace glory

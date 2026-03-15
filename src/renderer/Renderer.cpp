@@ -49,7 +49,11 @@ Renderer::Renderer(Window& window) : m_window(window) {
                       VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT));
 
     m_descriptors = std::make_unique<Descriptors>(*m_device, Sync::MAX_FRAMES_IN_FLIGHT);
-    m_pipeline = std::make_unique<Pipeline>(*m_device, *m_swapchain, m_descriptors->getLayout(), m_hdrFB->mainFormats());
+    m_bindless    = std::make_unique<BindlessDescriptors>(*m_device);
+    m_pipeline = std::make_unique<Pipeline>(*m_device, *m_swapchain,
+                                            m_descriptors->getLayout(),
+                                            m_bindless->getLayout(),
+                                            m_hdrFB->mainFormats());
     m_sync = std::make_unique<Sync>(*m_device, m_swapchain->getImageCount());
 
     // Dummy 1×1 white texture bound to the shadow-map descriptor slot.
@@ -278,6 +282,7 @@ Renderer::~Renderer() {
     m_dummyShadow = Texture{};
     m_shadowPass.destroy();
     m_descriptors.reset();
+    m_bindless.reset();
     m_sync.reset();
     m_pipeline.reset();
     m_scene = Scene{};
@@ -1233,8 +1238,9 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
                                               : m_pipeline->getGraphicsPipeline();
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline);
         VkDescriptorSet ds = m_descriptors->getSet(m_currentFrame);
+        VkDescriptorSet sets[2] = { ds, m_bindless->getSet() };
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                m_pipeline->getPipelineLayout(), 0, 1, &ds, 0, nullptr);
+                                m_pipeline->getPipelineLayout(), 0, 2, sets, 0, nullptr);
 
         auto* instances = static_cast<InstanceData*>(m_instanceMapped[m_currentFrame]);
         uint32_t instanceIndex = 0;
@@ -1270,7 +1276,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
         if (m_skinnedPipeline != VK_NULL_HANDLE) {
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_skinnedPipeline);
             vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    m_skinnedPipelineLayout, 0, 1, &ds, 0, nullptr);
+                                    m_skinnedPipelineLayout, 0, 2, sets, 0, nullptr);
 
             // Collect per-entity draw parameters so the outline pass can replay
             // them after all geometry is drawn (avoids mid-loop pipeline switches).
@@ -1366,7 +1372,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
                 // Restore the skinned pipeline for anything that follows
                 vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_skinnedPipeline);
                 vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                        m_skinnedPipelineLayout, 0, 1, &ds, 0, nullptr);
+                                        m_skinnedPipelineLayout, 0, 2, sets, 0, nullptr);
             }
         }
 
@@ -1406,11 +1412,11 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
             float appTime = static_cast<float>(glfwGetTime());
             glm::mat4 waterModel = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.25f, 0.0f))
                                  * glm::scale(glm::mat4(1.0f), glm::vec3(200.0f, 1.0f, 200.0f));
-            m_waterRenderer->render(cmd, ds, appTime, waterModel);
+            m_waterRenderer->render(cmd, ds, m_bindless->getSet(), appTime, waterModel);
             // Restore main pipeline after water hijacked the pipeline bind point
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_skinnedPipeline);
             vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    m_skinnedPipelineLayout, 0, 1, &ds, 0, nullptr);
+                                    m_skinnedPipelineLayout, 0, 2, sets, 0, nullptr);
         }
     }
 
@@ -1711,7 +1717,7 @@ void Renderer::buildScene() {
     // Bind to bindless descriptor array
     for (uint32_t i = 0; i < static_cast<uint32_t>(m_scene.getTextures().size()); ++i) {
         auto& tex = m_scene.getTexture(i);
-        m_descriptors->writeBindlessTexture(i, tex.getImageView(), tex.getSampler());
+        m_bindless->registerTexture(tex.getImageView(), tex.getSampler());
     }
 
     // ── Toon ramp texture (binding 5, 256×1 R8G8B8A8_UNORM) ─────────────
@@ -1796,8 +1802,7 @@ void Renderer::buildScene() {
             auto glbTextures = Model::loadGLBTextures(*m_device, laneTilePath);
             if (!glbTextures.empty()) {
                 laneTileTex = m_scene.addTexture(std::move(glbTextures[0].texture));
-                m_descriptors->writeBindlessTexture(
-                    laneTileTex,
+                m_bindless->registerTexture(
                     m_scene.getTexture(laneTileTex).getImageView(),
                     m_scene.getTexture(laneTileTex).getSampler());
             }
@@ -1890,7 +1895,7 @@ void Renderer::buildScene() {
         auto glbTextures = Model::loadGLBTextures(*m_device, charPath);
         if (!glbTextures.empty()) {
             charTex = m_scene.addTexture(std::move(glbTextures[0].texture));
-            m_descriptors->writeBindlessTexture(charTex, 
+            m_bindless->registerTexture(
                 m_scene.getTexture(charTex).getImageView(),
                 m_scene.getTexture(charTex).getSampler());
             spdlog::info("Character texture loaded at slot {}", charTex);
@@ -2036,7 +2041,7 @@ void Renderer::buildScene() {
         auto glbTextures = Model::loadGLBTextures(*m_device, minionPath);
         if (!glbTextures.empty()) {
             minionTex = m_scene.addTexture(std::move(glbTextures[0].texture));
-            m_descriptors->writeBindlessTexture(minionTex,
+            m_bindless->registerTexture(
                 m_scene.getTexture(minionTex).getImageView(),
                 m_scene.getTexture(minionTex).getSampler());
             spdlog::info("Minion texture loaded at slot {}", minionTex);
@@ -2131,8 +2136,7 @@ void Renderer::buildScene() {
             auto glbTextures = Model::loadGLBTextures(*m_device, qModelPath);
             if (!glbTextures.empty()) {
                 qTexIdx = m_scene.addTexture(std::move(glbTextures[0].texture));
-                m_descriptors->writeBindlessTexture(
-                    qTexIdx,
+                m_bindless->registerTexture(
                     m_scene.getTexture(qTexIdx).getImageView(),
                     m_scene.getTexture(qTexIdx).getSampler());
             }
@@ -2146,8 +2150,7 @@ void Renderer::buildScene() {
             uint32_t purplePixel = 0xFF9900CC;  // ABGR: opaque purple (R=0xCC, G=0x00, B=0x99)
             auto purpleTex = Texture::createFromPixels(*m_device, &purplePixel, 1, 1);
             uint32_t purpleTexIdx = m_scene.addTexture(std::move(purpleTex));
-            m_descriptors->writeBindlessTexture(
-                purpleTexIdx,
+            m_bindless->registerTexture(
                 m_scene.getTexture(purpleTexIdx).getImageView(),
                 m_scene.getTexture(purpleTexIdx).getSampler());
             m_projectileSystem->registerAbilityMesh("fire_mage_trick",
@@ -2157,8 +2160,7 @@ void Renderer::buildScene() {
             uint32_t bombPixel = 0xFF0044FF;  // ABGR: opaque red-orange
             auto bombTex = Texture::createFromPixels(*m_device, &bombPixel, 1, 1);
             uint32_t bombTexIdx = m_scene.addTexture(std::move(bombTex));
-            m_descriptors->writeBindlessTexture(
-                bombTexIdx,
+            m_bindless->registerTexture(
                 m_scene.getTexture(bombTexIdx).getImageView(),
                 m_scene.getTexture(bombTexIdx).getSampler());
             m_projectileSystem->registerAbilityMesh("fire_mage_bomb",
@@ -2173,11 +2175,11 @@ void Renderer::buildScene() {
     // ── Water renderer ────────────────────────────────────────────────────
     // Register its 3 procedural textures just after all scene textures.
     {
-        uint32_t waterBaseSlot = static_cast<uint32_t>(m_scene.getTextures().size());
         m_waterRenderer = std::make_unique<WaterRenderer>();
         m_waterRenderer->init(*m_device, m_hdrFB->mainFormats(),
                               m_descriptors->getLayout(),
-                              *m_descriptors, waterBaseSlot);
+                              m_bindless->getLayout(),
+                              *m_bindless);
     }
 }
 
@@ -2525,15 +2527,15 @@ void Renderer::createSkinnedPipeline() {
     VkPipelineColorBlendStateCreateInfo cb{ VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
     cb.attachmentCount = 2; cb.pAttachments = skinnedBlends;
 
-    VkDescriptorSetLayout descLayout = m_descriptors->getLayout();
+    VkDescriptorSetLayout setLayouts[2] = { m_descriptors->getLayout(), m_bindless->getLayout() };
     VkPushConstantRange pc{};
     // Include FRAGMENT_BIT so this range is compatible with the water renderer's
     // VERTEX|FRAGMENT push constant range that overlaps at bytes [0..4].
     pc.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     pc.size       = sizeof(uint32_t); // boneBaseIndex
     VkPipelineLayoutCreateInfo lci{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-    lci.setLayoutCount         = 1;
-    lci.pSetLayouts            = &descLayout;
+    lci.setLayoutCount         = 2;
+    lci.pSetLayouts            = setLayouts;
     lci.pushConstantRangeCount = 1;
     lci.pPushConstantRanges    = &pc;
     VK_CHECK(vkCreatePipelineLayout(dev, &lci, nullptr, &m_skinnedPipelineLayout), "skinned layout");

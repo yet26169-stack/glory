@@ -16,7 +16,8 @@ class Swapchain;
 class Pipeline {
 public:
     Pipeline(const Device& device, const Swapchain& swapchain,
-             VkDescriptorSetLayout descriptorSetLayout,
+             VkDescriptorSetLayout globalLayout,
+             VkDescriptorSetLayout bindlessLayout,
              const RenderFormats& formats);
     ~Pipeline();
 
@@ -39,7 +40,9 @@ private:
     VkPipeline                 m_wireframePipeline = VK_NULL_HANDLE;
     bool m_cleaned = false;
 
-    void createGraphicsPipeline(VkExtent2D extent, VkDescriptorSetLayout descriptorSetLayout);
+    void createGraphicsPipeline(VkExtent2D extent,
+                                VkDescriptorSetLayout globalLayout,
+                                VkDescriptorSetLayout bindlessLayout);
 
     VkShaderModule createShaderModule(const std::vector<char>& code) const;
     static std::vector<char> readFile(const std::string& filepath);

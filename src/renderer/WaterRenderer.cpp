@@ -75,8 +75,7 @@ static inline uint32_t packRGBA(float r, float g, float b, float a = 1.0f) {
 }
 
 void WaterRenderer::createTextures(const Device& device,
-                                   Descriptors& descriptors,
-                                   uint32_t baseSlot) {
+                                   BindlessDescriptors& bindless) {
     // ── 1. Water surface normal map (128×128) ─────────────────────────────
     // Two overlapping sine waves to simulate wind-driven ripples.
     {
@@ -141,24 +140,21 @@ void WaterRenderer::createTextures(const Device& device,
     }
 
     // ── Register in the bindless array ────────────────────────────────────
-    m_normalMapIdx = static_cast<int>(baseSlot);
-    m_flowMapIdx   = static_cast<int>(baseSlot + 1);
-    m_foamTexIdx   = static_cast<int>(baseSlot + 2);
+    m_normalMapIdx = static_cast<int>(bindless.registerTexture(
+        m_normalMapTex.getImageView(), m_normalMapTex.getSampler()));
+    m_flowMapIdx   = static_cast<int>(bindless.registerTexture(
+        m_flowMapTex.getImageView(), m_flowMapTex.getSampler()));
+    m_foamTexIdx   = static_cast<int>(bindless.registerTexture(
+        m_foamTex.getImageView(), m_foamTex.getSampler()));
 
-    descriptors.writeBindlessTexture(baseSlot,
-        m_normalMapTex.getImageView(), m_normalMapTex.getSampler());
-    descriptors.writeBindlessTexture(baseSlot + 1,
-        m_flowMapTex.getImageView(), m_flowMapTex.getSampler());
-    descriptors.writeBindlessTexture(baseSlot + 2,
-        m_foamTex.getImageView(), m_foamTex.getSampler());
-
-    spdlog::info("WaterRenderer: textures at bindless slots {}-{}", baseSlot, baseSlot + 2);
+    spdlog::info("WaterRenderer: textures at bindless slots {},{},{}", m_normalMapIdx, m_flowMapIdx, m_foamTexIdx);
 }
 
 // ── Pipeline ──────────────────────────────────────────────────────────────────
 
 void WaterRenderer::createPipeline(const RenderFormats& formats,
-                                   VkDescriptorSetLayout mainLayout) {
+                                   VkDescriptorSetLayout mainLayout,
+                                   VkDescriptorSetLayout bindlessLayout) {
     VkDevice dev = m_device->getDevice();
 
     auto readFile = [](const std::string& path) -> std::vector<char> {
@@ -263,9 +259,10 @@ void WaterRenderer::createPipeline(const RenderFormats& formats,
     pcRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     pcRange.size       = sizeof(WaterPC);
 
+    VkDescriptorSetLayout setLayouts[2] = { mainLayout, bindlessLayout };
     VkPipelineLayoutCreateInfo lci{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-    lci.setLayoutCount         = 1;
-    lci.pSetLayouts            = &mainLayout;
+    lci.setLayoutCount         = 2;
+    lci.pSetLayouts            = setLayouts;
     lci.pushConstantRangeCount = 1;
     lci.pPushConstantRanges    = &pcRange;
     VK_CHECK(vkCreatePipelineLayout(dev, &lci, nullptr, &m_pipelineLayout), "water pipeline layout");
@@ -298,15 +295,16 @@ void WaterRenderer::createPipeline(const RenderFormats& formats,
 void WaterRenderer::init(const Device& device,
                          const RenderFormats& formats,
                          VkDescriptorSetLayout mainLayout,
-                         Descriptors& descriptors,
-                         uint32_t baseSlot) {
+                         VkDescriptorSetLayout bindlessLayout,
+                         BindlessDescriptors& bindless) {
     m_device = &device;
     createMesh();
-    createTextures(device, descriptors, baseSlot);
-    createPipeline(formats, mainLayout);
+    createTextures(device, bindless);
+    createPipeline(formats, mainLayout, bindlessLayout);
 }
 
 void WaterRenderer::render(VkCommandBuffer cmd, VkDescriptorSet mainSet,
+                           VkDescriptorSet bindlessSet,
                            float time, const glm::mat4& model) {
     WaterPC pc{};
     pc.model               = model;
@@ -319,8 +317,9 @@ void WaterRenderer::render(VkCommandBuffer cmd, VkDescriptorSet mainSet,
     pc.foamTexIdx          = m_foamTexIdx;
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+    VkDescriptorSet sets[2] = { mainSet, bindlessSet };
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            m_pipelineLayout, 0, 1, &mainSet, 0, nullptr);
+                            m_pipelineLayout, 0, 2, sets, 0, nullptr);
     vkCmdPushConstants(cmd, m_pipelineLayout,
                        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
                        0, sizeof(WaterPC), &pc);

@@ -19,6 +19,7 @@
 #include "renderer/SpriteEffectRenderer.h"
 #include "renderer/Context.h"
 #include "renderer/Descriptors.h"
+#include "renderer/BindlessDescriptors.h"
 #include "renderer/Device.h"
 #include "renderer/Pipeline.h"
 #include "renderer/RenderFormats.h"
@@ -76,6 +77,7 @@ private:
     std::unique_ptr<Swapchain>   m_swapchain;
     std::unique_ptr<Sync>        m_sync;
     std::unique_ptr<Descriptors> m_descriptors;
+    std::unique_ptr<BindlessDescriptors> m_bindless;
     std::unique_ptr<Pipeline>    m_pipeline;   // forward pass, owns renderpass + FBs
     std::unique_ptr<HDRFramebuffer> m_hdrFB;
     std::unique_ptr<BloomPass>      m_bloom;

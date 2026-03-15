@@ -1,7 +1,7 @@
 #version 450
 #extension GL_EXT_nonuniform_qualifier : require
 
-layout(binding = 1) uniform sampler2D textures[64]; // bindless texture array
+layout(set = 1, binding = 0) uniform sampler2D textures[4096]; // global bindless array
 
 struct PointLight {
     vec3 position;

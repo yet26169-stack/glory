@@ -1,14 +1,10 @@
 #pragma once
 
-#include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
 
-#include <string>
+#include <cstdint>
 
 namespace glory {
-
-class Device;
-class Texture;
 
 struct MaterialProperties {
     glm::vec3 albedo{1.0f};
@@ -17,33 +13,21 @@ struct MaterialProperties {
     float     ao        = 1.0f; // ambient occlusion
 };
 
+// Lightweight material — no Vulkan resources.
+// Texture lookups use bindless indices stored in textureIndices[].
 class Material {
 public:
     Material() = default;
-    Material(const Device& device, VkDescriptorSetLayout layout,
-             VkDescriptorPool pool, uint32_t frameCount);
-    ~Material();
-
-    Material(const Material&)            = delete;
-    Material& operator=(const Material&) = delete;
-    Material(Material&& other) noexcept;
-    Material& operator=(Material&& other) noexcept;
-
-    void setAlbedoTexture(const Texture& tex);
-    void bind(VkCommandBuffer cmd, VkPipelineLayout pipelineLayout,
-              uint32_t frameIndex) const;
 
     MaterialProperties& getProperties() { return m_props; }
     const MaterialProperties& getProperties() const { return m_props; }
 
-    VkDescriptorSet getDescriptorSet(uint32_t frameIndex) const {
-        return m_descriptorSets[frameIndex];
-    }
+    // Bindless texture slots (returned by BindlessDescriptors::registerTexture)
+    // 0=albedo, 1=normal, 2=metallic-roughness, 3=emissive, 4-7=reserved
+    uint32_t textureIndices[8] = {};
 
 private:
     MaterialProperties m_props;
-    std::vector<VkDescriptorSet> m_descriptorSets;
-    VkDevice m_vkDevice = VK_NULL_HANDLE;
 };
 
 } // namespace glory

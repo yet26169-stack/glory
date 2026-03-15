@@ -224,7 +224,7 @@ void Device::createLogicalDevice() {
         spdlog::warn("Device: drawIndirectCount not supported — "
                      "GPU culling will fall back to vkCmdDrawIndexedIndirect");
 
-    // Descriptor indexing features (required for bindless textures)
+    // Descriptor indexing features (required for bindless textures + SSBOs)
     vk12Features.descriptorBindingSampledImageUpdateAfterBind =
         available12.descriptorBindingSampledImageUpdateAfterBind;
     vk12Features.shaderSampledImageArrayNonUniformIndexing =
@@ -233,6 +233,12 @@ void Device::createLogicalDevice() {
         available12.descriptorBindingPartiallyBound;
     vk12Features.runtimeDescriptorArray =
         available12.runtimeDescriptorArray;
+    vk12Features.descriptorBindingStorageBufferUpdateAfterBind =
+        available12.descriptorBindingStorageBufferUpdateAfterBind;
+    vk12Features.descriptorBindingVariableDescriptorCount =
+        available12.descriptorBindingVariableDescriptorCount;
+    vk12Features.shaderStorageBufferArrayNonUniformIndexing =
+        available12.shaderStorageBufferArrayNonUniformIndexing;
 
     // Vulkan 1.3 features — dynamic rendering, synchronization2, maintenance4
     VkPhysicalDeviceVulkan13Features vk13Features{};

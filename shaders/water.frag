@@ -1,7 +1,7 @@
 #version 450
 #extension GL_EXT_nonuniform_qualifier : require
 
-layout(binding = 1) uniform sampler2D textures[64];
+layout(set = 1, binding = 0) uniform sampler2D textures[4096];
 
 struct PointLight { vec3 position; vec3 color; };
 layout(binding = 2) uniform LightUBO {

@@ -13,11 +13,12 @@
 namespace glory {
 
 Pipeline::Pipeline(const Device& device, const Swapchain& swapchain,
-                   VkDescriptorSetLayout descriptorSetLayout,
+                   VkDescriptorSetLayout globalLayout,
+                   VkDescriptorSetLayout bindlessLayout,
                    const RenderFormats& formats)
     : m_device(device), m_formats(formats)
 {
-    createGraphicsPipeline(swapchain.getExtent(), descriptorSetLayout);
+    createGraphicsPipeline(swapchain.getExtent(), globalLayout, bindlessLayout);
 }
 
 Pipeline::~Pipeline() { cleanup(); }
@@ -38,7 +39,8 @@ void Pipeline::cleanup() {
 
 // ── Graphics pipeline ───────────────────────────────────────────────────────
 void Pipeline::createGraphicsPipeline(VkExtent2D /*extent*/,
-                                      VkDescriptorSetLayout descriptorSetLayout) {
+                                      VkDescriptorSetLayout globalLayout,
+                                      VkDescriptorSetLayout bindlessLayout) {
     auto vertCode = readFile(std::string(SHADER_DIR) + "triangle.vert.spv");
     auto fragCode = readFile(std::string(SHADER_DIR) + "triangle.frag.spv");
 
@@ -132,11 +134,13 @@ void Pipeline::createGraphicsPipeline(VkExtent2D /*extent*/,
     colorBlend.attachmentCount = 2;
     colorBlend.pAttachments    = staticBlends;
 
-    // No push constants — per-entity data is in the instance buffer (binding 1)
+    // Pipeline layout: set 0 = global (UBO, lights, shadow, bones, etc.)
+    //                  set 1 = bindless (textures[4096], SSBOs[256])
+    VkDescriptorSetLayout setLayouts[2] = { globalLayout, bindlessLayout };
     VkPipelineLayoutCreateInfo layoutCI{};
     layoutCI.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    layoutCI.setLayoutCount         = 1;
-    layoutCI.pSetLayouts            = &descriptorSetLayout;
+    layoutCI.setLayoutCount         = 2;
+    layoutCI.pSetLayouts            = setLayouts;
     layoutCI.pushConstantRangeCount = 0;
     layoutCI.pPushConstantRanges    = nullptr;
 

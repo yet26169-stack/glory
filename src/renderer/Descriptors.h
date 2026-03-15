@@ -84,8 +84,6 @@ static_assert(sizeof(LightUBO)                        == 256, "LightUBO must be 
 
 class Descriptors {
 public:
-    static constexpr uint32_t MAX_BINDLESS_TEXTURES = 64;
-
     Descriptors(const Device& device, uint32_t frameCount);
     ~Descriptors();
 
@@ -106,7 +104,6 @@ public:
     // Flush the entire bone SSBO for the given frame to make all per-frame
     // bone writes visible to the GPU in a single coherency operation.
     void flushBones(uint32_t frameIndex);
-    void writeBindlessTexture(uint32_t arrayIndex, VkImageView imageView, VkSampler sampler);
     void updateShadowMap(VkImageView depthView, VkSampler shadowSampler);
     // binding 5: 1-D toon ramp texture (256×1 R8G8B8A8_UNORM gradient)
     void writeToonRamp(VkImageView rampView, VkSampler rampSampler);
