@@ -1,9 +1,10 @@
 {
-  "id": "fireball_impact_composite",
-  "layers": [
-    { "delay": 0.0, "type": "PARTICLE",     "effectRef": "vfx_fireball_explosion", "anchor": "TARGET" },
-    { "delay": 0.0, "type": "SHOCKWAVE",     "effectRef": "default",                "anchor": "TARGET" },
-    { "delay": 0.05, "type": "DISTORTION",  "effectRef": "vfx_ripple",             "anchor": "TARGET" },
-    { "delay": 0.1, "type": "GROUND_DECAL", "effectRef": "decal_circle",           "anchor": "TARGET", "scale": 4.0, "color": [0.2, 0.1, 0.05, 0.8] }
-  ]
+    "id": "fireball_impact_composite",
+    "layers": [
+        { "delay": 0.0,  "type": "PARTICLE",    "effectRef": "vfx_fireball_explosion",       "anchor": "TARGET", "scale": 1.2 },
+        { "delay": 0.0,  "type": "SHOCKWAVE",    "effectRef": "default",                      "anchor": "TARGET" },
+        { "delay": 0.02, "type": "DISTORTION",   "effectRef": "vfx_ripple",                   "anchor": "TARGET" },
+        { "delay": 0.0,  "type": "PARTICLE",     "effectRef": "vfx_fireball_impact_sparks",   "anchor": "TARGET" },
+        { "delay": 0.08, "type": "GROUND_DECAL", "effectRef": "decal_circle",                 "anchor": "TARGET", "scale": 3.5, "color": [0.15, 0.05, 0.02, 0.6] }
+    ]
 }

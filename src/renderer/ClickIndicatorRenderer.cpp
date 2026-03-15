@@ -168,10 +168,10 @@ void ClickIndicatorRenderer::createPipeline(VkRenderPass renderPass) {
     cbA.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
     cbA.alphaBlendOp = VK_BLEND_OP_ADD;
     cbA.colorWriteMask = 0xF;
-    
+    VkPipelineColorBlendAttachmentState clickBlends[2] = {cbA, {}};
     VkPipelineColorBlendStateCreateInfo cb{};
     cb.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    cb.attachmentCount = 1; cb.pAttachments = &cbA;
+    cb.attachmentCount = 2; cb.pAttachments = clickBlends;
     
     VkDynamicState dyns[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
     VkPipelineDynamicStateCreateInfo dy{};

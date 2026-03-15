@@ -1,0 +1,32 @@
+#version 450
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(binding = 0) uniform sampler2D inputTex;
+layout(binding = 1, r8) uniform writeonly image2D outputTex;
+
+layout(push_constant) uniform PC {
+    int horizontal;
+} pc;
+
+const float weights[15] = float[](
+    0.0044, 0.0115, 0.0257, 0.0488, 0.0799, 0.1133, 0.1394, 0.1494,
+    0.1394, 0.1133, 0.0799, 0.0488, 0.0257, 0.0115, 0.0044
+);
+
+void main() {
+    ivec2 coord   = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 outSize = imageSize(outputTex);
+    if (coord.x >= outSize.x || coord.y >= outSize.y) return;
+
+    vec2 texelSize = 1.0 / vec2(textureSize(inputTex, 0));
+    float result   = 0.0;
+
+    for (int i = 0; i < 15; ++i) {
+        int  off = i - 7;
+        vec2 uv  = (vec2(coord) + 0.5) / vec2(outSize);
+        if (pc.horizontal == 1) uv.x += float(off) * texelSize.x;
+        else                    uv.y += float(off) * texelSize.y;
+        result += texture(inputTex, uv).r * weights[i];
+    }
+    imageStore(outputTex, coord, vec4(result, 0.0, 0.0, 0.0));
+}

@@ -192,9 +192,11 @@ void DistortionRenderer::createPipeline() {
     blend.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO; // We want to OVERWRITE with distorted sample
     blend.colorBlendOp = VK_BLEND_OP_ADD;
 
+    // Second attachment (charDepth) declared with write-mask=0; distortion only writes to color.
+    VkPipelineColorBlendAttachmentState distBlends[2] = {blend, {}};
     VkPipelineColorBlendStateCreateInfo cbCI{ VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
-    cbCI.attachmentCount = 1;
-    cbCI.pAttachments = &blend;
+    cbCI.attachmentCount = 2;
+    cbCI.pAttachments    = distBlends;
 
     VkDynamicState dynStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
     VkPipelineDynamicStateCreateInfo dynCI{ VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };

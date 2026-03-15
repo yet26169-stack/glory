@@ -15,7 +15,10 @@ class Device;
 struct UniformBufferObject {
     alignas(16) glm::mat4 view;
     alignas(16) glm::mat4 proj;
-    alignas(16) glm::mat4 lightSpaceMatrix;
+    alignas(16) glm::mat4 lightSpaceMatrix;    // cascade 0 (backwards compat)
+    alignas(16) glm::mat4 lightSpaceMatrix1;   // cascade 1
+    alignas(16) glm::mat4 lightSpaceMatrix2;   // cascade 2
+    alignas(16) glm::vec4 cascadeSplits;       // x,y,z = split depths (view-space far dist)
 };
 
 // binding 2 — fragment stage
@@ -37,6 +40,16 @@ struct LightUBO {
     alignas(4)  float     fogDensity       = 0.03f;
     alignas(4)  float     fogStart         = 5.0f;
     alignas(4)  float     fogEnd           = 50.0f;
+
+    // ── Toon / stylized shading (LoL/SC2 style) ───────────────────────────
+    alignas(16) glm::vec3 rimColor{0.4f, 0.7f, 1.0f};   // team-colour rim (blue team default)
+    alignas(4)  float     rimIntensity      = 0.6f;       // rim brightness multiplier
+    alignas(4)  float     appTime           = 0.0f;       // elapsed game time for animation
+    alignas(4)  float     toonRampSharpness = 0.45f;      // 0=soft LoL look, 1=hard cel-shade
+    alignas(4)  float     shadowWarmth      = 0.3f;       // warm/cool shadow tinting weight
+    alignas(16) glm::vec3 shadowTint{0.15f, 0.12f, 0.25f}; // cool purple shadow tint (LoL style)
+    alignas(8) glm::vec2 fowMapMin{-100.0f, -100.0f};    // world-space FoW min bounds
+    alignas(8) glm::vec2 fowMapMax{ 100.0f,  100.0f};    // world-space FoW max bounds
 };
 
 class Descriptors {
@@ -65,6 +78,10 @@ public:
     void flushBones(uint32_t frameIndex);
     void writeBindlessTexture(uint32_t arrayIndex, VkImageView imageView, VkSampler sampler);
     void updateShadowMap(VkImageView depthView, VkSampler shadowSampler);
+    // binding 5: 1-D toon ramp texture (256×1 R8G8B8A8_UNORM gradient)
+    void writeToonRamp(VkImageView rampView, VkSampler rampSampler);
+    // binding 6: FoW visibility texture (512×512 R8_UNORM, compute output)
+    void writeFogOfWar(VkImageView fowView, VkSampler fowSampler);
 
     VkDescriptorSetLayout getLayout() const { return m_layout; }
     VkDescriptorPool      getPool()   const { return m_pool; }

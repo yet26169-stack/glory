@@ -8,6 +8,11 @@
 #include "renderer/ClickIndicatorRenderer.h"
 #include "renderer/GroundDecalRenderer.h"
 #include "renderer/DistortionRenderer.h"
+#include "renderer/InkingPass.h"
+#include "renderer/FogOfWarRenderer.h"
+#include "renderer/OutlineRenderer.h"
+#include "renderer/WaterRenderer.h"
+#include "fog/FogSystem.h"
 #include "renderer/ShieldBubbleRenderer.h"
 #include "renderer/ConeAbilityRenderer.h"
 #include "renderer/ExplosionRenderer.h"
@@ -77,6 +82,11 @@ private:
     std::unique_ptr<ClickIndicatorRenderer> m_clickIndicatorRenderer;
     std::unique_ptr<GroundDecalRenderer>    m_groundDecalRenderer;
     std::unique_ptr<DistortionRenderer>     m_distortionRenderer;
+    std::unique_ptr<InkingPass>             m_inkingPass;
+    std::unique_ptr<FogOfWarRenderer>       m_fogOfWar;
+    std::unique_ptr<OutlineRenderer>        m_outlineRenderer;
+    std::unique_ptr<WaterRenderer>          m_waterRenderer;
+    FogSystem                               m_fogSystem;
     std::unique_ptr<ShieldBubbleRenderer>   m_shieldBubble;
     std::unique_ptr<ConeAbilityRenderer>    m_coneEffect;
     std::unique_ptr<ExplosionRenderer>      m_explosionRenderer;
@@ -92,6 +102,7 @@ private:
     glm::vec3 m_coneDirection   = {0.0f, 0.0f, 1.0f};
     glm::vec3 m_coneApex        = {0.0f, 0.0f, 0.0f};  // latched at cast time
     Texture m_dummyShadow; // 1×1 white — bound to shadow-map slot so calcShadow()=1
+    Texture m_toonRamp;   // 256×1 R8G8B8A8_UNORM gradient — bound to toon-ramp slot (binding 5)
     ShadowPass m_shadowPass;
 
     // ── VFX system ────────────────────────────────────────────────────────
@@ -141,7 +152,7 @@ private:
     float m_spawnTimer = 0.0f;
 
     // ── Per-frame CPU→GPU instance buffer (InstanceData per draw call) ────
-    static constexpr uint32_t MAX_INSTANCES = 256;
+    static constexpr uint32_t MAX_INSTANCES = 512;
     std::vector<Buffer>  m_instanceBuffers;
     std::vector<void*>   m_instanceMapped;
 

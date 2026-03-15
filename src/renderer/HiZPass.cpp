@@ -1,0 +1,393 @@
+#include "renderer/HiZPass.h"
+#include "renderer/VkCheck.h"
+
+#include <spdlog/spdlog.h>
+
+#include <algorithm>
+#include <cmath>
+#include <fstream>
+#include <stdexcept>
+
+namespace glory {
+
+// ── helpers ─────────────────────────────────────────────────────────────────
+
+static std::vector<char> readFile(const std::string& path) {
+    std::ifstream f(path, std::ios::ate | std::ios::binary);
+    if (!f.is_open()) throw std::runtime_error("Failed to open shader: " + path);
+    auto sz = static_cast<size_t>(f.tellg());
+    std::vector<char> buf(sz);
+    f.seekg(0);
+    f.read(buf.data(), static_cast<std::streamsize>(sz));
+    return buf;
+}
+
+static VkShaderModule createShaderModule(VkDevice dev, const std::vector<char>& code) {
+    VkShaderModuleCreateInfo ci{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
+    ci.codeSize = code.size();
+    ci.pCode    = reinterpret_cast<const uint32_t*>(code.data());
+    VkShaderModule mod;
+    VK_CHECK(vkCreateShaderModule(dev, &ci, nullptr, &mod), "Failed to create shader module");
+    return mod;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HiZPass
+// ═══════════════════════════════════════════════════════════════════════════
+
+void HiZPass::init(const Device& device, uint32_t width, uint32_t height) {
+    m_device = &device;
+    m_width  = width;
+    m_height = height;
+    m_mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
+
+    createPyramidImage();
+    createMipViews();
+    createSampler();
+    createComputePipeline();
+    createDescriptors();
+
+    spdlog::info("HiZPass initialized ({}×{}, {} mip levels)", width, height, m_mipLevels);
+}
+
+void HiZPass::destroy() {
+    destroyResources();
+}
+
+void HiZPass::resize(uint32_t width, uint32_t height) {
+    if (width == m_width && height == m_height) return;
+    destroyResources();
+    m_width  = width;
+    m_height = height;
+    m_mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
+    createPyramidImage();
+    createMipViews();
+    createSampler();
+    createComputePipeline();
+    createDescriptors();
+}
+
+void HiZPass::generate(VkCommandBuffer cmd, VkImageView sourceDepthView) {
+    // Transition pyramid image to general for compute writes
+    VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+    barrier.oldLayout     = VK_IMAGE_LAYOUT_UNDEFINED;
+    barrier.newLayout     = VK_IMAGE_LAYOUT_GENERAL;
+    barrier.image         = m_pyramidImage;
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseMipLevel   = 0;
+    barrier.subresourceRange.levelCount     = m_mipLevels;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount     = 1;
+    barrier.srcAccessMask = 0;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+
+    vkCmdPipelineBarrier(cmd,
+        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipeline);
+
+    // Generate each mip level
+    for (uint32_t mip = 0; mip < m_mipLevels - 1; ++mip) {
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
+                                m_pipeLayout, 0, 1, &m_descSets[mip], 0, nullptr);
+
+        uint32_t dstW = std::max(1u, m_width  >> (mip + 1));
+        uint32_t dstH = std::max(1u, m_height >> (mip + 1));
+        uint32_t groupsX = (dstW + 7) / 8;
+        uint32_t groupsY = (dstH + 7) / 8;
+        vkCmdDispatch(cmd, groupsX, groupsY, 1);
+
+        // Barrier between mip levels
+        VkImageMemoryBarrier mipBarrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        mipBarrier.oldLayout     = VK_IMAGE_LAYOUT_GENERAL;
+        mipBarrier.newLayout     = VK_IMAGE_LAYOUT_GENERAL;
+        mipBarrier.image         = m_pyramidImage;
+        mipBarrier.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+        mipBarrier.subresourceRange.baseMipLevel   = mip + 1;
+        mipBarrier.subresourceRange.levelCount     = 1;
+        mipBarrier.subresourceRange.baseArrayLayer = 0;
+        mipBarrier.subresourceRange.layerCount     = 1;
+        mipBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        mipBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        vkCmdPipelineBarrier(cmd,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            0, 0, nullptr, 0, nullptr, 1, &mipBarrier);
+    }
+
+    // Final transition to shader-read for the cull pass
+    barrier.oldLayout     = VK_IMAGE_LAYOUT_GENERAL;
+    barrier.newLayout     = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount   = m_mipLevels;
+
+    vkCmdPipelineBarrier(cmd,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        0, 0, nullptr, 0, nullptr, 1, &barrier);
+}
+
+// ── private ─────────────────────────────────────────────────────────────────
+
+void HiZPass::createPyramidImage() {
+    VkImageCreateInfo imgCI{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
+    imgCI.imageType     = VK_IMAGE_TYPE_2D;
+    imgCI.format        = VK_FORMAT_R32_SFLOAT;
+    imgCI.extent        = {m_width, m_height, 1};
+    imgCI.mipLevels     = m_mipLevels;
+    imgCI.arrayLayers   = 1;
+    imgCI.samples       = VK_SAMPLE_COUNT_1_BIT;
+    imgCI.tiling        = VK_IMAGE_TILING_OPTIMAL;
+    imgCI.usage         = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
+    imgCI.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+    VmaAllocationCreateInfo allocCI{};
+    allocCI.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+
+    VK_CHECK(vmaCreateImage(m_device->getAllocator(), &imgCI, &allocCI,
+                            &m_pyramidImage, &m_pyramidAlloc, nullptr),
+             "Failed to create Hi-Z pyramid image");
+
+    // Full-mip-chain image view
+    VkImageViewCreateInfo viewCI{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+    viewCI.image    = m_pyramidImage;
+    viewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewCI.format   = VK_FORMAT_R32_SFLOAT;
+    viewCI.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+    viewCI.subresourceRange.baseMipLevel   = 0;
+    viewCI.subresourceRange.levelCount     = m_mipLevels;
+    viewCI.subresourceRange.baseArrayLayer = 0;
+    viewCI.subresourceRange.layerCount     = 1;
+
+    VK_CHECK(vkCreateImageView(m_device->getDevice(), &viewCI, nullptr, &m_pyramidView),
+             "Failed to create Hi-Z pyramid view");
+}
+
+void HiZPass::createMipViews() {
+    m_mipViews.resize(m_mipLevels);
+    for (uint32_t mip = 0; mip < m_mipLevels; ++mip) {
+        VkImageViewCreateInfo viewCI{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+        viewCI.image    = m_pyramidImage;
+        viewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewCI.format   = VK_FORMAT_R32_SFLOAT;
+        viewCI.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+        viewCI.subresourceRange.baseMipLevel   = mip;
+        viewCI.subresourceRange.levelCount     = 1;
+        viewCI.subresourceRange.baseArrayLayer = 0;
+        viewCI.subresourceRange.layerCount     = 1;
+
+        VK_CHECK(vkCreateImageView(m_device->getDevice(), &viewCI, nullptr, &m_mipViews[mip]),
+                 "Failed to create Hi-Z mip view");
+    }
+}
+
+void HiZPass::createSampler() {
+    VkSamplerCreateInfo ci{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+    ci.magFilter    = VK_FILTER_LINEAR;
+    ci.minFilter    = VK_FILTER_LINEAR;
+    ci.mipmapMode   = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+    ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    ci.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    ci.maxLod       = static_cast<float>(m_mipLevels);
+
+    VK_CHECK(vkCreateSampler(m_device->getDevice(), &ci, nullptr, &m_sampler),
+             "Failed to create Hi-Z sampler");
+}
+
+void HiZPass::createComputePipeline() {
+    VkDevice dev = m_device->getDevice();
+    std::string shaderDir = SHADER_DIR;
+
+    // Descriptor layout: binding 0 = input sampler, binding 1 = output storage image
+    std::array<VkDescriptorSetLayoutBinding, 2> bindings{};
+    bindings[0].binding         = 0;
+    bindings[0].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[0].descriptorCount = 1;
+    bindings[0].stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT;
+    bindings[1].binding         = 1;
+    bindings[1].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    bindings[1].descriptorCount = 1;
+    bindings[1].stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT;
+
+    VkDescriptorSetLayoutCreateInfo layoutCI{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+    layoutCI.bindingCount = static_cast<uint32_t>(bindings.size());
+    layoutCI.pBindings    = bindings.data();
+
+    VK_CHECK(vkCreateDescriptorSetLayout(dev, &layoutCI, nullptr, &m_descLayout),
+             "Failed to create Hi-Z descriptor layout");
+
+    VkPipelineLayoutCreateInfo plCI{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+    plCI.setLayoutCount = 1;
+    plCI.pSetLayouts    = &m_descLayout;
+
+    VK_CHECK(vkCreatePipelineLayout(dev, &plCI, nullptr, &m_pipeLayout),
+             "Failed to create Hi-Z pipeline layout");
+
+    auto compCode = readFile(shaderDir + "/hiz_generate.comp.spv");
+    VkShaderModule compMod = createShaderModule(dev, compCode);
+
+    VkComputePipelineCreateInfo pipeCI{VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
+    pipeCI.stage.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    pipeCI.stage.stage  = VK_SHADER_STAGE_COMPUTE_BIT;
+    pipeCI.stage.module = compMod;
+    pipeCI.stage.pName  = "main";
+    pipeCI.layout       = m_pipeLayout;
+
+    VK_CHECK(vkCreateComputePipelines(dev, VK_NULL_HANDLE, 1, &pipeCI, nullptr, &m_pipeline),
+             "Failed to create Hi-Z compute pipeline");
+
+    vkDestroyShaderModule(dev, compMod, nullptr);
+}
+
+void HiZPass::createDescriptors() {
+    VkDevice dev = m_device->getDevice();
+    uint32_t setCount = m_mipLevels > 0 ? m_mipLevels - 1 : 0;
+
+    // Pool
+    std::array<VkDescriptorPoolSize, 2> poolSizes{};
+    poolSizes[0].type            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizes[0].descriptorCount = setCount;
+    poolSizes[1].type            = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    poolSizes[1].descriptorCount = setCount;
+
+    VkDescriptorPoolCreateInfo poolCI{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+    poolCI.maxSets       = setCount;
+    poolCI.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+    poolCI.pPoolSizes    = poolSizes.data();
+
+    VK_CHECK(vkCreateDescriptorPool(dev, &poolCI, nullptr, &m_descPool),
+             "Failed to create Hi-Z descriptor pool");
+
+    // Allocate sets
+    std::vector<VkDescriptorSetLayout> layouts(setCount, m_descLayout);
+    VkDescriptorSetAllocateInfo allocInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+    allocInfo.descriptorPool     = m_descPool;
+    allocInfo.descriptorSetCount = setCount;
+    allocInfo.pSetLayouts        = layouts.data();
+
+    m_descSets.resize(setCount);
+    VK_CHECK(vkAllocateDescriptorSets(dev, &allocInfo, m_descSets.data()),
+             "Failed to allocate Hi-Z descriptor sets");
+
+    // Write descriptors: each set reads mip N and writes mip N+1
+    for (uint32_t mip = 0; mip < setCount; ++mip) {
+        VkDescriptorImageInfo inputInfo{};
+        inputInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+        inputInfo.imageView   = m_mipViews[mip];
+        inputInfo.sampler     = m_sampler;
+
+        VkDescriptorImageInfo outputInfo{};
+        outputInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+        outputInfo.imageView   = m_mipViews[mip + 1];
+
+        std::array<VkWriteDescriptorSet, 2> writes{};
+        writes[0].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[0].dstSet          = m_descSets[mip];
+        writes[0].dstBinding      = 0;
+        writes[0].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        writes[0].descriptorCount = 1;
+        writes[0].pImageInfo      = &inputInfo;
+
+        writes[1].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[1].dstSet          = m_descSets[mip];
+        writes[1].dstBinding      = 1;
+        writes[1].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        writes[1].descriptorCount = 1;
+        writes[1].pImageInfo      = &outputInfo;
+
+        vkUpdateDescriptorSets(dev, static_cast<uint32_t>(writes.size()),
+                               writes.data(), 0, nullptr);
+    }
+}
+
+void HiZPass::destroyResources() {
+    if (!m_device) return;
+    VkDevice dev = m_device->getDevice();
+
+    if (m_pipeline)   vkDestroyPipeline(dev, m_pipeline, nullptr);
+    if (m_pipeLayout) vkDestroyPipelineLayout(dev, m_pipeLayout, nullptr);
+    if (m_descPool)   vkDestroyDescriptorPool(dev, m_descPool, nullptr);
+    if (m_descLayout) vkDestroyDescriptorSetLayout(dev, m_descLayout, nullptr);
+    if (m_sampler)    vkDestroySampler(dev, m_sampler, nullptr);
+
+    for (auto view : m_mipViews) {
+        if (view) vkDestroyImageView(dev, view, nullptr);
+    }
+    m_mipViews.clear();
+
+    if (m_pyramidView)  vkDestroyImageView(dev, m_pyramidView, nullptr);
+    if (m_pyramidImage) vmaDestroyImage(m_device->getAllocator(), m_pyramidImage, m_pyramidAlloc);
+
+    m_pipeline = VK_NULL_HANDLE;
+    m_pipeLayout = VK_NULL_HANDLE;
+    m_descPool = VK_NULL_HANDLE;
+    m_descLayout = VK_NULL_HANDLE;
+    m_sampler = VK_NULL_HANDLE;
+    m_pyramidView = VK_NULL_HANDLE;
+    m_pyramidImage = VK_NULL_HANDLE;
+    m_pyramidAlloc = VK_NULL_HANDLE;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GpuCuller — stub implementation (will be completed when indirect draws
+//             are integrated into the main rendering loop)
+// ═══════════════════════════════════════════════════════════════════════════
+
+void GpuCuller::init(const Device& device, uint32_t maxObjects) {
+    m_device = &device;
+    m_maxObjects = maxObjects;
+    spdlog::info("GpuCuller initialized (max {} objects)", maxObjects);
+    // Full implementation deferred until indirect draw integration
+}
+
+void GpuCuller::destroy() {
+    if (!m_device) return;
+    VkDevice dev = m_device->getDevice();
+
+    if (m_pipeline)   vkDestroyPipeline(dev, m_pipeline, nullptr);
+    if (m_pipeLayout) vkDestroyPipelineLayout(dev, m_pipeLayout, nullptr);
+    if (m_descPool)   vkDestroyDescriptorPool(dev, m_descPool, nullptr);
+    if (m_descLayout) vkDestroyDescriptorSetLayout(dev, m_descLayout, nullptr);
+
+    m_pipeline = VK_NULL_HANDLE;
+    m_pipeLayout = VK_NULL_HANDLE;
+    m_descPool = VK_NULL_HANDLE;
+    m_descLayout = VK_NULL_HANDLE;
+    m_frames.clear();
+    m_device = nullptr;
+}
+
+void GpuCuller::uploadBounds(uint32_t /*frameIndex*/, const std::vector<ObjectAABB>& /*bounds*/) {
+    // Stub — full implementation with indirect draw integration
+}
+
+void GpuCuller::dispatch(VkCommandBuffer /*cmd*/, uint32_t /*frameIndex*/,
+                         VkImageView /*hizView*/, VkSampler /*hizSampler*/,
+                         const glm::mat4& /*viewProj*/,
+                         uint32_t /*screenWidth*/, uint32_t /*screenHeight*/) {
+    // Stub — full implementation with indirect draw integration
+}
+
+VkBuffer GpuCuller::getIndirectBuffer(uint32_t /*frameIndex*/) const {
+    return VK_NULL_HANDLE; // Stub
+}
+
+VkBuffer GpuCuller::getCountBuffer(uint32_t /*frameIndex*/) const {
+    return VK_NULL_HANDLE; // Stub
+}
+
+void GpuCuller::createComputePipeline() {
+    // Stub — created when indirect draws are integrated
+}
+
+void GpuCuller::createDescriptors() {
+    // Stub — created when indirect draws are integrated
+}
+
+} // namespace glory

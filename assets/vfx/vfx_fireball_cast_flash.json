@@ -1,0 +1,21 @@
+{
+    "id": "vfx_fireball_cast_flash",
+    "maxParticles": 32,
+    "emitRate": 0.0,
+    "burstCount": 24.0,
+    "looping": false,
+    "duration": 0.2,
+    "lifetimeMin": 0.05,
+    "lifetimeMax": 0.15,
+    "initialSpeedMin": 3.0,
+    "initialSpeedMax": 8.0,
+    "sizeMin": 0.2,
+    "sizeMax": 0.4,
+    "spreadAngle": 45.0,
+    "gravity": 0.0,
+    "blendMode": "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [1.0, 0.95, 0.7, 1.0]},
+        {"time": 1.0, "color": [1.0, 0.4,  0.0, 0.0]}
+    ]
+}

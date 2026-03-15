@@ -1,0 +1,26 @@
+{
+    "id": "vfx_fireball_outer",
+    "maxParticles": 96,
+    "emitRate": 60.0,
+    "burstCount": 0.0,
+    "looping": true,
+    "duration": 5.0,
+    "lifetimeMin": 0.15,
+    "lifetimeMax": 0.35,
+    "initialSpeedMin": 1.5,
+    "initialSpeedMax": 4.0,
+    "sizeMin": 0.25,
+    "sizeMax": 0.5,
+    "sizeEnd": 0.05,
+    "rotationSpeedMin": -360.0,
+    "rotationSpeedMax": 360.0,
+    "spreadAngle": 90.0,
+    "gravity": -0.5,
+    "drag": 4.0,
+    "blendMode": "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [1.0, 0.7,  0.2, 0.8]},
+        {"time": 0.4, "color": [0.9, 0.35, 0.05, 0.5]},
+        {"time": 1.0, "color": [0.3, 0.05, 0.0, 0.0]}
+    ]
+}

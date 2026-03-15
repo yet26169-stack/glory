@@ -47,4 +47,11 @@ void main() {
 
     if (color.a < 0.01) discard;
     outColor = color;
+
+    // ── LoL/SC2 VFX readability boost ─────────────────────────────────────────
+    // Slight gamma lift makes particles pop against the desaturated FoW world.
+    outColor.rgb = pow(outColor.rgb, vec3(0.8));
+    // Opaque particles get an additional 30% brightness so they glow through
+    // the stylized toon lighting (SC2 approach).
+    if (outColor.a > 0.3) outColor.rgb *= 1.3;
 }

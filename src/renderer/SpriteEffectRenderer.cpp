@@ -220,10 +220,11 @@ void SpriteEffectRenderer::createPipelines(VkRenderPass renderPass) {
         cb.alphaBlendOp        = VK_BLEND_OP_ADD;
         cb.colorWriteMask      = 0xF;
 
+        VkPipelineColorBlendAttachmentState spriteAlphaBlends[2] = {cb, {}};
         VkPipelineColorBlendStateCreateInfo cbCI{};
         cbCI.sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-        cbCI.attachmentCount = 1;
-        cbCI.pAttachments    = &cb;
+        cbCI.attachmentCount = 2;
+        cbCI.pAttachments    = spriteAlphaBlends;
 
         VkGraphicsPipelineCreateInfo gpCI{};
         gpCI.sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -264,10 +265,11 @@ void SpriteEffectRenderer::createPipelines(VkRenderPass renderPass) {
         cb.alphaBlendOp        = VK_BLEND_OP_ADD;
         cb.colorWriteMask      = 0xF;
 
+        VkPipelineColorBlendAttachmentState spriteAddBlends[2] = {cb, {}};
         VkPipelineColorBlendStateCreateInfo cbCI{};
         cbCI.sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-        cbCI.attachmentCount = 1;
-        cbCI.pAttachments    = &cb;
+        cbCI.attachmentCount = 2;
+        cbCI.pAttachments    = spriteAddBlends;
 
         VkGraphicsPipelineCreateInfo gpCI{};
         gpCI.sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;

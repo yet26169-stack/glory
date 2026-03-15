@@ -1,0 +1,11 @@
+{
+    "id": "fireball_trail",
+    "width": 0.6,
+    "widthEnd": 0.05,
+    "lifetime": 0.25,
+    "segmentDistance": 0.15,
+    "maxSegments": 32,
+    "colorStart": [1.0, 0.9, 0.5, 0.9],
+    "colorEnd":   [0.8, 0.2, 0.0, 0.0],
+    "blendMode": "additive"
+}

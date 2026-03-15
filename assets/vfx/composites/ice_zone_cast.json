@@ -1,0 +1,10 @@
+{
+    "id": "ice_zone_cast_composite",
+    "layers": [
+        { "delay": 0.0,  "type": "GROUND_DECAL", "effectRef": "decal_circle",          "anchor": "TARGET", "scale": 5.0, "color": [0.3, 0.6, 1.0, 0.5] },
+        { "delay": 0.0,  "type": "PARTICLE",     "effectRef": "vfx_ice_crystal_burst", "anchor": "TARGET" },
+        { "delay": 0.05, "type": "PARTICLE",     "effectRef": "vfx_ice_zone_ground",   "anchor": "TARGET" },
+        { "delay": 0.1,  "type": "PARTICLE",     "effectRef": "vfx_ice_mist",          "anchor": "TARGET" },
+        { "delay": 0.0,  "type": "DISTORTION",   "effectRef": "vfx_ripple",            "anchor": "TARGET" }
+    ]
+}

@@ -1,0 +1,24 @@
+{
+    "id": "vfx_ice_zone_ground",
+    "maxParticles": 128,
+    "emitRate": 80.0,
+    "burstCount": 0.0,
+    "looping": true,
+    "duration": 3.0,
+    "lifetimeMin": 0.3,
+    "lifetimeMax": 0.6,
+    "initialSpeedMin": 0.5,
+    "initialSpeedMax": 2.0,
+    "sizeMin": 0.3,
+    "sizeMax": 0.6,
+    "sizeEnd": 0.1,
+    "spreadAngle": 360.0,
+    "gravity": 2.0,
+    "drag": 3.0,
+    "blendMode": "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [0.7,  0.9,  1.0,  0.8]},
+        {"time": 0.5, "color": [0.3,  0.6,  0.95, 0.5]},
+        {"time": 1.0, "color": [0.1,  0.25, 0.6,  0.0]}
+    ]
+}

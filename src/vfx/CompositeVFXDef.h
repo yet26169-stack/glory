@@ -24,11 +24,12 @@ struct VFXLayer {
     std::string    effectRef;             // ID in the relevant subsystem
     float          duration   = -1.0f;   // override duration (-1 = use default)
     float          scale      = 1.0f;
-    glm::vec4      color      = {1,1,1,1};
+    glm::vec4      color      = {1,1,1,1};  // multiply tint (alias: colorTint)
 
-    enum class Anchor : uint8_t { CASTER, TARGET, WORLD };
-    Anchor         anchor     = Anchor::CASTER;
-    glm::vec3      offset     = {0,0,0};
+    enum class Anchor : uint8_t { CASTER, TARGET, PROJECTILE, WORLD };
+    Anchor         anchor      = Anchor::CASTER;
+    glm::vec3      offset      = {0,0,0};
+    bool           followAnchor = false;  // true = reposition with anchor each frame
 };
 
 struct CompositeVFXDef {

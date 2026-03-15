@@ -34,6 +34,8 @@ void CombatSystem::requestShield(entt::entity entity, entt::registry& reg) {
     auto& t = reg.get<TransformComponent>(entity);
     combat.shieldVfxHandle = static_cast<uint32_t>(entity) | 0x80000000;
     emitVFX("vfx_shield", t.position, glm::vec3(0, 1, 0), 1.0f, combat.shieldVfxHandle);
+    emitVFX("vfx_molten_shield_apply", t.position, glm::vec3(0, 1, 0));
+    emitVFX("vfx_molten_shield_embers", t.position, glm::vec3(0, 1, 0));
 }
 
 void CombatSystem::releaseShield(entt::entity entity, entt::registry& reg) {
@@ -64,8 +66,9 @@ void CombatSystem::requestTrick(entt::entity attacker, entt::entity target,
     combat.targetEntity = target;
 
     auto& t = reg.get<TransformComponent>(attacker);
-    emitVFX("vfx_trick", t.position,
-            glm::normalize(reg.get<TransformComponent>(target).position - t.position));
+    glm::vec3 dir = glm::normalize(reg.get<TransformComponent>(target).position - t.position);
+    emitVFX("vfx_trick_cast", t.position, dir);
+    emitVFX("vfx_trick", t.position, dir);
 }
 
 // ── Per-frame update ────────────────────────────────────────────────────────
@@ -79,8 +82,14 @@ void CombatSystem::update(entt::registry& registry, float dt) {
         combat.trickCooldown  = std::max(0.0f, combat.trickCooldown  - dt);
 
         switch (combat.state) {
-        case CombatState::AUTO_ATTACKING:
-            processAutoAttack(registry, entity, combat, dt);
+        case CombatState::ATTACK_WINDUP:
+            processAttackWindup(registry, entity, combat, dt);
+            break;
+        case CombatState::ATTACK_FIRE:
+            processAttackFire(registry, entity, combat, dt);
+            break;
+        case CombatState::ATTACK_WINDDOWN:
+            processAttackWinddown(registry, entity, combat, dt);
             break;
         case CombatState::SHIELDING:
             processShield(registry, entity, combat, dt);
@@ -99,12 +108,37 @@ void CombatSystem::update(entt::registry& registry, float dt) {
 
 // ── State processors ────────────────────────────────────────────────────────
 
-void CombatSystem::processAutoAttack(entt::registry& reg, entt::entity entity,
-                                      CombatComponent& combat, float dt) {
+void CombatSystem::processAttackWindup(entt::registry& reg, entt::entity entity,
+                                        CombatComponent& combat, float dt) {
     combat.stateTimer -= dt;
     if (combat.stateTimer <= 0.0f) {
+        combat.state = CombatState::ATTACK_FIRE;
+        combat.stateTimer = 0.0f; // Instant transition to FIRE phase
+    }
+}
+
+void CombatSystem::processAttackFire(entt::registry& reg, entt::entity entity,
+                                      CombatComponent& combat, float dt) {
+    // Determine the fire point logic (damage vs projectile)
+    if (combat.isRanged) {
+        spawnAutoAttackProjectile(reg, entity, combat.targetEntity, combat);
+    } else {
         applyAutoAttackHit(reg, entity, combat.targetEntity);
-        combat.attackCooldown = 1.0f / combat.attackSpeed;
+    }
+
+    // Set internal attack cooldown based on AttackSpeed
+    combat.attackCooldown = 1.0f / combat.attackSpeed;
+
+    // Transition to Wind-down
+    combat.state = CombatState::ATTACK_WINDDOWN;
+    float cycleTime = 1.0f / combat.attackSpeed;
+    combat.stateTimer = cycleTime * (1.0f - combat.windupPercent);
+}
+
+void CombatSystem::processAttackWinddown(entt::registry& reg, entt::entity entity,
+                                          CombatComponent& combat, float dt) {
+    combat.stateTimer -= dt;
+    if (combat.stateTimer <= 0.0f) {
         combat.state = CombatState::IDLE;
         combat.targetEntity = entt::null;
     }
@@ -160,6 +194,33 @@ void CombatSystem::processStun(CombatComponent& combat, float dt) {
 
 // ── Hit resolution ──────────────────────────────────────────────────────────
 
+void CombatSystem::spawnAutoAttackProjectile(entt::registry& reg, entt::entity attacker,
+                                              entt::entity target, CombatComponent& combat) {
+    if (!reg.valid(target) || !reg.all_of<TransformComponent>(target))
+        return;
+
+    auto& attackerPos = reg.get<TransformComponent>(attacker).position;
+    auto& targetPos   = reg.get<TransformComponent>(target).position;
+    glm::vec3 spawnPos = attackerPos + glm::vec3(0, 1.0f, 0); // spawn at chest height
+
+    entt::entity proj = reg.create();
+    reg.emplace<TransformComponent>(proj, TransformComponent{spawnPos, glm::vec3(0), glm::vec3(1.0f)});
+    
+    auto& pc = reg.emplace<ProjectileComponent>(proj);
+    pc.casterEntity = static_cast<EntityID>(entt::to_integral(attacker));
+    pc.targetEntity = static_cast<EntityID>(entt::to_integral(target));
+    pc.speed        = combat.projectileSpeed;
+    pc.damage       = combat.attackDamage;
+    pc.isAutoAttack = true;
+
+    // Spawn flight VFX
+    if (!combat.projectileVfx.empty()) {
+        uint32_t vfxHandle = (static_cast<uint32_t>(entt::to_integral(proj)) + 1) * 1000;
+        pc.vfxHandles.push_back(vfxHandle);
+        emitVFX(combat.projectileVfx, spawnPos, glm::normalize(targetPos - attackerPos), 1.0f, vfxHandle);
+    }
+}
+
 void CombatSystem::applyAutoAttackHit(entt::registry& reg, entt::entity attacker,
                                        entt::entity target) {
     if (!reg.valid(target) || !reg.all_of<CombatComponent, TransformComponent>(target))
@@ -170,9 +231,10 @@ void CombatSystem::applyAutoAttackHit(entt::registry& reg, entt::entity attacker
     auto& targetPos    = reg.get<TransformComponent>(target).position;
     glm::vec3 dir      = glm::normalize(targetPos - attackerPos);
 
-    // Emit slash VFX at midpoint
+    // Emit melee slash + hit VFX at midpoint
     glm::vec3 midpoint = (attackerPos + targetPos) * 0.5f;
-    emitVFX("vfx_auto_attack", midpoint, dir);
+    emitVFX("vfx_melee_slash", midpoint, dir);
+    emitVFX("vfx_melee_hit", midpoint, dir);
 
     if (targetCombat.state == CombatState::SHIELDING) {
         // BLOCKED

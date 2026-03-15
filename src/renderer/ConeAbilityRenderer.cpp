@@ -213,11 +213,11 @@ VkPipeline ConeAbilityRenderer::createPipeline(VkRenderPass        renderPass,
     cbA.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
     cbA.alphaBlendOp        = VK_BLEND_OP_ADD;
     cbA.colorWriteMask      = 0xF;
-
+    VkPipelineColorBlendAttachmentState coneBlends[2] = {cbA, {}};
     VkPipelineColorBlendStateCreateInfo cb{
         VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
-    cb.attachmentCount = 1;
-    cb.pAttachments    = &cbA;
+    cb.attachmentCount = 2;
+    cb.pAttachments    = coneBlends;
 
     VkDynamicState dyns[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
     VkPipelineDynamicStateCreateInfo dy{

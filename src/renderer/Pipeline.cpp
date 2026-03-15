@@ -210,11 +210,14 @@ void Pipeline::createGraphicsPipeline(VkExtent2D /*extent*/,
         VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     blendAttachment.blendEnable = VK_FALSE;
 
+    VkPipelineColorBlendAttachmentState noWriteBlend{};  // charDepth: no write for static geometry
+    VkPipelineColorBlendAttachmentState staticBlends[2] = {blendAttachment, noWriteBlend};
+
     VkPipelineColorBlendStateCreateInfo colorBlend{};
     colorBlend.sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlend.logicOpEnable   = VK_FALSE;
-    colorBlend.attachmentCount = 1;
-    colorBlend.pAttachments    = &blendAttachment;
+    colorBlend.attachmentCount = 2;
+    colorBlend.pAttachments    = staticBlends;
 
     // No push constants — per-entity data is in the instance buffer (binding 1)
     VkPipelineLayoutCreateInfo layoutCI{};

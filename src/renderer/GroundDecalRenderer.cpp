@@ -202,10 +202,10 @@ void GroundDecalRenderer::createPipelines() {
     blend.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
     blend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
     blend.alphaBlendOp = VK_BLEND_OP_ADD;
-
+    VkPipelineColorBlendAttachmentState decalBlends[2] = {blend, {}};
     VkPipelineColorBlendStateCreateInfo cbCI{ VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
-    cbCI.attachmentCount = 1;
-    cbCI.pAttachments = &blend;
+    cbCI.attachmentCount = 2;
+    cbCI.pAttachments = decalBlends;
 
     VkDynamicState dynStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
     VkPipelineDynamicStateCreateInfo dynCI{ VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };

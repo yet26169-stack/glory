@@ -1,0 +1,11 @@
+{
+    "id": "storm_strike_impact_composite",
+    "layers": [
+        { "delay": 0.0,  "type": "PARTICLE",    "effectRef": "vfx_ult_pillar",              "anchor": "TARGET" },
+        { "delay": 0.0,  "type": "SHOCKWAVE",   "effectRef": "default",                     "anchor": "TARGET" },
+        { "delay": 0.05, "type": "PARTICLE",    "effectRef": "vfx_ult_shockwave_ring",      "anchor": "TARGET" },
+        { "delay": 0.0,  "type": "DISTORTION",  "effectRef": "vfx_ripple",                  "anchor": "TARGET" },
+        { "delay": 0.1,  "type": "GROUND_DECAL","effectRef": "decal_circle",                "anchor": "TARGET", "scale": 6.0, "color": [0.1, 0.15, 0.4, 0.7] },
+        { "delay": 0.15, "type": "PARTICLE",    "effectRef": "vfx_fireball_impact_sparks",  "anchor": "TARGET" }
+    ]
+}

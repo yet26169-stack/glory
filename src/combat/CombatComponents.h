@@ -24,7 +24,9 @@ struct TestDummyTag {};
 // ── Combat state machine ──────────────────────────────────────────────────
 enum class CombatState : uint8_t {
     IDLE,             // Can perform any action
-    AUTO_ATTACKING,   // In auto-attack windup → hit
+    ATTACK_WINDUP,    // Animation starting, can be cancelled by movement
+    ATTACK_FIRE,      // Damage applied or projectile spawned
+    ATTACK_WINDDOWN,  // Animation finishing, can be cancelled by movement (repos)
     SHIELDING,        // Shield is active (blocks attacks)
     TRICKING,         // Performing trick windup → resolve
     STUNNED           // Cannot act (result of failed trick or broken shield)
@@ -36,10 +38,14 @@ struct CombatComponent {
 
     // ── Auto-attack ───────────────────────────────────────────────────────
     float attackRange      = 3.0f;
-    float attackCooldown   = 0.0f;
+    float attackCooldown   = 0.0f;   // Internal timer before next attack can start
     float attackSpeed      = 1.0f;   // attacks per second
-    float attackWindup     = 0.3f;
+    float windupPercent    = 0.3f;   // % of attack cycle spent in windup
     float attackDamage     = 60.0f;
+    
+    bool  isRanged         = false;
+    float projectileSpeed  = 20.0f;
+    std::string projectileVfx = "vfx_fireball_projectile";
 
     // ── Shield ────────────────────────────────────────────────────────────
     float shieldDuration     = 3.5f;

@@ -1,0 +1,8 @@
+{
+    "id": "nature_shield_cast_composite",
+    "layers": [
+        { "delay": 0.0, "type": "PARTICLE",     "effectRef": "vfx_heal_rising",  "anchor": "CASTER" },
+        { "delay": 0.0, "type": "PARTICLE",     "effectRef": "vfx_shield_pulse", "anchor": "CASTER" },
+        { "delay": 0.0, "type": "GROUND_DECAL", "effectRef": "decal_circle",     "anchor": "CASTER", "scale": 3.0, "color": [0.2, 0.8, 0.3, 0.4] }
+    ]
+}

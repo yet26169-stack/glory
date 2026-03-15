@@ -1,10 +1,12 @@
 #include "renderer/Renderer.h"
+#include "renderer/FogOfWarRenderer.h"
 #include "renderer/VkCheck.h"
 #include "renderer/Model.h"
 #include "renderer/StaticSkinnedMesh.h"
 #include "renderer/Frustum.h"
 #include "core/SimulationLoop.h"
 #include "scene/Components.h"
+#include "combat/CombatComponents.h"
 #include "ability/AbilityComponents.h"
 #include "map/MapLoader.h"
 #include "window/Window.h"
@@ -38,7 +40,12 @@ Renderer::Renderer(Window& window) : m_window(window) {
     m_swapchain = std::make_unique<Swapchain>(*m_device, m_window.getSurface(), m_window.getExtent());
 
     m_hdrFB = std::make_unique<HDRFramebuffer>();
-    m_hdrFB->init(*m_device, m_window.getExtent().width, m_window.getExtent().height);
+    m_hdrFB->init(*m_device, m_window.getExtent().width, m_window.getExtent().height,
+                  VK_FORMAT_R16G16B16A16_SFLOAT,
+                  m_device->findSupportedFormat(
+                      {VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
+                      VK_IMAGE_TILING_OPTIMAL,
+                      VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT));
 
     m_descriptors = std::make_unique<Descriptors>(*m_device, Sync::MAX_FRAMES_IN_FLIGHT);
     m_pipeline = std::make_unique<Pipeline>(*m_device, *m_swapchain, m_descriptors->getLayout(), m_hdrFB->renderPass());
@@ -73,6 +80,13 @@ Renderer::Renderer(Window& window) : m_window(window) {
     ripple.strength = 1.0f;
     m_distortionRenderer->registerDef(ripple);
 
+    m_inkingPass = std::make_unique<InkingPass>();
+    m_inkingPass->init(*m_device, m_hdrFB->loadRenderPass(),
+                       m_hdrFB->characterDepthView(), m_hdrFB->sampler());
+
+    m_fogOfWar = std::make_unique<FogOfWarRenderer>();
+    m_fogOfWar->init(*m_device);
+
     m_shieldBubble = std::make_unique<ShieldBubbleRenderer>();
     m_shieldBubble->init(*m_device, m_hdrFB->renderPass());
     m_coneEffect = std::make_unique<ConeAbilityRenderer>();
@@ -96,7 +110,9 @@ Renderer::Renderer(Window& window) : m_window(window) {
     createGridPipeline();
     createSkinnedPipeline();
 
-    // ── VFX & Ability systems ─────────────────────────────────────────────
+    m_outlineRenderer = std::make_unique<OutlineRenderer>();
+    m_outlineRenderer->init(*m_device, m_hdrFB->renderPass(),
+                            m_descriptors->getLayout());
     m_vfxQueue      = std::make_unique<VFXEventQueue>();
     m_combatVfxQueue = std::make_unique<VFXEventQueue>(); // separate SPSC for CombatSystem
     m_vfxRenderer   = std::make_unique<VFXRenderer>(*m_device, m_hdrFB->renderPass());
@@ -104,16 +120,30 @@ Renderer::Renderer(Window& window) : m_window(window) {
     m_vfxRenderer->loadEmitterDirectory(std::string(ASSET_DIR) + "vfx/");
 
     m_trailRenderer = std::make_unique<TrailRenderer>(*m_device, m_hdrFB->renderPass());
-    // Register basic fireball trail
+
+    // Original fireball trail (kept for backward compatibility with existing IDs)
     TrailDef fireballTrail;
-    fireballTrail.id = "vfx_fireball_trail";
+    fireballTrail.id         = "vfx_fireball_trail";
     fireballTrail.widthStart = 0.6f;
-    fireballTrail.widthEnd = 0.1f;
+    fireballTrail.widthEnd   = 0.1f;
     fireballTrail.colorStart = {1.0f, 0.6f, 0.2f, 1.0f};
-    fireballTrail.colorEnd = {1.0f, 0.2f, 0.0f, 0.0f};
-    fireballTrail.fadeSpeed = 4.0f;
+    fireballTrail.colorEnd   = {1.0f, 0.2f, 0.0f, 0.0f};
+    fireballTrail.fadeSpeed  = 4.0f;
     fireballTrail.emitInterval = 0.01f;
     m_trailRenderer->registerTrail(fireballTrail);
+
+    // LoL-palette fireball trail: white-gold core → orange-red → fade
+    // Matches assets/trails/fireball_trail.json
+    TrailDef fireballTrailLoL;
+    fireballTrailLoL.id          = "fireball_trail";
+    fireballTrailLoL.widthStart  = 0.6f;
+    fireballTrailLoL.widthEnd    = 0.05f;
+    fireballTrailLoL.colorStart  = {1.0f, 0.9f, 0.5f, 0.9f};
+    fireballTrailLoL.colorEnd    = {0.8f, 0.2f, 0.0f, 0.0f};
+    fireballTrailLoL.fadeSpeed   = 4.0f;              // 1/0.25s lifetime
+    fireballTrailLoL.emitInterval = 0.015f;            // ~segmentDistance/speed
+    fireballTrailLoL.additive    = true;
+    m_trailRenderer->registerTrail(fireballTrailLoL);
 
     m_meshEffectRenderer = std::make_unique<MeshEffectRenderer>(*m_device, m_hdrFB->renderPass());
     // Register basic slash effect
@@ -208,6 +238,9 @@ Renderer::~Renderer() {
     m_clickIndicatorRenderer.reset();
     m_groundDecalRenderer.reset();
     m_distortionRenderer.reset();
+    m_inkingPass.reset();
+    m_fogOfWar.reset();
+    if (m_waterRenderer) { m_waterRenderer->destroy(); m_waterRenderer.reset(); }
     m_shieldBubble.reset();
     m_coneEffect.reset();
     m_explosionRenderer.reset();
@@ -302,6 +335,26 @@ void Renderer::drawFrame() {
             };
             SimulationLoop::tick(simCtx);
             m_coneEffectTimer = simCtx.coneEffectTimer;
+
+            // ── Fog of War vision update ──────────────────────────────────
+            if (m_fogOfWar) {
+                auto& reg = m_scene.getRegistry();
+                std::vector<VisionEntity> visionEnts;
+                visionEnts.reserve(32);
+
+                // Friendly (PLAYER team) units reveal the map.
+                // The player's champion gets a larger personal sight range.
+                auto view = reg.view<TransformComponent, TeamComponent>();
+                for (auto [ent, tf, team] : view.each()) {
+                    if (team.team != Team::PLAYER) continue;
+                    float range = (ent == m_playerEntity) ? 18.0f : 10.0f;
+                    visionEnts.push_back({ tf.position, range });
+                }
+
+                m_fogSystem.update(visionEnts);
+                m_fogOfWar->updateVisibility(
+                    m_fogSystem.getVisibilityBuffer().data(), 128, 128);
+            }
         }
 
         // ── ImGui new frame (before any UI building) ─────────────────────────
@@ -459,15 +512,9 @@ void Renderer::drawFrame() {
         tryAbility(m_input->wasQPressed(), AbilitySlot::Q);
         tryAbility(m_input->wasWPressed(), AbilitySlot::W);
 
-        // E: Molten Shield — self-buff + cone visual effect
+        // E: nature_shield — self-buff (SELF targeting; no cone visual)
         if (m_input->wasEPressed()) {
             m_abilitySystem->enqueueRequest(m_playerEntity, AbilitySlot::E, groundTarget);
-            m_coneDirection   = groundTarget.direction;
-            m_coneEffectTimer = CONE_DURATION;
-            if (m_scene.getRegistry().all_of<TransformComponent>(m_playerEntity)) {
-                const auto& pt = m_scene.getRegistry().get<TransformComponent>(m_playerEntity);
-                m_coneApex = pt.position + glm::vec3(0.0f, 0.05f, 0.0f);
-            }
         }
 
         tryAbility(m_input->wasRPressed(), AbilitySlot::R);
@@ -825,14 +872,22 @@ void Renderer::drawFrame() {
 
             if (anim.activeClipIndex != targetClip && targetClip < (int)anim.clips.size()) {
                 anim.activeClipIndex = targetClip;
-                anim.player.crossfadeTo(&anim.clips[targetClip], 0.1f);
+                // Shorter blend into attack (0.05s) for a snappy responsive feel;
+                // longer blend out of attack (0.12s) for a smooth recovery.
+                float blendTime = (targetClip == 2) ? 0.05f : 0.12f;
+                anim.player.crossfadeTo(&anim.clips[targetClip], blendTime);
             }
 
             // Scale animation speed
             if (anim.activeClipIndex == 2 && m_scene.getRegistry().all_of<CombatComponent>(e)) {
-                // Attack: scale by attackSpeed
+                // Attack: scale so the clip spans exactly one full attack cycle.
+                // timeScale = clipDuration * attackSpeed ensures the animation
+                // finishes at the same moment the combat cycle ends, regardless
+                // of the clip's authored length.
                 auto& combat = m_scene.getRegistry().get<CombatComponent>(e);
-                anim.player.setTimeScale(combat.attackSpeed);
+                const auto& attackClip = anim.clips[anim.activeClipIndex];
+                float clipDuration = (attackClip.duration > 0.0f) ? attackClip.duration : 1.0f;
+                anim.player.setTimeScale(clipDuration * combat.attackSpeed);
             } else if (anim.activeClipIndex == 1 && anim.activeClipIndex < (int)anim.clips.size()) {
                 // Walk: scale to match movement speed
                 const auto& walkClip = anim.clips[anim.activeClipIndex];
@@ -955,6 +1010,11 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
     VkCommandBufferBeginInfo bi{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
     VK_CHECK(vkBeginCommandBuffer(cmd, &bi), "Begin command buffer");
 
+    // ── FoW compute pass ────────────────────────────────────────────────────
+    if (m_fogOfWar) {
+        m_fogOfWar->dispatch(cmd);
+    }
+
     // ── VFX compute pass (particle simulation, OUTSIDE render pass) ──────
     if (m_vfxRenderer && m_state != AppState::Launcher) {
         m_vfxRenderer->dispatchCompute(cmd);
@@ -997,6 +1057,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
         light.fogColor   = glm::vec3(0.6f, 0.65f, 0.75f);
         light.fogStart   = 5.0f;
         light.fogEnd     = 50.0f;
+        light.appTime    = m_gameTime;
         m_descriptors->updateLightBuffer(m_currentFrame, light);
     }
 
@@ -1027,9 +1088,10 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
     }
 
     // ── Begin HDR render pass ────────────────────────────────────────────────
-    std::array<VkClearValue, 2> clears{};
+    std::array<VkClearValue, 3> clears{};
     clears[0].color        = {{ 0.08f, 0.10f, 0.14f, 1.0f }};
     clears[1].depthStencil = { 1.0f, 0 };
+    clears[2].color        = {{ 1.0f, 0.0f, 0.0f, 0.0f }};  // charDepth: clear to far (1.0)
 
     VkRenderPassBeginInfo rp{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
     rp.renderPass       = m_hdrFB->renderPass();
@@ -1089,6 +1151,17 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
             vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                     m_skinnedPipelineLayout, 0, 1, &ds, 0, nullptr);
 
+            // Collect per-entity draw parameters so the outline pass can replay
+            // them after all geometry is drawn (avoids mid-loop pipeline switches).
+            struct SkinnedDrawInfo {
+                entt::entity entity;
+                VkBuffer     instBuf;
+                VkDeviceSize instOffset;
+                uint32_t     boneBase;
+                uint32_t     meshIdx; // staticSkinnedMeshIndex
+            };
+            std::vector<SkinnedDrawInfo> skinnedDraws;
+
             auto skinnedView = m_scene.getRegistry()
                 .view<TransformComponent, MaterialComponent, GPUSkinnedMeshComponent>();
             for (auto&& [e, t, mat, ssm] : skinnedView.each()) {
@@ -1096,20 +1169,18 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
                 glm::mat4 model = t.getModelMatrix();
                 instances[instanceIndex].model        = model;
                 instances[instanceIndex].normalMatrix = glm::transpose(glm::inverse(model));
-                
-                // Highlight logic: Red for hovered, Green for selected
+
+                // Tint: hover turns slightly red so the outline is still the
+                // canonical highlight; selected green tint is now replaced by
+                // the outline system entirely.
                 glm::vec4 tint(1.0f);
                 if (e == m_hoveredEntity) {
-                    tint = glm::vec4(1.0f, 0.4f, 0.4f, 1.0f); // Hover red
-                } else if (m_scene.getRegistry().all_of<SelectableComponent>(e)) {
-                    if (m_scene.getRegistry().get<SelectableComponent>(e).isSelected) {
-                        tint = glm::vec4(0.5f, 1.0f, 0.5f, 1.0f); // Selected green
-                    }
+                    tint = glm::vec4(1.0f, 0.6f, 0.6f, 1.0f); // subtle hover tint
                 }
                 instances[instanceIndex].tint = tint;
 
                 instances[instanceIndex].params = glm::vec4(mat.shininess, mat.metallic, mat.roughness, mat.emissive);
-                instances[instanceIndex].texIndices   = glm::vec4(
+                instances[instanceIndex].texIndices = glm::vec4(
                     static_cast<float>(mat.materialIndex), static_cast<float>(mat.normalMapIndex), 0.0f, 0.0f);
 
                 VkBuffer     instBuf    = m_instanceBuffers[m_currentFrame].getBuffer();
@@ -1123,7 +1194,57 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
                 const auto& mesh = m_scene.getStaticSkinnedMesh(ssm.staticSkinnedMeshIndex);
                 mesh.bind(cmd);
                 mesh.draw(cmd);
+
+                skinnedDraws.push_back({e, instBuf, instOffset, boneBase, ssm.staticSkinnedMeshIndex});
                 ++instanceIndex;
+            }
+
+            // ── Team-colored outlines (LoL Stage 8) ──────────────────────────
+            // Run after ALL skinned geometry so stencil writes don't interfere
+            // with subsequent normal draws.
+            if (m_outlineRenderer && !skinnedDraws.empty()) {
+                auto& reg = m_scene.getRegistry();
+
+                // Determine the player's current attack target (for red outline).
+                entt::entity attackTarget = entt::null;
+                if (reg.valid(m_playerEntity) &&
+                    reg.all_of<CombatComponent>(m_playerEntity)) {
+                    attackTarget = reg.get<CombatComponent>(m_playerEntity).targetEntity;
+                    if (!reg.valid(attackTarget)) attackTarget = entt::null;
+                }
+
+                for (const auto& info : skinnedDraws) {
+                    entt::entity e      = info.entity;
+                    bool isHovered      = (e == m_hoveredEntity);
+                    bool isSelected     = reg.all_of<SelectableComponent>(e) &&
+                                          reg.get<SelectableComponent>(e).isSelected;
+                    bool isAttackTarget = (e == attackTarget);
+
+                    const auto& mesh = m_scene.getStaticSkinnedMesh(info.meshIdx);
+
+                    // Priority: hovered > attack-target > selected.
+                    if (isHovered) {
+                        m_outlineRenderer->renderOutline(
+                            cmd, ds, info.instBuf, info.instOffset,
+                            info.boneBase, mesh,
+                            0.035f, glm::vec4(1.0f, 0.85f, 0.0f, 1.0f)); // gold
+                    } else if (isAttackTarget) {
+                        m_outlineRenderer->renderOutline(
+                            cmd, ds, info.instBuf, info.instOffset,
+                            info.boneBase, mesh,
+                            0.030f, glm::vec4(1.0f, 0.25f, 0.1f, 1.0f)); // enemy red
+                    } else if (isSelected) {
+                        m_outlineRenderer->renderOutline(
+                            cmd, ds, info.instBuf, info.instOffset,
+                            info.boneBase, mesh,
+                            0.030f, glm::vec4(0.2f, 0.5f, 1.0f, 1.0f)); // blue team
+                    }
+                }
+
+                // Restore the skinned pipeline for anything that follows
+                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_skinnedPipeline);
+                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                        m_skinnedPipelineLayout, 0, 1, &ds, 0, nullptr);
             }
         }
 
@@ -1157,6 +1278,18 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
         // ── Debug Renderer (Marquee Box) ──────────────────────────────────────
         glm::mat4 viewProj = m_isoCam.getProjectionMatrix(aspect) * m_isoCam.getViewMatrix();
         m_debugRenderer.render(cmd, viewProj);
+
+        // ── Water surface (alpha-blend, depth-test ON, depth-write OFF) ───
+        if (m_waterRenderer) {
+            float appTime = static_cast<float>(glfwGetTime());
+            glm::mat4 waterModel = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.25f, 0.0f))
+                                 * glm::scale(glm::mat4(1.0f), glm::vec3(200.0f, 1.0f, 200.0f));
+            m_waterRenderer->render(cmd, ds, appTime, waterModel);
+            // Restore main pipeline after water hijacked the pipeline bind point
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_skinnedPipeline);
+            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                    m_skinnedPipelineLayout, 0, 1, &ds, 0, nullptr);
+        }
     }
 
     vkCmdEndRenderPass(cmd);
@@ -1176,6 +1309,11 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
 
         vkCmdSetViewport(cmd, 0, 1, &vp);
         vkCmdSetScissor(cmd, 0, 1, &sc);
+
+        // ── Character outline (Sobel inking pass) ──────────────────────────────
+        if (m_inkingPass) {
+            m_inkingPass->render(cmd, 0.02f, 1.5f, glm::vec4(0.05f, 0.03f, 0.02f, 1.0f));
+        }
 
         glm::mat4 viewProj = m_isoCam.getProjectionMatrix(aspect) * m_isoCam.getViewMatrix();
 
@@ -1303,15 +1441,161 @@ void Renderer::buildScene() {
         m_descriptors->writeBindlessTexture(i, tex.getImageView(), tex.getSampler());
     }
 
-    // ── Flat map (200×200 units, flat terrain) ────────────────────────────
-    uint32_t mapMesh = m_scene.addMesh(
-        Model::createTerrain(*m_device, m_device->getAllocator(), 200.0f, 64, 0.0f));
-    auto map = m_scene.createEntity("FlatMap");
-    m_scene.getRegistry().emplace<MeshComponent>(map, MeshComponent{ mapMesh });
-    m_scene.getRegistry().emplace<MaterialComponent>(map,
-        MaterialComponent{ checkerTex, flatNorm, 0.0f, 0.0f, 0.9f, 0.0f });
-    auto& mapT = m_scene.getRegistry().get<TransformComponent>(map);
-    mapT.position = glm::vec3(100.0f, 0.0f, 100.0f);
+    // ── Toon ramp texture (binding 5, 256×1 R8G8B8A8_UNORM) ─────────────
+    // LoL-style gradient: dark cool shadow → midtone → bright warm highlight.
+    // Zones: [0-39] shadow, [40-89] shadow→mid transition,
+    //        [90-179] midtone, [180-219] mid→highlight transition, [220-255] highlight
+    {
+        constexpr uint32_t RAMP_W = 256;
+        uint32_t pixels[RAMP_W];
+
+        // Pack RGBA into a uint32_t for VK_FORMAT_R8G8B8A8_UNORM (little-endian)
+        auto pack = [](float r, float g, float b) -> uint32_t {
+            uint32_t R = static_cast<uint32_t>(r * 255.0f + 0.5f);
+            uint32_t G = static_cast<uint32_t>(g * 255.0f + 0.5f);
+            uint32_t B = static_cast<uint32_t>(b * 255.0f + 0.5f);
+            return R | (G << 8) | (B << 16) | (0xFFu << 24);
+        };
+
+        // Anchor colours
+        const float sR = 0.25f, sG = 0.22f, sB = 0.30f; // shadow
+        const float mR = 0.75f, mG = 0.70f, mB = 0.68f; // midtone
+        const float hR = 1.00f, hG = 0.98f, hB = 0.95f; // highlight
+
+        for (uint32_t x = 0; x < RAMP_W; ++x) {
+            if (x < 40) {
+                pixels[x] = pack(sR, sG, sB);
+            } else if (x < 90) {
+                float t   = static_cast<float>(x - 40) / 50.0f;
+                pixels[x] = pack(sR + t * (mR - sR), sG + t * (mG - sG), sB + t * (mB - sB));
+            } else if (x < 180) {
+                pixels[x] = pack(mR, mG, mB);
+            } else if (x < 220) {
+                float t   = static_cast<float>(x - 180) / 40.0f;
+                pixels[x] = pack(mR + t * (hR - mR), mG + t * (hG - mG), mB + t * (hB - mB));
+            } else {
+                pixels[x] = pack(hR, hG, hB);
+            }
+        }
+
+        m_toonRamp = Texture::createFromPixels(*m_device, pixels, RAMP_W, 1,
+                                               VK_FORMAT_R8G8B8A8_UNORM);
+        m_descriptors->writeToonRamp(m_toonRamp.getImageView(), m_toonRamp.getSampler());
+        spdlog::info("Toon ramp texture created and bound to descriptor binding 5");
+    }
+
+    if (m_fogOfWar) {
+        m_descriptors->writeFogOfWar(m_fogOfWar->getVisibilityView(), m_fogOfWar->getSampler());
+    }
+
+    // ── Flat map removed for testing (replaced by lane tiles) ─────────────
+    // uint32_t mapMesh = m_scene.addMesh(
+    //     Model::createTerrain(*m_device, m_device->getAllocator(), 200.0f, 64, 0.0f));
+    // auto map = m_scene.createEntity("FlatMap");
+    // m_scene.getRegistry().emplace<MeshComponent>(map, MeshComponent{ mapMesh });
+    // m_scene.getRegistry().emplace<MaterialComponent>(map,
+    //     MaterialComponent{ checkerTex, flatNorm, 0.0f, 0.0f, 0.9f, 0.0f });
+    // auto& mapT = m_scene.getRegistry().get<TransformComponent>(map);
+    // mapT.position = glm::vec3(100.0f, 0.0f, 100.0f);
+
+    // ── Lane tiles (stone-textured flat quads along each lane path) ─────────
+    {
+        std::string laneTilePath = std::string(MODEL_DIR) +
+                                   "models/maps/stone+tile+ground+lane.glb";
+        uint32_t laneTileMesh = 0;
+        uint32_t laneTileTex  = checkerTex;
+        bool     laneTileOK   = false;
+
+        // Procedural 1×1 flat quad — fast (2 tris), reused for all 86 tiles.
+        // The GLB is ~1.9 M tris and unsuitable for instancing; we only borrow
+        // its texture for the stone appearance.
+        auto tileQuad = Model::createTerrain(*m_device, m_device->getAllocator(),
+                                             1.0f, 1, 0.0f);
+        laneTileMesh = m_scene.addMesh(std::move(tileQuad));
+
+        try {
+            auto glbTextures = Model::loadGLBTextures(*m_device, laneTilePath);
+            if (!glbTextures.empty()) {
+                laneTileTex = m_scene.addTexture(std::move(glbTextures[0].texture));
+                m_descriptors->writeBindlessTexture(
+                    laneTileTex,
+                    m_scene.getTexture(laneTileTex).getImageView(),
+                    m_scene.getTexture(laneTileTex).getSampler());
+            }
+            laneTileOK = true;
+            spdlog::info("Lane tile texture loaded (tex={})", laneTileTex);
+        } catch (const std::exception& e) {
+            spdlog::warn("Lane tile GLB not found at '{}': {} — using checkerboard",
+                         laneTilePath, e.what());
+            laneTileOK = true;  // still place tiles with fallback texture
+        }
+
+        if (laneTileOK) {
+            // Quad is 1×1; scale it so it covers the lane width in both axes.
+            // Stride = scale factor, so tiles step exactly their own width along the lane.
+            auto placeLaneTiles = [&](const std::vector<glm::vec3>& waypoints,
+                                      float laneWidth, const std::string& laneName)
+            {
+                int tileCount = 0;
+                // Each tile is scaled to laneWidth × laneWidth world units.
+                float stride = laneWidth;
+
+                for (size_t i = 0; i + 1 < waypoints.size(); ++i) {
+                    glm::vec3 a    = waypoints[i];
+                    glm::vec3 b    = waypoints[i + 1];
+                    glm::vec3 diff = b - a;
+                    float segLen   = glm::length(diff);
+                    if (segLen < 0.001f) continue;
+                    glm::vec3 dir = diff / segLen;
+
+                    // Align tile's +Z to travel direction
+                    float yaw = std::atan2(dir.x, dir.z);
+
+                    float walked = 0.0f;
+                    while (walked < segLen) {
+                        glm::vec3 pos = a + dir * (walked + stride * 0.5f);
+                        pos.y = 0.0f;
+
+                        auto tile = m_scene.createEntity(
+                            laneName + "_tile_" + std::to_string(tileCount));
+                        m_scene.getRegistry().emplace<MeshComponent>(
+                            tile, MeshComponent{ laneTileMesh });
+                        m_scene.getRegistry().emplace<MaterialComponent>(
+                            tile, MaterialComponent{ laneTileTex, flatNorm,
+                                                     0.0f, 0.0f, 0.9f, 0.0f });
+                        m_scene.getRegistry().emplace<MapComponent>(tile);
+
+                        auto& tt    = m_scene.getRegistry().get<TransformComponent>(tile);
+                        tt.position = pos;
+                        tt.rotation = glm::vec3(0.0f, yaw, 0.0f);
+                        tt.scale    = glm::vec3(laneWidth);
+
+                        ++tileCount;
+                        walked += stride;
+                    }
+                }
+                spdlog::info("Placed {} tiles for {}", tileCount, laneName);
+            };
+
+            // Top Lane: up the left edge then across the top
+            placeLaneTiles({
+                {22,0,22}, {22,0,60}, {22,0,100}, {22,0,140}, {22,0,178},
+                {60,0,178}, {100,0,178}, {140,0,178}, {178,0,178}
+            }, 12.0f, "TopLane");
+
+            // Mid Lane: diagonal base to base
+            placeLaneTiles({
+                {22,0,22}, {40,0,40}, {60,0,60}, {80,0,80}, {100,0,100},
+                {120,0,120}, {140,0,140}, {160,0,160}, {178,0,178}
+            }, 14.0f, "MidLane");
+
+            // Bot Lane: across the bottom then up the right edge
+            placeLaneTiles({
+                {22,0,22}, {60,0,22}, {100,0,22}, {140,0,22}, {178,0,22},
+                {178,0,60}, {178,0,100}, {178,0,140}, {178,0,178}
+            }, 12.0f, "BotLane");
+        }
+    }
 
     // ── Player character ─────────────────────────────────────────────────
     auto character = m_scene.createEntity("PlayerCharacter");
@@ -1380,6 +1664,9 @@ void Renderer::buildScene() {
             if (!idleOk && !skinnedData.animations.empty())
                 animComp.clips.push_back(skinnedData.animations[0]); // embedded fallback
             tryLoadAnim(base + "scientist_walk.glb");
+            // Attack animation (clip[2]): play once and hold — no looping
+            if (tryLoadAnim(base + "scientist_auto_attack.glb"))
+                animComp.clips.back().looping = false;
 
             if (!animComp.clips.empty()) {
                 animComp.activeClipIndex = 0;
@@ -1391,11 +1678,11 @@ void Renderer::buildScene() {
             m_scene.getRegistry().emplace<GPUSkinnedMeshComponent>(character,
                 GPUSkinnedMeshComponent{ ssIdx });
             m_scene.getRegistry().emplace<MaterialComponent>(character,
-                MaterialComponent{ charTex, flatNorm, 0.0f, 0.0f, 0.5f, 0.2f });
+                MaterialComponent{ charTex, flatNorm, 0.0f, 0.0f, 0.5f, 0.0f });
 
             auto& ct = m_scene.getRegistry().get<TransformComponent>(character);
             ct.position  = glm::vec3(100.0f, 0.0f, 100.0f);
-            ct.scale     = glm::vec3(0.05f); // Increased scale
+            ct.scale     = glm::vec3(0.05f);
             skinnedLoaded = true;
             spdlog::info("Character loaded with GPU skinning");
         }
@@ -1438,8 +1725,10 @@ void Renderer::buildScene() {
     if (m_abilitySystem) {
         // QWER: Q=Fireball, W=Flame Pillar, E=Molten Shield, R=Incendiary Bomb (ultimate)
         m_abilitySystem->initEntity(m_scene.getRegistry(), character,
-                                    {"fire_mage_fireball", "fire_mage_flame_pillar",
-                                     "fire_mage_molten_shield", "fire_mage_bomb"});
+                                    {"fire_mage_fireball",  // Q — multi-layer skillshot fireball
+                                     "ice_zone",            // W — Glacial Storm AoE freeze
+                                     "nature_shield",       // E — Living Barrier shield + HoT
+                                     "storm_strike"});      // R — Storm Strike ultimate burst
         m_abilitySystem->setAbilityLevel(m_scene.getRegistry(), character, AbilitySlot::Q, 1);
         m_abilitySystem->setAbilityLevel(m_scene.getRegistry(), character, AbilitySlot::W, 1);
         m_abilitySystem->setAbilityLevel(m_scene.getRegistry(), character, AbilitySlot::E, 1);
@@ -1534,6 +1823,7 @@ void Renderer::buildScene() {
                 if (!attackData.animations.empty()) {
                     m_minionClips.push_back(std::move(attackData.animations[0]));
                     retargetClip(m_minionClips.back(), m_minionSkeleton);
+                    m_minionClips.back().looping = false; // Attack plays once, don't loop
                     attackOk = true;
                     spdlog::info("Minion attack animation loaded and retargeted");
                 }
@@ -1599,6 +1889,16 @@ void Renderer::buildScene() {
         } catch (const std::exception& e) {
             spdlog::warn("Could not load Q ability model: {}", e.what());
         }
+    }
+
+    // ── Water renderer ────────────────────────────────────────────────────
+    // Register its 3 procedural textures just after all scene textures.
+    {
+        uint32_t waterBaseSlot = static_cast<uint32_t>(m_scene.getTextures().size());
+        m_waterRenderer = std::make_unique<WaterRenderer>();
+        m_waterRenderer->init(*m_device, m_hdrFB->renderPass(),
+                              m_descriptors->getLayout(),
+                              *m_descriptors, waterBaseSlot);
     }
 }
 
@@ -1691,6 +1991,7 @@ void Renderer::recreateSwapchain() {
     m_bloom->recreate(m_hdrFB->colorView(), extent.width, extent.height);
     m_vfxRenderer->setDepthBuffer(m_hdrFB->depthView(), m_hdrFB->sampler());
     m_distortionRenderer->updateDescriptorSet(m_hdrFB->colorCopyView());
+    if (m_inkingPass) m_inkingPass->updateInput(m_hdrFB->characterDepthView());
     destroySwapchainFramebuffers();
     createSwapchainFramebuffers();
     m_toneMap->updateDescriptorSets(m_hdrFB->colorView(), m_bloom->bloomResultView());
@@ -1834,7 +2135,8 @@ void Renderer::createGridPipeline() {
     blend.colorWriteMask      = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
                                 VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     VkPipelineColorBlendStateCreateInfo cb{ VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
-    cb.attachmentCount = 1; cb.pAttachments = &blend;
+    VkPipelineColorBlendAttachmentState gridBlends[2] = {blend, {}};
+    cb.attachmentCount = 2; cb.pAttachments = gridBlends;
 
     VkPushConstantRange pc{};
     pc.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -1938,12 +2240,18 @@ void Renderer::createSkinnedPipeline() {
     VkPipelineColorBlendAttachmentState blendAttach{};
     blendAttach.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
                                  VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    VkPipelineColorBlendAttachmentState charDepthBlend{};
+    charDepthBlend.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                                    VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    VkPipelineColorBlendAttachmentState skinnedBlends[2] = {blendAttach, charDepthBlend};
     VkPipelineColorBlendStateCreateInfo cb{ VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
-    cb.attachmentCount = 1; cb.pAttachments = &blendAttach;
+    cb.attachmentCount = 2; cb.pAttachments = skinnedBlends;
 
     VkDescriptorSetLayout descLayout = m_descriptors->getLayout();
     VkPushConstantRange pc{};
-    pc.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    // Include FRAGMENT_BIT so this range is compatible with the water renderer's
+    // VERTEX|FRAGMENT push constant range that overlaps at bytes [0..4].
+    pc.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     pc.size       = sizeof(uint32_t); // boneBaseIndex
     VkPipelineLayoutCreateInfo lci{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
     lci.setLayoutCount         = 1;

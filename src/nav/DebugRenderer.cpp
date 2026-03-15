@@ -149,8 +149,9 @@ void DebugRenderer::createPipeline(const Device &device, VkRenderPass renderPass
 
   VkPipelineColorBlendAttachmentState cbA{};
   cbA.colorWriteMask = 0xF;
+  VkPipelineColorBlendAttachmentState dbgBlends[2] = {cbA, {}};
   VkPipelineColorBlendStateCreateInfo cb{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
-  cb.attachmentCount = 1; cb.pAttachments = &cbA;
+  cb.attachmentCount = 2; cb.pAttachments = dbgBlends;
 
   VkDynamicState dyns[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
   VkPipelineDynamicStateCreateInfo dy{VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};

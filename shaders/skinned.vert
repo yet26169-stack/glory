@@ -5,6 +5,9 @@ layout(binding = 0) uniform UniformBufferObject {
     mat4 view;
     mat4 proj;
     mat4 lightSpaceMatrix;
+    mat4 lightSpaceMatrix1;
+    mat4 lightSpaceMatrix2;
+    vec4 cascadeSplits;
 } ubo;
 
 // Large bone SSBO: MAX_CHARS * MAX_BONES entries (ring-buffer layout).
@@ -44,11 +47,12 @@ layout(location = 7) out float fragRoughness;
 layout(location = 8) out float fragEmissive;
 layout(location = 9)  flat out int fragDiffuseIdx;
 layout(location = 10) flat out int fragNormalIdx;
+layout(location = 11) out vec4 fragLightSpacePos1;
+layout(location = 12) out vec4 fragLightSpacePos2;
+layout(location = 13) out float fragViewDepth;
 
 void main() {
     // ── GPU Skinning: blend bone transforms by weights ────────────────────────
-    // Joint indices are local (0-based); offset by boneBaseIndex to reach the
-    // correct slot in the shared SSBO.
     uint base = pc.boneBaseIndex;
     mat4 skinMat = mat4(0.0);
     skinMat += bones[base + inJoints.x] * inWeights.x;
@@ -56,7 +60,6 @@ void main() {
     skinMat += bones[base + inJoints.z] * inWeights.z;
     skinMat += bones[base + inJoints.w] * inWeights.w;
 
-    // Fall back to identity if all weights are zero (should not happen)
     if (dot(inWeights, vec4(1.0)) < 0.0001)
         skinMat = mat4(1.0);
 
@@ -65,18 +68,21 @@ void main() {
     vec3 skinnedNormal = mat3(skinMat) * inNormal;
 
     vec4 worldPos = inModel * skinnedPos;
-    gl_Position   = ubo.proj * ubo.view * worldPos;
+    vec4 viewPos  = ubo.view * worldPos;
+    gl_Position   = ubo.proj * viewPos;
 
-    // Normal into world space using the normal matrix
-    fragWorldNormal   = normalize(mat3(inNormalMatrix) * skinnedNormal);
-    fragWorldPos      = worldPos.xyz;
-    fragColor         = inColor * inTint.rgb;
-    fragTexCoord      = inTexCoord;
-    fragLightSpacePos = ubo.lightSpaceMatrix * worldPos;
-    fragShininess     = inParams.x;
-    fragMetallic      = inParams.y;
-    fragRoughness     = inParams.z;
-    fragEmissive      = inParams.w;
-    fragDiffuseIdx    = int(inTexIndices.x);
-    fragNormalIdx     = int(inTexIndices.y);
+    fragWorldNormal    = normalize(mat3(inNormalMatrix) * skinnedNormal);
+    fragWorldPos       = worldPos.xyz;
+    fragColor          = inColor * inTint.rgb;
+    fragTexCoord       = inTexCoord;
+    fragLightSpacePos  = ubo.lightSpaceMatrix  * worldPos;
+    fragLightSpacePos1 = ubo.lightSpaceMatrix1 * worldPos;
+    fragLightSpacePos2 = ubo.lightSpaceMatrix2 * worldPos;
+    fragViewDepth      = -viewPos.z;
+    fragShininess      = inParams.x;
+    fragMetallic       = inParams.y;
+    fragRoughness      = inParams.z;
+    fragEmissive       = inParams.w;
+    fragDiffuseIdx     = int(inTexIndices.x);
+    fragNormalIdx      = int(inTexIndices.y);
 }

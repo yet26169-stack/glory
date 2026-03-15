@@ -1,0 +1,33 @@
+{
+    "id": "nature_shield",
+    "displayName": "Living Barrier",
+    "slot": "E",
+    "targeting": "SELF",
+    "resourceType": "MANA",
+    "castTime": 0.0,
+    "castRange": 0.0,
+    "costPerLevel": [50, 55, 60, 65, 70],
+    "cooldownPerLevel": [14.0, 13.0, 12.0, 11.0, 10.0],
+    "compositeCastVFX": "nature_shield_cast_composite",
+    "onSelfEffects": [
+        {
+            "type": "SHIELD",
+            "scaling": {
+                "basePerLevel": [60, 100, 140, 180, 220],
+                "apRatio": 0.5
+            },
+            "duration": 3.0
+        },
+        {
+            "type": "HOT",
+            "scaling": {
+                "basePerLevel": [30, 45, 60, 75, 90],
+                "apRatio": 0.2
+            },
+            "duration": 3.0,
+            "tickRate": 0.5
+        }
+    ],
+    "onHitEffects": [],
+    "tags": ["shield", "heal", "defensive"]
+}

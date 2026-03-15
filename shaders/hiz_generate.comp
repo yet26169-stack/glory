@@ -1,0 +1,35 @@
+#version 450
+
+// Hi-Z mipmap generation compute shader.
+// Downsamples the previous mip level by taking the maximum depth
+// from each 2×2 texel block (conservative occlusion test).
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(set = 0, binding = 0) uniform sampler2D u_prevMip;
+layout(set = 0, binding = 1, r32f) writeonly uniform image2D u_nextMip;
+
+void main() {
+    ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 srcSize = textureSize(u_prevMip, 0);
+    ivec2 dstSize = imageSize(u_nextMip);
+
+    if (pos.x >= dstSize.x || pos.y >= dstSize.y) return;
+
+    // Sample 2×2 block from previous mip
+    ivec2 src = pos * 2;
+    float d0 = texelFetch(u_prevMip, src + ivec2(0, 0), 0).r;
+    float d1 = texelFetch(u_prevMip, src + ivec2(1, 0), 0).r;
+    float d2 = texelFetch(u_prevMip, src + ivec2(0, 1), 0).r;
+    float d3 = texelFetch(u_prevMip, src + ivec2(1, 1), 0).r;
+
+    // Handle odd-sized source: clamp fetches that would go out of bounds
+    if (src.x + 1 >= srcSize.x) { d1 = d0; d3 = d2; }
+    if (src.y + 1 >= srcSize.y) { d2 = d0; d3 = d1; }
+
+    // Max depth = farthest surface (conservative for occlusion culling)
+    // With standard depth (0=near, 1=far), max gives the farthest occluder
+    float maxDepth = max(max(d0, d1), max(d2, d3));
+
+    imageStore(u_nextMip, pos, vec4(maxDepth));
+}

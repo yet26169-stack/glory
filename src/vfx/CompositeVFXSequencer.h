@@ -22,7 +22,15 @@ public:
     uint32_t trigger(const std::string& compositeId,
                      glm::vec3 casterPos,
                      glm::vec3 targetPos,
-                     glm::vec3 direction);
+                     glm::vec3 direction,
+                     glm::vec3 projectilePos = {0,0,0});
+
+    // Call each frame for composites with followAnchor layers to keep
+    // anchor world-positions current.
+    void updatePositions(uint32_t handle,
+                         glm::vec3 casterPos,
+                         glm::vec3 targetPos,
+                         glm::vec3 projectilePos = {0,0,0});
 
     void cancel(uint32_t handle);
 
@@ -41,7 +49,7 @@ private:
         uint32_t     handle;
         const CompositeVFXDef* def;
         float        elapsed = 0.0f;
-        glm::vec3    casterPos, targetPos, direction;
+        glm::vec3    casterPos, targetPos, direction, projectilePos;
         std::vector<bool> fired;
     };
 

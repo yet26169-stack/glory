@@ -57,6 +57,15 @@ set(SHADER_SOURCES
     ${CMAKE_SOURCE_DIR}/shaders/mesh_effect_energy.frag
     ${CMAKE_SOURCE_DIR}/shaders/mesh_effect_slash.frag
     ${CMAKE_SOURCE_DIR}/shaders/distortion.frag
+    ${CMAKE_SOURCE_DIR}/shaders/inking.vert
+    ${CMAKE_SOURCE_DIR}/shaders/inking.frag
+    ${CMAKE_SOURCE_DIR}/shaders/fow_upsample.comp
+    ${CMAKE_SOURCE_DIR}/shaders/fow_blur.comp
+    ${CMAKE_SOURCE_DIR}/shaders/outline_stencil.frag
+    ${CMAKE_SOURCE_DIR}/shaders/outline.vert
+    ${CMAKE_SOURCE_DIR}/shaders/outline.frag
+    ${CMAKE_SOURCE_DIR}/shaders/water.vert
+    ${CMAKE_SOURCE_DIR}/shaders/water.frag
     ${CMAKE_SOURCE_DIR}/shaders/particle_compact.comp
     ${CMAKE_SOURCE_DIR}/shaders/shadow.vert
     ${CMAKE_SOURCE_DIR}/shaders/shadow_skinned.vert
@@ -122,6 +131,11 @@ set(SOURCES
     src/renderer/ToneMapPass.cpp
     src/renderer/GroundDecalRenderer.cpp
     src/renderer/DistortionRenderer.cpp
+    src/renderer/InkingPass.cpp
+    src/renderer/OutlineRenderer.cpp
+    src/renderer/WaterRenderer.cpp
+    src/fog/FogSystem.cpp
+    src/renderer/FogOfWarRenderer.cpp
     src/map/MapLoader.cpp
     src/terrain/IsometricCamera.cpp
     src/nav/DebugRenderer.cpp

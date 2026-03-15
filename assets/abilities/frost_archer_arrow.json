@@ -30,7 +30,7 @@
     "castVFX": ["vfx_frost_arrow_cast", "vfx_frost_arrow_cast_flash"],
     "compositeCastVFX": "frost_arrow_cast_composite",
     "projectileVFX": ["vfx_frost_arrow_projectile", "vfx_frost_arrow_trail_glow"],
-    "projectileTrailDef": ["vfx_frost_arrow_trail_wide", "vfx_frost_arrow_trail_shards"],
+    "projectileTrailDef": "vfx_frost_arrow_trail_wide",
     "impactVFX": ["vfx_frost_arrow_impact", "vfx_frost_arrow_impact_shards", "vfx_frost_arrow_impact_frost", "vfx_frost_arrow_impact_flash"],
     "compositeImpactVFX": "frost_arrow_impact_composite",
     "tags": ["damage", "skillshot", "magical", "stun", "global"]

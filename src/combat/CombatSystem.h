@@ -29,16 +29,15 @@ public:
 private:
     VFXEventQueue& m_vfxQueue;
 
-    void processAutoAttack(entt::registry& reg, entt::entity entity,
-                           CombatComponent& combat, float dt);
-    void processShield(entt::registry& reg, entt::entity entity,
-                       CombatComponent& combat, float dt);
-    void processTrick(entt::registry& reg, entt::entity entity,
-                      CombatComponent& combat, float dt);
+    void processAttackWindup(entt::registry& reg, entt::entity entity, CombatComponent& combat, float dt);
+    void processAttackFire(entt::registry& reg, entt::entity entity, CombatComponent& combat, float dt);
+    void processAttackWinddown(entt::registry& reg, entt::entity entity, CombatComponent& combat, float dt);
+    void processShield(entt::registry& reg, entt::entity entity, CombatComponent& combat, float dt);
+    void processTrick(entt::registry& reg, entt::entity entity, CombatComponent& combat, float dt);
     void processStun(CombatComponent& combat, float dt);
 
-    void applyAutoAttackHit(entt::registry& reg, entt::entity attacker,
-                            entt::entity target);
+    void applyAutoAttackHit(entt::registry& reg, entt::entity attacker, entt::entity target);
+    void spawnAutoAttackProjectile(entt::registry& reg, entt::entity attacker, entt::entity target, CombatComponent& combat);
     void applyTrickHit(entt::registry& reg, entt::entity attacker,
                        entt::entity target, CombatComponent& attackerCombat);
 

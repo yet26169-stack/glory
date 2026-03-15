@@ -57,14 +57,17 @@ void CompositeVFXSequencer::loadDirectory(const std::string& dirPath) {
                     }
 
                     std::string anchorStr = lj.value("anchor", "CASTER");
-                    if (anchorStr == "CASTER") layer.anchor = VFXLayer::Anchor::CASTER;
+                    if (anchorStr == "CASTER")     layer.anchor = VFXLayer::Anchor::CASTER;
                     else if (anchorStr == "TARGET") layer.anchor = VFXLayer::Anchor::TARGET;
+                    else if (anchorStr == "PROJECTILE") layer.anchor = VFXLayer::Anchor::PROJECTILE;
                     else layer.anchor = VFXLayer::Anchor::WORLD;
 
                     if (lj.contains("offset")) {
                         auto& o = lj["offset"];
                         layer.offset = {o[0], o[1], o[2]};
                     }
+
+                    layer.followAnchor = lj.value("followAnchor", false);
 
                     def.layers.push_back(layer);
                 }
@@ -80,7 +83,8 @@ void CompositeVFXSequencer::loadDirectory(const std::string& dirPath) {
 uint32_t CompositeVFXSequencer::trigger(const std::string& compositeId,
                                          glm::vec3 casterPos,
                                          glm::vec3 targetPos,
-                                         glm::vec3 direction) {
+                                         glm::vec3 direction,
+                                         glm::vec3 projectilePos) {
     auto it = m_defs.find(compositeId);
     if (it == m_defs.end()) {
         spdlog::warn("CompositeVFX: Unknown definition '{}'", compositeId);
@@ -88,11 +92,12 @@ uint32_t CompositeVFXSequencer::trigger(const std::string& compositeId,
     }
 
     ActiveComposite active;
-    active.handle = m_nextHandle++;
-    active.def = &it->second;
-    active.casterPos = casterPos;
-    active.targetPos = targetPos;
-    active.direction = direction;
+    active.handle       = m_nextHandle++;
+    active.def          = &it->second;
+    active.casterPos    = casterPos;
+    active.targetPos    = targetPos;
+    active.direction    = direction;
+    active.projectilePos = projectilePos;
     active.fired.resize(it->second.layers.size(), false);
     
     m_active.push_back(active);
@@ -102,6 +107,19 @@ uint32_t CompositeVFXSequencer::trigger(const std::string& compositeId,
 void CompositeVFXSequencer::cancel(uint32_t handle) {
     m_active.erase(std::remove_if(m_active.begin(), m_active.end(),
         [handle](const ActiveComposite& c) { return c.handle == handle; }), m_active.end());
+}
+
+void CompositeVFXSequencer::updatePositions(uint32_t handle,
+                                             glm::vec3 casterPos,
+                                             glm::vec3 targetPos,
+                                             glm::vec3 projectilePos) {
+    for (auto& ac : m_active) {
+        if (ac.handle != handle) continue;
+        ac.casterPos     = casterPos;
+        ac.targetPos     = targetPos;
+        ac.projectilePos = projectilePos;
+        break;
+    }
 }
 
 void CompositeVFXSequencer::update(float dt,
@@ -122,9 +140,15 @@ void CompositeVFXSequencer::update(float dt,
             
             const auto& layer = it->def->layers[i];
             if (it->elapsed >= layer.delay) {
-                glm::vec3 pos = (layer.anchor == VFXLayer::Anchor::CASTER) ? it->casterPos :
-                                (layer.anchor == VFXLayer::Anchor::TARGET) ? it->targetPos : glm::vec3(0);
-                pos += layer.offset;
+                auto resolvePos = [&](const ActiveComposite& ac, VFXLayer::Anchor a) -> glm::vec3 {
+                    switch (a) {
+                        case VFXLayer::Anchor::CASTER:     return ac.casterPos;
+                        case VFXLayer::Anchor::TARGET:     return ac.targetPos;
+                        case VFXLayer::Anchor::PROJECTILE: return ac.projectilePos;
+                        default:                           return glm::vec3(0);
+                    }
+                };
+                glm::vec3 pos = resolvePos(*it, layer.anchor) + layer.offset;
 
                 switch (layer.type) {
                     case VFXLayerType::PARTICLE: {
@@ -165,8 +189,28 @@ void CompositeVFXSequencer::update(float dt,
                     default: break;
                 }
                 it->fired[i] = true;
+
+                // followAnchor layers: keep the composite alive until their duration
+                // expires so callers can push updated positions via updatePositions().
+                if (layer.followAnchor && layer.duration > 0.0f) {
+                    it->fired[i] = false; // re-arm for duration tracking
+                    // re-check allFired = false handled below
+                }
             } else {
                 allFired = false;
+            }
+        }
+
+        // followAnchor layers also keep the composite alive post-fire until expiry
+        for (size_t i = 0; i < it->def->layers.size(); ++i) {
+            const auto& layer = it->def->layers[i];
+            if (!it->fired[i] && layer.followAnchor && layer.duration > 0.0f) {
+                float layerExpiry = layer.delay + layer.duration;
+                if (it->elapsed < layerExpiry) {
+                    allFired = false;
+                } else {
+                    it->fired[i] = true; // duration elapsed, mark done
+                }
             }
         }
 

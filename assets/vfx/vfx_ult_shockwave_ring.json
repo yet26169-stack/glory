@@ -1,0 +1,23 @@
+{
+    "id": "vfx_ult_shockwave_ring",
+    "maxParticles": 96,
+    "emitRate": 0.0,
+    "burstCount": 72.0,
+    "looping": false,
+    "duration": 0.6,
+    "lifetimeMin": 0.3,
+    "lifetimeMax": 0.5,
+    "initialSpeedMin": 12.0,
+    "initialSpeedMax": 20.0,
+    "sizeMin": 0.15,
+    "sizeMax": 0.35,
+    "spreadAngle": 360.0,
+    "gravity": 3.0,
+    "drag": 4.0,
+    "blendMode": "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [0.8,  0.9,  1.0,  1.0]},
+        {"time": 0.5, "color": [0.3,  0.5,  1.0,  0.6]},
+        {"time": 1.0, "color": [0.1,  0.2,  0.6,  0.0]}
+    ]
+}

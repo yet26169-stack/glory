@@ -1,22 +1,22 @@
 {
     "id": "fire_mage_bomb",
     "displayName": "Incendiary Bomb",
-    "slot": "E",
+    "slot": "R",
     "targeting": "POINT",
     "resourceType": "MANA",
-    "costPerLevel": [70, 75, 80, 85, 90],
-    "cooldownPerLevel": [12.0, 11.0, 10.0, 9.0, 8.0],
-    "castTime": 0.2,
+    "costPerLevel": [100, 100, 100],
+    "cooldownPerLevel": [90.0, 75.0, 60.0],
+    "castTime": 0.3,
     "channelDuration": 0.0,
     "canMoveWhileCasting": true,
     "canBeInterrupted": true,
     "castRange": 40.0,
     "areaShape": "CIRCLE",
-    "areaRadius": 4.0,
+    "areaRadius": 5.0,
     "projectile": {
         "isLob": true,
         "lobFlightTime": 1.0,
-        "lobApexHeight": 9.0,
+        "lobApexHeight": 12.0,
         "speed": 0.0,
         "maxRange": 40.0,
         "width": 0.6,
@@ -29,9 +29,24 @@
             "type": "DAMAGE",
             "damageType": "MAGICAL",
             "scaling": {
-                "basePerLevel": [90, 145, 200, 255, 310],
-                "apRatio": 0.65
+                "basePerLevel": [200, 350, 500],
+                "apRatio": 0.85
             }
+        },
+        {
+            "type": "DOT",
+            "damageType": "MAGICAL",
+            "scaling": {
+                "basePerLevel": [40, 70, 100],
+                "apRatio": 0.15
+            },
+            "duration": 3.0,
+            "tickRate": 1.0
+        },
+        {
+            "type": "SLOW",
+            "duration": 1.5,
+            "value": 0.30
         }
     ],
     "onSelfEffects": [],
@@ -41,5 +56,5 @@
     "compositeImpactVFX": "bomb_impact_composite",
     "castSFX": "sfx_bomb_cast",
     "impactSFX": "sfx_bomb_impact",
-    "tags": ["damage", "aoe", "magical", "lob"]
+    "tags": ["damage", "aoe", "magical", "lob", "dot", "slow", "ultimate"]
 }

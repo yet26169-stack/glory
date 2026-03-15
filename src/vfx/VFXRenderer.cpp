@@ -262,10 +262,11 @@ void VFXRenderer::createRenderPipeline(VkRenderPass renderPass) {
     cbA_alpha.alphaBlendOp        = VK_BLEND_OP_ADD;
     cbA_alpha.colorWriteMask      = 0xF;
 
+    VkPipelineColorBlendAttachmentState vfxAlphaBlends[2] = {cbA_alpha, {}};
     VkPipelineColorBlendStateCreateInfo cb_alpha{};
     cb_alpha.sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    cb_alpha.attachmentCount = 1;
-    cb_alpha.pAttachments    = &cbA_alpha;
+    cb_alpha.attachmentCount = 2;
+    cb_alpha.pAttachments    = vfxAlphaBlends;
 
     VkDynamicState dyns[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
     VkPipelineDynamicStateCreateInfo dy{};
@@ -294,9 +295,10 @@ void VFXRenderer::createRenderPipeline(VkRenderPass renderPass) {
     // Additive blending: src_alpha * src + 1 * dst
     VkPipelineColorBlendAttachmentState cbA_additive = cbA_alpha;
     cbA_additive.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
-    
+
+    VkPipelineColorBlendAttachmentState vfxAddBlends[2] = {cbA_additive, {}};
     VkPipelineColorBlendStateCreateInfo cb_additive = cb_alpha;
-    cb_additive.pAttachments = &cbA_additive;
+    cb_additive.pAttachments = vfxAddBlends;
     
     gpCI.pColorBlendState = &cb_additive;
     vkCreateGraphicsPipelines(dev, VK_NULL_HANDLE, 1, &gpCI, nullptr, &m_additivePipeline);
@@ -548,8 +550,9 @@ void VFXRenderer::loadEmitterDirectory(const std::string& dirPath) {
                 }
             }
 
+            const std::string emitterID = def.id;
             registerEmitter(std::move(def));
-            spdlog::debug("VFXRenderer: loaded emitter '{}'", def.id);
+            spdlog::debug("VFXRenderer: loaded emitter '{}'", emitterID);
         } catch (const std::exception& e) {
             spdlog::warn("VFXRenderer: failed to parse '{}': {}",
                          entry.path().string(), e.what());

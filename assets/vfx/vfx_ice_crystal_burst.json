@@ -1,0 +1,23 @@
+{
+    "id": "vfx_ice_crystal_burst",
+    "maxParticles": 48,
+    "emitRate": 0.0,
+    "burstCount": 36.0,
+    "looping": false,
+    "duration": 0.6,
+    "lifetimeMin": 0.3,
+    "lifetimeMax": 0.5,
+    "initialSpeedMin": 6.0,
+    "initialSpeedMax": 14.0,
+    "sizeMin": 0.1,
+    "sizeMax": 0.25,
+    "spreadAngle": 30.0,
+    "gravity": 12.0,
+    "drag": 1.0,
+    "blendMode": "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [0.9,  0.97, 1.0,  1.0]},
+        {"time": 0.4, "color": [0.4,  0.7,  1.0,  0.7]},
+        {"time": 1.0, "color": [0.1,  0.2,  0.5,  0.0]}
+    ]
+}

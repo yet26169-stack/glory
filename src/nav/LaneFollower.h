@@ -9,6 +9,14 @@
 namespace glory {
 
 /// Component for an entity that follows a lane path.
+///
+/// Hybrid navigation approach:
+///   - Normal movement: minions follow lane splines via update().
+///   - Detour movement: when a minion needs to leave its lane (e.g. chasing a
+///     hero), call setDetourTarget() which uses PathfindingSystem::findPath()
+///     for navmesh-based pathfinding, then steers through the returned waypoints.
+///   - Once the detour target is reached or the timer expires, the minion returns
+///     to its lane via the existing deviate()/return logic.
 struct LaneFollower {
   TeamID team = TeamID::Blue;
   LaneType lane = LaneType::Mid;
@@ -59,6 +67,17 @@ struct LaneFollower {
     targetPos = target;
     returnTimer = maxTime;
     laneReturnPos = currentPos;
+  }
+
+  /// Start a navmesh-based detour toward a target.
+  /// Unlike deviate(), this will use PathfindingSystem::findPath() to plan
+  /// a path around obstacles. Falls back to straight-line via deviate() if
+  /// the pathfinding system is not available.
+  void setDetourTarget(const glm::vec3 &target, float maxTime = 5.0f) {
+    // TODO: query PathfindingSystem::findPath(currentPos, target) and
+    //       store the resulting waypoints for multi-step steering.
+    //       For now, fall back to direct-line deviation.
+    deviate(target, maxTime);
   }
 };
 

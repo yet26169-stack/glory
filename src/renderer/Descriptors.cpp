@@ -114,9 +114,46 @@ void Descriptors::updateShadowMap(VkImageView depthView, VkSampler shadowSampler
     }
 }
 
+void Descriptors::writeToonRamp(VkImageView rampView, VkSampler rampSampler) {
+    for (uint32_t i = 0; i < m_frameCount; ++i) {
+        VkDescriptorImageInfo imgInfo{};
+        imgInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imgInfo.imageView   = rampView;
+        imgInfo.sampler     = rampSampler;
+
+        VkWriteDescriptorSet write{};
+        write.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstSet          = m_sets[i];
+        write.dstBinding      = 5;
+        write.dstArrayElement = 0;
+        write.descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        write.descriptorCount = 1;
+        write.pImageInfo      = &imgInfo;
+
+        vkUpdateDescriptorSets(m_device.getDevice(), 1, &write, 0, nullptr);
+    }
+}
+
+void Descriptors::writeFogOfWar(VkImageView view, VkSampler sampler) {
+    VkDescriptorImageInfo imgInfo{};
+    imgInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imgInfo.imageView   = view;
+    imgInfo.sampler     = sampler;
+
+    for (auto& set : m_sets) {
+        VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+        write.dstSet          = set;
+        write.dstBinding      = 6;
+        write.descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        write.descriptorCount = 1;
+        write.pImageInfo      = &imgInfo;
+        vkUpdateDescriptorSets(m_device.getDevice(), 1, &write, 0, nullptr);
+    }
+}
+
 // ── Private ─────────────────────────────────────────────────────────────────
 void Descriptors::createLayout() {
-    std::array<VkDescriptorSetLayoutBinding, 5> bindings{};
+    std::array<VkDescriptorSetLayoutBinding, 7> bindings{};
 
     // binding 0: UBO (vertex + fragment)
     bindings[0].binding         = 0;
@@ -148,14 +185,28 @@ void Descriptors::createLayout() {
     bindings[4].descriptorCount = 1;
     bindings[4].stageFlags      = VK_SHADER_STAGE_VERTEX_BIT;
 
+    // binding 5: toon ramp 1-D texture (256×1 gradient, fragment stage)
+    bindings[5].binding         = 5;
+    bindings[5].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[5].descriptorCount = 1;
+    bindings[5].stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    // binding 6: Fog of War visibility texture (512×512 R8_UNORM, fragment stage)
+    bindings[6].binding         = 6;
+    bindings[6].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[6].descriptorCount = 1;
+    bindings[6].stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
+
     // Binding flags
-    std::array<VkDescriptorBindingFlags, 5> bindingFlags{};
+    std::array<VkDescriptorBindingFlags, 7> bindingFlags{};
     bindingFlags[0] = 0;
     bindingFlags[1] = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT
                     | VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;
     bindingFlags[2] = 0;
     bindingFlags[3] = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
     bindingFlags[4] = 0;
+    bindingFlags[5] = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
+    bindingFlags[6] = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
 
     VkDescriptorSetLayoutBindingFlagsCreateInfo flagsCI{};
     flagsCI.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
@@ -171,7 +222,7 @@ void Descriptors::createLayout() {
 
     VK_CHECK(vkCreateDescriptorSetLayout(m_device.getDevice(), &ci, nullptr, &m_layout),
              "Failed to create descriptor set layout");
-    spdlog::info("Descriptor set layout created (bindless: {} textures, bone SSBO binding 4)",
+    spdlog::info("Descriptor set layout created (bindless: {} textures, bone SSBO binding 4, toon ramp binding 5, FoW binding 6)",
                  MAX_BINDLESS_TEXTURES);
 }
 
@@ -214,7 +265,7 @@ void Descriptors::createPool(uint32_t frameCount) {
     poolSizes[0].type            = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = frameCount * 2; // UBO + light UBO per frame
     poolSizes[1].type            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = frameCount * (MAX_BINDLESS_TEXTURES + 1); // bindless array + shadow map
+    poolSizes[1].descriptorCount = frameCount * (MAX_BINDLESS_TEXTURES + 3); // bindless array + shadow map + toon ramp + FoW
     poolSizes[2].type            = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     poolSizes[2].descriptorCount = frameCount; // bone SSBO per frame
 

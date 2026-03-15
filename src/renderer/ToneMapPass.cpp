@@ -21,11 +21,12 @@ void ToneMapPass::init(const Device& device, VkRenderPass swapchainRenderPass,
     createPipeline();
 }
 
-void ToneMapPass::render(VkCommandBuffer cmd, float exposure, float bloomStrength) {
+void ToneMapPass::render(VkCommandBuffer cmd, float exposure, float bloomStrength,
+                         uint32_t enableVignette, uint32_t enableColorGrade) {
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &m_descriptorSet, 0, nullptr);
 
-    ToneMapPushConstants pc{exposure, bloomStrength, {0, 0}};
+    ToneMapPushConstants pc{exposure, bloomStrength, enableVignette, enableColorGrade};
     vkCmdPushConstants(cmd, m_pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(ToneMapPushConstants), &pc);
 
     vkCmdDraw(cmd, 3, 1, 0, 0);

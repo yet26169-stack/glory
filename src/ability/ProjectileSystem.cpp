@@ -29,6 +29,74 @@ void ProjectileSystem::update(entt::registry& reg, float dt,
     auto view = reg.view<ProjectileComponent, TransformComponent>();
     for (auto [entity, pc, tc] : view.each()) {
 
+        // ── Homing (Targeted) projectile ───────────────────────────────────
+        if (pc.targetEntity != NULL_ENTITY) {
+            entt::entity target = static_cast<entt::entity>(pc.targetEntity);
+            if (!reg.valid(target) || !reg.all_of<TransformComponent>(target)) {
+                toDestroy.push_back(entity);
+                continue;
+            }
+
+            auto& ttc = reg.get<TransformComponent>(target);
+            glm::vec3 targetCenter = ttc.position + glm::vec3(0, 1.0f, 0); // target chest
+            glm::vec3 toTarget = targetCenter - tc.position;
+            float dist = glm::length(toTarget);
+
+            if (dist < 0.5f) {
+                // HIT!
+                if (pc.isAutoAttack) {
+                    // Apply auto-attack damage directly
+                    if (reg.all_of<StatsComponent>(target)) {
+                        auto& stats = reg.get<StatsComponent>(target);
+                        float damage = pc.damage;
+                        float effectiveArmor = stats.total().armor;
+                        float finalDamage = damage * (100.0f / (100.0f + effectiveArmor));
+                        stats.base.currentHP = std::max(0.0f, stats.base.currentHP - finalDamage);
+                        
+                        // Hit VFX
+                        VFXEvent ev{};
+                        ev.type = VFXEventType::Spawn;
+                        std::strncpy(ev.effectID, "vfx_melee_hit", sizeof(ev.effectID) - 1);
+                        ev.position = tc.position;
+                        vfxQueue.push(ev);
+                    }
+                } else if (pc.sourceDef) {
+                    TargetInfo ti{};
+                    ti.type = TargetingType::TARGETED;
+                    ti.targetEntity = pc.targetEntity;
+                    ti.targetPosition = ttc.position;
+                    abilitySystem.resolveHit(reg, static_cast<entt::entity>(pc.casterEntity),
+                                             *pc.sourceDef, ti);
+                }
+
+                toDestroy.push_back(entity);
+                destroyProjectile(reg, entity, pc, vfxQueue, &abilitySystem,
+                                  tc.position, true, trailRenderer);
+                continue;
+            }
+
+            glm::vec3 dir = toTarget / dist;
+            pc.velocity = dir * pc.speed;
+            tc.position += pc.velocity * dt;
+
+            // Orient model
+            tc.rotation.y = std::atan2(dir.x, dir.z);
+            tc.rotation.x = -std::asin(dir.y);
+
+            // Keep VFX trail locked to projectile position
+            for (auto vfxH : pc.vfxHandles) {
+                VFXEvent mv{};
+                mv.type     = VFXEventType::Move;
+                mv.handle   = vfxH;
+                mv.position = tc.position;
+                vfxQueue.push(mv);
+            }
+            if (pc.trailHandle != 0 && trailRenderer) {
+                trailRenderer->updateHead(pc.trailHandle, tc.position);
+            }
+            continue;
+        }
+
         // ── Lob (arc) projectile — quadratic Bezier ────────────────────────
         if (pc.isLob) {
             pc.lobElapsed += dt;

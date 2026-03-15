@@ -22,6 +22,7 @@ public:
     VkImageView     colorView()   const { return m_colorImage.getImageView(); }
     VkImageView     colorCopyView() const { return m_colorCopyImage.getImageView(); }
     VkImageView     depthView()   const { return m_depthImage.getImageView(); }
+    VkImageView     characterDepthView() const { return m_characterDepthImage.getImageView(); }
     VkSampler       sampler()     const { return m_sampler; }
 
     void copyColor(VkCommandBuffer cmd);
@@ -38,7 +39,17 @@ private:
     Image m_colorImage;
     Image m_colorCopyImage;
     Image m_depthImage;
+    Image m_characterDepthImage;
+    // Separate depth view that includes VK_IMAGE_ASPECT_STENCIL_BIT for
+    // framebuffer attachment use when a depth-stencil format is active.
+    // depthView() keeps returning the depth-only view for sampler reads.
+    VkImageView m_depthAttachmentView = VK_NULL_HANDLE;
     VkSampler m_sampler = VK_NULL_HANDLE;
+
+    static bool hasStencil(VkFormat fmt) {
+        return fmt == VK_FORMAT_D32_SFLOAT_S8_UINT ||
+               fmt == VK_FORMAT_D24_UNORM_S8_UINT;
+    }
     VkRenderPass m_renderPass = VK_NULL_HANDLE;
     VkRenderPass m_loadRenderPass = VK_NULL_HANDLE;
     VkFramebuffer m_framebuffer = VK_NULL_HANDLE;

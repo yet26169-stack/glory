@@ -27,9 +27,15 @@ void HDRFramebuffer::recreate(uint32_t width, uint32_t height) {
     if (m_framebuffer != VK_NULL_HANDLE) {
         vkDestroyFramebuffer(m_device->getDevice(), m_framebuffer, nullptr);
     }
+    if (m_depthAttachmentView != VK_NULL_HANDLE &&
+        m_depthAttachmentView != m_depthImage.getImageView()) {
+        vkDestroyImageView(m_device->getDevice(), m_depthAttachmentView, nullptr);
+    }
+    m_depthAttachmentView = VK_NULL_HANDLE;
     m_colorImage = Image{};
     m_colorCopyImage = Image{};
     m_depthImage = Image{};
+    m_characterDepthImage = Image{};
 
     createImages();
     createFramebuffer();
@@ -125,7 +131,15 @@ void HDRFramebuffer::destroy() {
 
     m_colorImage = Image{};
     m_colorCopyImage = Image{};
+    // Destroy the extra depth-stencil attachment view (it's different from the
+    // depth-only sample view owned by m_depthImage when hasStencil() is true).
+    if (m_depthAttachmentView != VK_NULL_HANDLE &&
+        m_depthAttachmentView != m_depthImage.getImageView()) {
+        vkDestroyImageView(m_device->getDevice(), m_depthAttachmentView, nullptr);
+    }
+    m_depthAttachmentView = VK_NULL_HANDLE;
     m_depthImage = Image{};
+    m_characterDepthImage = Image{};
 }
 
 void HDRFramebuffer::createImages() {
@@ -142,6 +156,33 @@ void HDRFramebuffer::createImages() {
     m_depthImage = Image(*m_device, m_width, m_height, m_depthFormat,
                         VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                         VK_IMAGE_ASPECT_DEPTH_BIT);
+
+    // For depth-stencil formats create a second view covering BOTH aspects so
+    // the framebuffer attachment can perform stencil operations.
+    if (m_depthAttachmentView != VK_NULL_HANDLE) {
+        vkDestroyImageView(m_device->getDevice(), m_depthAttachmentView, nullptr);
+        m_depthAttachmentView = VK_NULL_HANDLE;
+    }
+    if (hasStencil(m_depthFormat)) {
+        VkImageViewCreateInfo vci{};
+        vci.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        vci.image                           = m_depthImage.getImage();
+        vci.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
+        vci.format                          = m_depthFormat;
+        vci.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+        vci.subresourceRange.baseMipLevel   = 0;
+        vci.subresourceRange.levelCount     = 1;
+        vci.subresourceRange.baseArrayLayer = 0;
+        vci.subresourceRange.layerCount     = 1;
+        VK_CHECK(vkCreateImageView(m_device->getDevice(), &vci, nullptr, &m_depthAttachmentView),
+                 "depth-stencil attachment view");
+    } else {
+        m_depthAttachmentView = m_depthImage.getImageView();
+    }
+
+    m_characterDepthImage = Image(*m_device, m_width, m_height, VK_FORMAT_R32_SFLOAT,
+                                  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                                  VK_IMAGE_ASPECT_COLOR_BIT);
 }
 
 void HDRFramebuffer::createRenderPass() {
@@ -160,7 +201,9 @@ void HDRFramebuffer::createRenderPass() {
     depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
     depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    depthAttachment.stencilLoadOp = hasStencil(m_depthFormat)
+                                     ? VK_ATTACHMENT_LOAD_OP_CLEAR
+                                     : VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
@@ -169,14 +212,30 @@ void HDRFramebuffer::createRenderPass() {
     colorAttachmentRef.attachment = 0;
     colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+    VkAttachmentDescription charDepthAttachment{};
+    charDepthAttachment.format         = VK_FORMAT_R32_SFLOAT;
+    charDepthAttachment.samples        = VK_SAMPLE_COUNT_1_BIT;
+    charDepthAttachment.loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    charDepthAttachment.storeOp        = VK_ATTACHMENT_STORE_OP_STORE;
+    charDepthAttachment.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    charDepthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    charDepthAttachment.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
+    charDepthAttachment.finalLayout    = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    VkAttachmentReference charDepthRef{};
+    charDepthRef.attachment = 2;
+    charDepthRef.layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
     VkAttachmentReference depthAttachmentRef{};
     depthAttachmentRef.attachment = 1;
     depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
+    VkAttachmentReference colorRefs[2] = {colorAttachmentRef, charDepthRef};
+
     VkSubpassDescription subpass{};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &colorAttachmentRef;
+    subpass.pipelineBindPoint    = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = 2;
+    subpass.pColorAttachments    = colorRefs;
     subpass.pDepthStencilAttachment = &depthAttachmentRef;
 
     std::array<VkSubpassDependency, 2> dependencies;
@@ -196,7 +255,7 @@ void HDRFramebuffer::createRenderPass() {
     dependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
-    std::array<VkAttachmentDescription, 2> attachments = {colorAttachment, depthAttachment};
+    std::array<VkAttachmentDescription, 3> attachments = {colorAttachment, depthAttachment, charDepthAttachment};
     VkRenderPassCreateInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
@@ -231,6 +290,16 @@ void HDRFramebuffer::createLoadRenderPass() {
     depthAttachment.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
     depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 
+    VkAttachmentDescription charDepthAttachmentLoad{};
+    charDepthAttachmentLoad.format         = VK_FORMAT_R32_SFLOAT;
+    charDepthAttachmentLoad.samples        = VK_SAMPLE_COUNT_1_BIT;
+    charDepthAttachmentLoad.loadOp         = VK_ATTACHMENT_LOAD_OP_LOAD;
+    charDepthAttachmentLoad.storeOp        = VK_ATTACHMENT_STORE_OP_STORE;
+    charDepthAttachmentLoad.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    charDepthAttachmentLoad.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    charDepthAttachmentLoad.initialLayout  = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    charDepthAttachmentLoad.finalLayout    = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
     VkAttachmentReference colorAttachmentRef{};
     colorAttachmentRef.attachment = 0;
     colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -239,10 +308,20 @@ void HDRFramebuffer::createLoadRenderPass() {
     depthAttachmentRef.attachment = 1;
     depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 
+    // charDepth is loaded (not written) during this pass; reference it so both
+    // render passes have the same subpass structure and share a compatible framebuffer.
+    VkAttachmentReference charDepthLoadRef{};
+    charDepthLoadRef.attachment = 2;
+    // GENERAL allows the image to be both referenced as a color attachment (write
+    // mask=0 — no actual writes) and sampled by InkingPass simultaneously, avoiding
+    // the undefined-behaviour layout conflict that COLOR_ATTACHMENT_OPTIMAL would cause.
+    charDepthLoadRef.layout     = VK_IMAGE_LAYOUT_GENERAL;
+    VkAttachmentReference colorRefsLoad[2] = {colorAttachmentRef, charDepthLoadRef};
+
     VkSubpassDescription subpass{};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &colorAttachmentRef;
+    subpass.pipelineBindPoint    = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = 2;
+    subpass.pColorAttachments    = colorRefsLoad;
     subpass.pDepthStencilAttachment = &depthAttachmentRef;
 
     std::array<VkSubpassDependency, 2> dependencies;
@@ -262,7 +341,7 @@ void HDRFramebuffer::createLoadRenderPass() {
     dependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
-    std::array<VkAttachmentDescription, 2> attachments = {colorAttachment, depthAttachment};
+    std::array<VkAttachmentDescription, 3> attachments = {colorAttachment, depthAttachment, charDepthAttachmentLoad};
     VkRenderPassCreateInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
@@ -277,14 +356,17 @@ void HDRFramebuffer::createLoadRenderPass() {
 }
 
 void HDRFramebuffer::createFramebuffer() {
-    std::array<VkImageView, 2> attachments = {
+    std::array<VkImageView, 3> attachments = {
         m_colorImage.getImageView(),
-        m_depthImage.getImageView()
+        m_depthAttachmentView,
+        m_characterDepthImage.getImageView()
     };
 
     VkFramebufferCreateInfo framebufferInfo{};
     framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-    framebufferInfo.renderPass = m_loadRenderPass;
+    // Use the main render pass as the framebuffer's reference so it is compatible
+    // with both m_renderPass and m_loadRenderPass (both now have the same subpass structure).
+    framebufferInfo.renderPass = m_renderPass;
     framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
     framebufferInfo.pAttachments = attachments.data();
     framebufferInfo.width = m_width;

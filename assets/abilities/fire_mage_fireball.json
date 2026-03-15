@@ -34,10 +34,10 @@
         }
     ],
     "onSelfEffects": [],
-    "castVFX": ["vfx_fireball_cast", "vfx_fireball_cast_sparks", "vfx_fireball_cast_glow"],
-    "projectileVFX": ["vfx_fireball_projectile", "vfx_fireball_trail_embers", "vfx_fireball_core_glow"],
+    "castVFX": ["vfx_fireball_cast", "vfx_fireball_cast_sparks", "vfx_fireball_cast_glow", "vfx_fireball_cast_flash"],
+    "projectileVFX": ["vfx_fireball_projectile", "vfx_fireball_outer", "vfx_fireball_trail_embers", "vfx_fireball_core_glow"],
     "impactVFX": ["vfx_fireball_explosion", "vfx_fireball_explosion_smoke", "vfx_fireball_explosion_sparks"],
-    "projectileTrailDef": "vfx_fireball_trail",
+    "projectileTrailDef": "fireball_trail",
     "compositeCastVFX": "fireball_cast_composite",
     "compositeImpactVFX": "fireball_impact_composite",
     "castSFX": "sfx_fireball_cast",

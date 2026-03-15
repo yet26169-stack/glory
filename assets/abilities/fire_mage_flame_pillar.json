@@ -22,9 +22,9 @@
     "channelDuration": 0.0,
     "canMoveWhileCasting": false,
     "canBeInterrupted": true,
-    "castRange": 900.0,
+    "castRange": 35.0,
     "areaShape": "CIRCLE",
-    "areaRadius": 250.0,
+    "areaRadius": 4.0,
     "onHitEffects": [
         {
             "type": "DAMAGE",

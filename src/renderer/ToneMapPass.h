@@ -12,7 +12,8 @@ public:
     void init(const Device& device, VkRenderPass swapchainRenderPass,
               VkImageView hdrView, VkImageView bloomView, VkSampler sampler);
 
-    void render(VkCommandBuffer cmd, float exposure, float bloomStrength);
+    void render(VkCommandBuffer cmd, float exposure, float bloomStrength,
+                uint32_t enableVignette = 1, uint32_t enableColorGrade = 1);
 
     void updateDescriptorSets(VkImageView hdrView, VkImageView bloomView);
     void destroy();
@@ -32,9 +33,10 @@ private:
     VkPipeline m_pipeline = VK_NULL_HANDLE;
 
     struct ToneMapPushConstants {
-        float exposure;
-        float bloomStrength;
-        float _pad[2];
+        float    exposure;
+        float    bloomStrength;
+        uint32_t enableVignette;    // 1=on, 0=off
+        uint32_t enableColorGrade;  // 1=on, 0=off
     };
 
     void createDescriptorSetLayout();

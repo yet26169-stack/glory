@@ -79,7 +79,9 @@ private:
 struct ProjectileComponent {
     const AbilityDefinition* sourceDef      = nullptr;
     EntityID                 casterEntity   = NULL_ENTITY;
+    EntityID                 targetEntity   = NULL_ENTITY; // For homing/auto-attacks
     glm::vec3                velocity       {0.f};
+    float                    speed          = 0.0f; // For homing speed
     float                    acceleration   = 0.0f;   // units/s² speed increase
     float                    maxSpeed       = 9999.0f;
     float                    maxRange       = 1100.0f;
@@ -89,6 +91,9 @@ struct ProjectileComponent {
     int                      hitCount       = 0;
     std::vector<uint32_t>    vfxHandles;
     uint32_t                 trailHandle    = 0;
+
+    bool                     isAutoAttack   = false;
+    float                    damage         = 0.0f;
 
     // Lob (arc) projectile fields
     bool      isLob         = false;

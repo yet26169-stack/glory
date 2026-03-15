@@ -1,0 +1,31 @@
+{
+    "id": "storm_strike",
+    "displayName": "Storm Strike",
+    "slot": "R",
+    "targeting": "POINT",
+    "resourceType": "MANA",
+    "castTime": 0.5,
+    "castRange": 18.0,
+    "costPerLevel": [100, 100, 100],
+    "cooldownPerLevel": [120.0, 100.0, 80.0],
+    "areaShape": "CIRCLE",
+    "areaRadius": 5.0,
+    "compositeImpactVFX": "storm_strike_impact_composite",
+    "castVFX": ["vfx_shield_pulse"],
+    "onHitEffects": [
+        {
+            "type": "DAMAGE",
+            "damageType": "MAGICAL",
+            "scaling": {
+                "basePerLevel": [200, 325, 450],
+                "apRatio": 0.8
+            }
+        },
+        {
+            "type": "STUN",
+            "duration": 1.5
+        }
+    ],
+    "onSelfEffects": [],
+    "tags": ["damage", "cc", "ultimate"]
+}

@@ -1,0 +1,32 @@
+{
+    "id": "ice_zone",
+    "displayName": "Glacial Storm",
+    "slot": "W",
+    "targeting": "POINT",
+    "resourceType": "MANA",
+    "castTime": 0.2,
+    "castRange": 15.0,
+    "costPerLevel": [70, 80, 90, 100, 110],
+    "cooldownPerLevel": [12.0, 11.0, 10.0, 9.0, 8.0],
+    "areaShape": "CIRCLE",
+    "areaRadius": 4.0,
+    "compositeCastVFX": "ice_zone_cast_composite",
+    "onHitEffects": [
+        {
+            "type": "DAMAGE",
+            "damageType": "MAGICAL",
+            "scaling": {
+                "basePerLevel": [70, 110, 150, 190, 230],
+                "apRatio": 0.6
+            }
+        },
+        {
+            "type": "SLOW",
+            "value": 0.4,
+            "duration": 2.0,
+            "applyVFX": "vfx_frost_debuff"
+        }
+    ],
+    "onSelfEffects": [],
+    "tags": ["damage", "cc", "zone"]
+}

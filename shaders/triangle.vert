@@ -4,6 +4,9 @@ layout(binding = 0) uniform UniformBufferObject {
     mat4 view;
     mat4 proj;
     mat4 lightSpaceMatrix;
+    mat4 lightSpaceMatrix1;
+    mat4 lightSpaceMatrix2;
+    vec4 cascadeSplits;
 } ubo;
 
 // Per-vertex attributes (binding 0)
@@ -30,16 +33,23 @@ layout(location = 7) out float fragRoughness;
 layout(location = 8) out float fragEmissive;
 layout(location = 9) flat out int fragDiffuseIdx;
 layout(location = 10) flat out int fragNormalIdx;
+layout(location = 11) out vec4 fragLightSpacePos1;
+layout(location = 12) out vec4 fragLightSpacePos2;
+layout(location = 13) out float fragViewDepth;
 
 void main() {
     vec4 worldPos = inModel * vec4(inPosition, 1.0);
-    gl_Position   = ubo.proj * ubo.view * worldPos;
+    vec4 viewPos  = ubo.view * worldPos;
+    gl_Position   = ubo.proj * viewPos;
 
     fragColor          = inColor * inTint.rgb;
     fragTexCoord       = inTexCoord;
     fragWorldPos       = worldPos.xyz;
     fragWorldNormal    = mat3(inNormalMatrix) * inNormal;
-    fragLightSpacePos  = ubo.lightSpaceMatrix * worldPos;
+    fragLightSpacePos  = ubo.lightSpaceMatrix  * worldPos;
+    fragLightSpacePos1 = ubo.lightSpaceMatrix1 * worldPos;
+    fragLightSpacePos2 = ubo.lightSpaceMatrix2 * worldPos;
+    fragViewDepth      = -viewPos.z;  // positive linear depth in view space
     fragShininess      = inParams.x;
     fragMetallic       = inParams.y;
     fragRoughness      = inParams.z;
