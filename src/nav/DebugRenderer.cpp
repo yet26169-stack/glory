@@ -102,7 +102,7 @@ void DebugRenderer::ensureCapacity(size_t needed) {
                          VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 }
 
-void DebugRenderer::createPipeline(const Device &device, VkRenderPass renderPass) {
+void DebugRenderer::createPipeline(const Device &device, const RenderFormats &formats) {
   VkDevice dev = device.getDevice();
   VkPushConstantRange pc{};
   pc.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
@@ -160,11 +160,14 @@ void DebugRenderer::createPipeline(const Device &device, VkRenderPass renderPass
   VkPipelineViewportStateCreateInfo vp{VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};
   vp.viewportCount = 1; vp.scissorCount = 1;
 
+  VkPipelineRenderingCreateInfo dynCI = formats.pipelineRenderingCI();
+
   VkGraphicsPipelineCreateInfo gpCI{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
+  gpCI.pNext = &dynCI;
   gpCI.stageCount = 2; gpCI.pStages = stages; gpCI.pVertexInputState = &vi;
   gpCI.pInputAssemblyState = &ia; gpCI.pViewportState = &vp; gpCI.pRasterizationState = &rs;
   gpCI.pMultisampleState = &ms; gpCI.pDepthStencilState = &ds; gpCI.pColorBlendState = &cb;
-  gpCI.pDynamicState = &dy; gpCI.layout = m_pipelineLayout; gpCI.renderPass = renderPass;
+  gpCI.pDynamicState = &dy; gpCI.layout = m_pipelineLayout; gpCI.renderPass = VK_NULL_HANDLE;
   vkCreateGraphicsPipelines(dev, VK_NULL_HANDLE, 1, &gpCI, nullptr, &m_pipeline);
 
   vkDestroyShaderModule(dev, fmod, nullptr);
@@ -177,10 +180,10 @@ std::vector<char> DebugRenderer::readFile(const std::string &path) {
   f.seekg(0); f.read(buf.data(), sz); return buf;
 }
 
-void DebugRenderer::init(const Device &device, VkRenderPass renderPass) {
+void DebugRenderer::init(const Device &device, const RenderFormats &formats) {
   m_device = &device;
   ensureCapacity(INITIAL_CAPACITY);
-  createPipeline(device, renderPass);
+  createPipeline(device, formats);
   m_initialized = true;
   spdlog::info("DebugRenderer initialized");
 }

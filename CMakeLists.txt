@@ -109,7 +109,7 @@ foreach(SHADER ${SHADER_SOURCES})
     set(SPV_OUTPUT ${CMAKE_BINARY_DIR}/shaders/${SHADER_NAME}.spv)
     add_custom_command(
         OUTPUT  ${SPV_OUTPUT}
-        COMMAND ${GLSLC} ${SHADER} -o ${SPV_OUTPUT}
+        COMMAND ${GLSLC} --target-env=vulkan1.3 ${SHADER} -o ${SPV_OUTPUT}
         DEPENDS ${SHADER}
         COMMENT "Compiling shader ${SHADER_NAME}"
     )
@@ -173,6 +173,7 @@ set(SOURCES
     src/renderer/ExplosionRenderer.cpp
     src/renderer/SpriteEffectRenderer.cpp
     src/renderer/Renderer.cpp
+    src/renderer/GpuTimer.cpp
     src/renderer/GLBLoader.cpp
     src/renderer/DynamicMesh.cpp
     src/renderer/StaticSkinnedMesh.cpp
@@ -196,6 +197,7 @@ set(SOURCES
     src/nav/DynamicObstacle.cpp
     src/hud/HUD.cpp
     src/hud/Minimap.cpp
+    src/hud/PerfOverlay.cpp
     src/animation/AnimationPlayer.cpp
     src/animation/CPUSkinning.cpp
     src/vfx/ParticleSystem.cpp

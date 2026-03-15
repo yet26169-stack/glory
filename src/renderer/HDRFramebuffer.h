@@ -2,6 +2,7 @@
 
 #include "renderer/Device.h"
 #include "renderer/Image.h"
+#include "renderer/RenderFormats.h"
 
 #include <vulkan/vulkan.h>
 #include <memory>
@@ -16,14 +17,25 @@ public:
 
     void recreate(uint32_t width, uint32_t height);
 
-    VkRenderPass    renderPass()  const { return m_renderPass; }
-    VkRenderPass    loadRenderPass() const { return m_loadRenderPass; }
-    VkFramebuffer   framebuffer() const { return m_framebuffer; }
     VkImageView     colorView()   const { return m_colorImage.getImageView(); }
     VkImageView     colorCopyView() const { return m_colorCopyImage.getImageView(); }
     VkImageView     depthView()   const { return m_depthImage.getImageView(); }
+    VkImageView     depthAttachmentView() const { return m_depthAttachmentView; }
     VkImageView     characterDepthView() const { return m_characterDepthImage.getImageView(); }
     VkSampler       sampler()     const { return m_sampler; }
+
+    VkImage         colorImage()  const { return m_colorImage.getImage(); }
+    VkImage         depthImage()  const { return m_depthImage.getImage(); }
+    VkImage         charDepthImage() const { return m_characterDepthImage.getImage(); }
+
+    VkFormat        colorFormat() const { return m_colorFormat; }
+    VkFormat        depthFormat() const { return m_depthFormat; }
+    uint32_t        width()  const { return m_width; }
+    uint32_t        height() const { return m_height; }
+
+    // RenderFormats for pipeline creation — used by all sub-renderers
+    RenderFormats   mainFormats() const;   // HDR clear pass (2 color + depth)
+    RenderFormats   loadFormats() const;   // HDR load pass (same formats)
 
     void copyColor(VkCommandBuffer cmd);
 
@@ -50,14 +62,8 @@ private:
         return fmt == VK_FORMAT_D32_SFLOAT_S8_UINT ||
                fmt == VK_FORMAT_D24_UNORM_S8_UINT;
     }
-    VkRenderPass m_renderPass = VK_NULL_HANDLE;
-    VkRenderPass m_loadRenderPass = VK_NULL_HANDLE;
-    VkFramebuffer m_framebuffer = VK_NULL_HANDLE;
 
     void createImages();
-    void createRenderPass();
-    void createLoadRenderPass();
-    void createFramebuffer();
     void createSampler();
 };
 

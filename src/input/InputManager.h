@@ -36,6 +36,9 @@ public:
   bool isLeftMouseDown() const { return glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS; }
   bool isRightMouseDown() const { return glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS; }
 
+  // ── Perf overlay (F3) ────────────────────────────────────────────────────
+  bool wasF3Pressed();
+
   // ── Combat keys (A/S/D) and debug UI (Tab) ─────────────────────────────
   bool wasTabPressed();
   bool wasAPressed();
@@ -77,6 +80,7 @@ private:
 
   // Combat / debug keys
   bool m_tabPressed  = false;
+  bool m_f3Pressed   = false;   // perf overlay toggle
   bool m_aPressed    = false;
   bool m_dPressed    = false;
   bool m_sPressed    = false;

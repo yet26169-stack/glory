@@ -1,4 +1,5 @@
 #include "renderer/BloomPass.h"
+#include "renderer/RenderFormats.h"
 #include "renderer/VkCheck.h"
 
 #include <array>
@@ -16,12 +17,10 @@ void BloomPass::init(const Device& device, VkImageView hdrColorView, VkSampler s
     m_height = height / 2;
 
     createImages();
-    createRenderPass();
     createDescriptorSetLayout();
     createPipelines();
     createDescriptorPool();
     createDescriptorSets();
-    createFramebuffers();
 }
 
 void BloomPass::recreate(VkImageView hdrColorView, uint32_t width, uint32_t height) {
@@ -29,32 +28,20 @@ void BloomPass::recreate(VkImageView hdrColorView, uint32_t width, uint32_t heig
     m_width = width / 2;
     m_height = height / 2;
 
-    VkDevice dev = m_device->getDevice();
-
-    for (auto fb : m_framebuffers) {
-        vkDestroyFramebuffer(dev, fb, nullptr);
-    }
-    m_framebuffers.clear();
     m_blurImages.clear();
 
     if (m_descriptorPool != VK_NULL_HANDLE) {
-        vkDestroyDescriptorPool(dev, m_descriptorPool, nullptr);
+        vkDestroyDescriptorPool(m_device->getDevice(), m_descriptorPool, nullptr);
         m_descriptorPool = VK_NULL_HANDLE;
     }
 
     createImages();
     createDescriptorPool();
     createDescriptorSets();
-    createFramebuffers();
 }
 
 void BloomPass::destroy() {
     if (!m_device) return;
-
-    for (auto fb : m_framebuffers) {
-        vkDestroyFramebuffer(m_device->getDevice(), fb, nullptr);
-    }
-    m_framebuffers.clear();
 
     if (m_extractPipeline != VK_NULL_HANDLE) {
         vkDestroyPipeline(m_device->getDevice(), m_extractPipeline, nullptr);
@@ -76,37 +63,64 @@ void BloomPass::destroy() {
         vkDestroyDescriptorPool(m_device->getDevice(), m_descriptorPool, nullptr);
         m_descriptorPool = VK_NULL_HANDLE;
     }
-    if (m_renderPass != VK_NULL_HANDLE) {
-        vkDestroyRenderPass(m_device->getDevice(), m_renderPass, nullptr);
-        m_renderPass = VK_NULL_HANDLE;
-    }
-
     m_blurImages.clear();
 }
 
 void BloomPass::dispatch(VkCommandBuffer cmd) {
-    VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
+    VkImageSubresourceRange fullRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
-    // 1. Extract bright areas
+    // 1. Extract bright areas (HDR -> Blur0)
     {
-        VkRenderPassBeginInfo rpBegin{};
-        rpBegin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        rpBegin.renderPass = m_renderPass;
-        rpBegin.framebuffer = m_framebuffers[0]; // Blur0
-        rpBegin.renderArea.offset = {0, 0};
-        rpBegin.renderArea.extent = {m_width, m_height};
-        rpBegin.clearValueCount = 1;
-        rpBegin.pClearValues = &clearColor;
+        // Transition Blur0 from UNDEFINED to COLOR_ATTACHMENT_OPTIMAL
+        {
+            VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+            barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            barrier.srcAccessMask = 0;
+            barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            barrier.image = m_blurImages[0].getImage();
+            barrier.subresourceRange = fullRange;
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                                 VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                 0, 0, nullptr, 0, nullptr, 1, &barrier);
+        }
 
-        vkCmdBeginRenderPass(cmd, &rpBegin, VK_SUBPASS_CONTENTS_INLINE);
+        VkRenderingAttachmentInfo colorAttach{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+        colorAttach.imageView = m_blurImages[0].getImageView();
+        colorAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        colorAttach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        colorAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        colorAttach.clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+
+        VkRenderingInfo renderInfo{VK_STRUCTURE_TYPE_RENDERING_INFO};
+        renderInfo.renderArea = {{0, 0}, {m_width, m_height}};
+        renderInfo.layerCount = 1;
+        renderInfo.colorAttachmentCount = 1;
+        renderInfo.pColorAttachments = &colorAttach;
+
+        vkCmdBeginRendering(cmd, &renderInfo);
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_extractPipeline);
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &m_descriptorSets[0], 0, nullptr);
-        
+
         BloomPushConstants pc{0, 1.0f};
         vkCmdPushConstants(cmd, m_pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(BloomPushConstants), &pc);
-        
+
         vkCmdDraw(cmd, 3, 1, 0, 0);
-        vkCmdEndRenderPass(cmd);
+        vkCmdEndRendering(cmd);
+
+        // Transition Blur0 to SHADER_READ_ONLY_OPTIMAL for sampling
+        {
+            VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+            barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            barrier.image = m_blurImages[0].getImage();
+            barrier.subresourceRange = fullRange;
+            vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                 VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                                 0, 0, nullptr, 0, nullptr, 1, &barrier);
+        }
     }
 
     // 2. Gaussian Blur (Ping-pong)
@@ -114,46 +128,116 @@ void BloomPass::dispatch(VkCommandBuffer cmd) {
     for (int i = 0; i < passes; ++i) {
         // Horizontal blur (Blur0 -> Blur1)
         {
-            VkRenderPassBeginInfo rpBegin{};
-            rpBegin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-            rpBegin.renderPass = m_renderPass;
-            rpBegin.framebuffer = m_framebuffers[1]; // Blur1
-            rpBegin.renderArea.offset = {0, 0};
-            rpBegin.renderArea.extent = {m_width, m_height};
-            rpBegin.clearValueCount = 1;
-            rpBegin.pClearValues = &clearColor;
+            VkImageLayout oldLayout = (i == 0) ? VK_IMAGE_LAYOUT_UNDEFINED
+                                               : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            VkAccessFlags srcAccess = (i == 0) ? VkAccessFlags(0) : VK_ACCESS_SHADER_READ_BIT;
+            VkPipelineStageFlags srcStage = (i == 0) ? VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
+                                                     : VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 
-            vkCmdBeginRenderPass(cmd, &rpBegin, VK_SUBPASS_CONTENTS_INLINE);
+            // Transition Blur1 to COLOR_ATTACHMENT_OPTIMAL
+            {
+                VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+                barrier.oldLayout = oldLayout;
+                barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                barrier.srcAccessMask = srcAccess;
+                barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+                barrier.image = m_blurImages[1].getImage();
+                barrier.subresourceRange = fullRange;
+                vkCmdPipelineBarrier(cmd, srcStage,
+                                     VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                     0, 0, nullptr, 0, nullptr, 1, &barrier);
+            }
+
+            VkRenderingAttachmentInfo colorAttach{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+            colorAttach.imageView = m_blurImages[1].getImageView();
+            colorAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            colorAttach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            colorAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            colorAttach.clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+
+            VkRenderingInfo renderInfo{VK_STRUCTURE_TYPE_RENDERING_INFO};
+            renderInfo.renderArea = {{0, 0}, {m_width, m_height}};
+            renderInfo.layerCount = 1;
+            renderInfo.colorAttachmentCount = 1;
+            renderInfo.pColorAttachments = &colorAttach;
+
+            vkCmdBeginRendering(cmd, &renderInfo);
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_blurPipeline);
             vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &m_descriptorSets[1], 0, nullptr);
-            
+
             BloomPushConstants pc{1, 1.0f};
             vkCmdPushConstants(cmd, m_pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(BloomPushConstants), &pc);
-            
+
             vkCmdDraw(cmd, 3, 1, 0, 0);
-            vkCmdEndRenderPass(cmd);
+            vkCmdEndRendering(cmd);
+
+            // Transition Blur1 to SHADER_READ_ONLY_OPTIMAL for sampling
+            {
+                VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+                barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+                barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+                barrier.image = m_blurImages[1].getImage();
+                barrier.subresourceRange = fullRange;
+                vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                     VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                                     0, 0, nullptr, 0, nullptr, 1, &barrier);
+            }
         }
 
         // Vertical blur (Blur1 -> Blur0)
         {
-            VkRenderPassBeginInfo rpBegin{};
-            rpBegin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-            rpBegin.renderPass = m_renderPass;
-            rpBegin.framebuffer = m_framebuffers[0]; // Blur0
-            rpBegin.renderArea.offset = {0, 0};
-            rpBegin.renderArea.extent = {m_width, m_height};
-            rpBegin.clearValueCount = 1;
-            rpBegin.pClearValues = &clearColor;
+            // Transition Blur0 to COLOR_ATTACHMENT_OPTIMAL (was SHADER_READ_ONLY from previous pass)
+            {
+                VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+                barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+                barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+                barrier.image = m_blurImages[0].getImage();
+                barrier.subresourceRange = fullRange;
+                vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                                     VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                     0, 0, nullptr, 0, nullptr, 1, &barrier);
+            }
 
-            vkCmdBeginRenderPass(cmd, &rpBegin, VK_SUBPASS_CONTENTS_INLINE);
+            VkRenderingAttachmentInfo colorAttach{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+            colorAttach.imageView = m_blurImages[0].getImageView();
+            colorAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            colorAttach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            colorAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            colorAttach.clearValue.color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+
+            VkRenderingInfo renderInfo{VK_STRUCTURE_TYPE_RENDERING_INFO};
+            renderInfo.renderArea = {{0, 0}, {m_width, m_height}};
+            renderInfo.layerCount = 1;
+            renderInfo.colorAttachmentCount = 1;
+            renderInfo.pColorAttachments = &colorAttach;
+
+            vkCmdBeginRendering(cmd, &renderInfo);
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_blurPipeline);
             vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &m_descriptorSets[2], 0, nullptr);
-            
+
             BloomPushConstants pc{0, 1.0f};
             vkCmdPushConstants(cmd, m_pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(BloomPushConstants), &pc);
-            
+
             vkCmdDraw(cmd, 3, 1, 0, 0);
-            vkCmdEndRenderPass(cmd);
+            vkCmdEndRendering(cmd);
+
+            // Transition Blur0 to SHADER_READ_ONLY_OPTIMAL for next pass / final sampling
+            {
+                VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+                barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+                barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+                barrier.image = m_blurImages[0].getImage();
+                barrier.subresourceRange = fullRange;
+                vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                     VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                                     0, 0, nullptr, 0, nullptr, 1, &barrier);
+            }
         }
     }
 }
@@ -165,47 +249,6 @@ void BloomPass::createImages() {
                                  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                                  VK_IMAGE_ASPECT_COLOR_BIT);
     }
-}
-
-void BloomPass::createRenderPass() {
-    VkAttachmentDescription colorAttachment{};
-    colorAttachment.format = VK_FORMAT_R16G16B16A16_SFLOAT;
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-    VkAttachmentReference colorAttachmentRef{};
-    colorAttachmentRef.attachment = 0;
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    VkSubpassDescription subpass{};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &colorAttachmentRef;
-
-    VkSubpassDependency dependency{};
-    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    dependency.dstSubpass = 0;
-    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.srcAccessMask = 0;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-    VkRenderPassCreateInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = 1;
-    renderPassInfo.pAttachments = &colorAttachment;
-    renderPassInfo.subpassCount = 1;
-    renderPassInfo.pSubpasses = &subpass;
-    renderPassInfo.dependencyCount = 1;
-    renderPassInfo.pDependencies = &dependency;
-
-    VK_CHECK(vkCreateRenderPass(m_device->getDevice(), &renderPassInfo, nullptr, &m_renderPass),
-             "Create Bloom render pass");
 }
 
 void BloomPass::createDescriptorSetLayout() {
@@ -327,8 +370,11 @@ void BloomPass::createPipelines() {
     pipelineInfo.pMultisampleState = &multisampling;
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.layout = m_pipelineLayout;
-    pipelineInfo.renderPass = m_renderPass;
-    pipelineInfo.subpass = 0;
+
+    RenderFormats bloomFmts = RenderFormats::colorOnly(VK_FORMAT_R16G16B16A16_SFLOAT);
+    VkPipelineRenderingCreateInfo dynCI = bloomFmts.pipelineRenderingCI();
+    pipelineInfo.pNext = &dynCI;
+    pipelineInfo.renderPass = VK_NULL_HANDLE;
 
     VK_CHECK(vkCreateGraphicsPipelines(m_device->getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_extractPipeline),
              "Create Extract pipeline");
@@ -401,24 +447,6 @@ void BloomPass::createDescriptorSets() {
     descriptorWrites[2].pImageInfo = &imageInfo2;
 
     vkUpdateDescriptorSets(m_device->getDevice(), 3, descriptorWrites, 0, nullptr);
-}
-
-void BloomPass::createFramebuffers() {
-    m_framebuffers.resize(2);
-    for (int i = 0; i < 2; ++i) {
-        VkImageView attachment = m_blurImages[i].getImageView();
-        VkFramebufferCreateInfo framebufferInfo{};
-        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass = m_renderPass;
-        framebufferInfo.attachmentCount = 1;
-        framebufferInfo.pAttachments = &attachment;
-        framebufferInfo.width = m_width;
-        framebufferInfo.height = m_height;
-        framebufferInfo.layers = 1;
-
-        VK_CHECK(vkCreateFramebuffer(m_device->getDevice(), &framebufferInfo, nullptr, &m_framebuffers[i]),
-                 "Create Bloom framebuffer");
-    }
 }
 
 VkShaderModule BloomPass::createShaderModule(const std::vector<char>& code) {

@@ -21,6 +21,7 @@
 #include "renderer/Descriptors.h"
 #include "renderer/Device.h"
 #include "renderer/Pipeline.h"
+#include "renderer/RenderFormats.h"
 #include "renderer/Swapchain.h"
 #include "renderer/HDRFramebuffer.h"
 #include "renderer/BloomPass.h"
@@ -28,6 +29,7 @@
 #include "renderer/Sync.h"
 #include "renderer/Texture.h"
 #include "renderer/ShadowPass.h"
+#include "renderer/GpuTimer.h"
 #include "input/InputManager.h"
 #include "scene/Scene.h"
 #include "terrain/IsometricCamera.h"
@@ -41,6 +43,7 @@
 #include "combat/CombatComponents.h"
 #include "combat/CombatSystem.h"
 #include "hud/HUD.h"
+#include "hud/PerfOverlay.h"
 #include "map/MapTypes.h"
 
 #include <glm/glm.hpp>
@@ -164,15 +167,18 @@ private:
     VkPipelineLayout m_skinnedPipelineLayout = VK_NULL_HANDLE;
     VkPipeline       m_skinnedPipeline       = VK_NULL_HANDLE;
 
-    VkRenderPass               m_swapchainRenderPass = VK_NULL_HANDLE;
-    std::vector<VkFramebuffer> m_swapchainFramebuffers;
-
     // ── ImGui ─────────────────────────────────────────────────────────────
     VkDescriptorPool m_imguiPool = VK_NULL_HANDLE;
 
     // ── HUD / Minimap ────────────────────────────────────────────────────
     HUD     m_hud;
     MapData m_mapData;
+
+    // ── GPU profiling / perf overlay ─────────────────────────────────────
+    std::unique_ptr<GpuTimer> m_gpuTimer;
+    PerfOverlay               m_perfOverlay;
+    std::vector<GpuTimingResult> m_lastGpuResults;
+    float m_lastGpuTotalMs = 0.0f;
 
     // ── Helpers ───────────────────────────────────────────────────────────
     void buildScene();
@@ -184,10 +190,6 @@ private:
     void destroyGridPipeline();
     void createSkinnedPipeline();
     void destroySkinnedPipeline();
-    void createSwapchainRenderPass();
-    void createSwapchainFramebuffers();
-    void destroySwapchainRenderPass();
-    void destroySwapchainFramebuffers();
     glm::vec3 screenToWorld(float mx, float my) const; // unproject to Y=0 plane
     glm::vec2 worldToScreen(const glm::vec3& worldPos) const; // project world to screen pixels
 

@@ -49,7 +49,7 @@ Renderer::Renderer(Window& window) : m_window(window) {
                       VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT));
 
     m_descriptors = std::make_unique<Descriptors>(*m_device, Sync::MAX_FRAMES_IN_FLIGHT);
-    m_pipeline = std::make_unique<Pipeline>(*m_device, *m_swapchain, m_descriptors->getLayout(), m_hdrFB->renderPass());
+    m_pipeline = std::make_unique<Pipeline>(*m_device, *m_swapchain, m_descriptors->getLayout(), m_hdrFB->mainFormats());
     m_sync = std::make_unique<Sync>(*m_device, m_swapchain->getImageCount());
 
     // Dummy 1×1 white texture bound to the shadow-map descriptor slot.
@@ -61,9 +61,9 @@ Renderer::Renderer(Window& window) : m_window(window) {
     m_shadowPass.bindToDescriptors(*m_descriptors);
 
     m_clickIndicatorRenderer = std::make_unique<ClickIndicatorRenderer>(
-        *m_device, m_hdrFB->renderPass());
+        *m_device, m_hdrFB->mainFormats());
     m_groundDecalRenderer = std::make_unique<GroundDecalRenderer>(
-        *m_device, m_hdrFB->renderPass());
+        *m_device, m_hdrFB->mainFormats());
     // Register basic AoE decal
     GroundDecalRenderer::DecalDef circleDecal;
     circleDecal.id = "decal_circle";
@@ -72,7 +72,7 @@ Renderer::Renderer(Window& window) : m_window(window) {
     m_groundDecalRenderer->registerDecal(circleDecal);
 
     m_distortionRenderer = std::make_unique<DistortionRenderer>(
-        *m_device, m_hdrFB->loadRenderPass(), m_hdrFB->colorCopyView(), m_hdrFB->sampler());
+        *m_device, m_hdrFB->loadFormats(), m_hdrFB->colorCopyView(), m_hdrFB->sampler());
     // Register basic ripple distortion
     DistortionDef ripple;
     ripple.id = "vfx_ripple";
@@ -82,22 +82,22 @@ Renderer::Renderer(Window& window) : m_window(window) {
     m_distortionRenderer->registerDef(ripple);
 
     m_inkingPass = std::make_unique<InkingPass>();
-    m_inkingPass->init(*m_device, m_hdrFB->loadRenderPass(),
+    m_inkingPass->init(*m_device, m_hdrFB->loadFormats(),
                        m_hdrFB->characterDepthView(), m_hdrFB->sampler());
 
     m_fogOfWar = std::make_unique<FogOfWarRenderer>();
     m_fogOfWar->init(*m_device);
 
     m_shieldBubble = std::make_unique<ShieldBubbleRenderer>();
-    m_shieldBubble->init(*m_device, m_hdrFB->renderPass());
+    m_shieldBubble->init(*m_device, m_hdrFB->mainFormats());
     m_coneEffect = std::make_unique<ConeAbilityRenderer>();
-    m_coneEffect->init(*m_device, m_hdrFB->renderPass());
+    m_coneEffect->init(*m_device, m_hdrFB->mainFormats());
     m_explosionRenderer = std::make_unique<ExplosionRenderer>();
-    m_explosionRenderer->init(*m_device, m_hdrFB->renderPass());
+    m_explosionRenderer->init(*m_device, m_hdrFB->mainFormats());
 
     // Sprite-atlas-based VFX renderer
     m_spriteEffectRenderer = std::make_unique<SpriteEffectRenderer>();
-    m_spriteEffectRenderer->init(*m_device, m_hdrFB->renderPass());
+    m_spriteEffectRenderer->init(*m_device, m_hdrFB->mainFormats());
     m_spriteEffectConeW = m_spriteEffectRenderer->registerEffect(
         "cone_w", std::string(ASSET_DIR) + "textures/cone_w_atlas.png",
         8, 56, 3.5f, true);
@@ -105,22 +105,22 @@ Renderer::Renderer(Window& window) : m_window(window) {
         "explosion_e", std::string(ASSET_DIR) + "textures/explosion_e_atlas.png",
         8, 56, 4.2f, true);
 
-    m_debugRenderer.init(*m_device, m_hdrFB->renderPass());
+    m_debugRenderer.init(*m_device, m_hdrFB->mainFormats());
 
     createInstanceBuffers();
     createGridPipeline();
     createSkinnedPipeline();
 
     m_outlineRenderer = std::make_unique<OutlineRenderer>();
-    m_outlineRenderer->init(*m_device, m_hdrFB->renderPass(),
+    m_outlineRenderer->init(*m_device, m_hdrFB->mainFormats(),
                             m_descriptors->getLayout());
     m_vfxQueue      = std::make_unique<VFXEventQueue>();
     m_combatVfxQueue = std::make_unique<VFXEventQueue>(); // separate SPSC for CombatSystem
-    m_vfxRenderer   = std::make_unique<VFXRenderer>(*m_device, m_hdrFB->renderPass());
+    m_vfxRenderer   = std::make_unique<VFXRenderer>(*m_device, m_hdrFB->mainFormats());
     m_vfxRenderer->setDepthBuffer(m_hdrFB->depthView(), m_hdrFB->sampler());
     m_vfxRenderer->loadEmitterDirectory(std::string(ASSET_DIR) + "vfx/");
 
-    m_trailRenderer = std::make_unique<TrailRenderer>(*m_device, m_hdrFB->renderPass());
+    m_trailRenderer = std::make_unique<TrailRenderer>(*m_device, m_hdrFB->mainFormats());
 
     // Original fireball trail (kept for backward compatibility with existing IDs)
     TrailDef fireballTrail;
@@ -146,7 +146,7 @@ Renderer::Renderer(Window& window) : m_window(window) {
     fireballTrailLoL.additive    = true;
     m_trailRenderer->registerTrail(fireballTrailLoL);
 
-    m_meshEffectRenderer = std::make_unique<MeshEffectRenderer>(*m_device, m_hdrFB->renderPass());
+    m_meshEffectRenderer = std::make_unique<MeshEffectRenderer>(*m_device, m_hdrFB->mainFormats());
     // Register basic slash effect
     MeshEffectDef slashDef;
     slashDef.id = "vfx_slash";
@@ -169,11 +169,10 @@ Renderer::Renderer(Window& window) : m_window(window) {
     m_bloom = std::make_unique<BloomPass>();
     m_bloom->init(*m_device, m_hdrFB->colorView(), m_hdrFB->sampler(), m_window.getExtent().width, m_window.getExtent().height);
 
-    createSwapchainRenderPass();
-    createSwapchainFramebuffers();
+    RenderFormats swapFmts = RenderFormats::swapchain(m_swapchain->getImageFormat());
 
     m_toneMap = std::make_unique<ToneMapPass>();
-    m_toneMap->init(*m_device, m_swapchainRenderPass, m_hdrFB->colorView(), m_bloom->bloomResultView(), m_hdrFB->sampler());
+    m_toneMap->init(*m_device, swapFmts, m_hdrFB->colorView(), m_bloom->bloomResultView(), m_hdrFB->sampler());
 
     m_isoCam.setBounds(glm::vec3(0, 0, 0), glm::vec3(200, 0, 200));
     m_isoCam.setTarget(glm::vec3(100, 0, 100));
@@ -214,10 +213,19 @@ Renderer::Renderer(Window& window) : m_window(window) {
         initInfo.DescriptorPool = m_imguiPool;
         initInfo.MinImageCount  = 2;
         initInfo.ImageCount     = m_swapchain->getImageCount();
-        initInfo.RenderPass     = m_swapchainRenderPass;
+        initInfo.UseDynamicRendering = true;
+        initInfo.PipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+        initInfo.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
+        VkFormat swapFormat = m_swapchain->getImageFormat();
+        initInfo.PipelineRenderingCreateInfo.pColorAttachmentFormats = &swapFormat;
         ImGui_ImplVulkan_Init(&initInfo);
         // ImGui 1.91.8 auto-uploads fonts on first render — no one-shot buffer needed
     }
+
+    // ── GPU timer for per-pass profiling ──────────────────────────────────
+    m_gpuTimer = std::make_unique<GpuTimer>(
+        m_device->getDevice(), m_device->getPhysicalDevice(),
+        Sync::MAX_FRAMES_IN_FLIGHT, /*maxZones=*/32);
 
     m_lastFrameTime = static_cast<float>(glfwGetTime());
     spdlog::info("Renderer initialized");
@@ -233,6 +241,8 @@ Renderer::~Renderer() {
     ImGui::DestroyContext();
     if (m_imguiPool != VK_NULL_HANDLE)
         vkDestroyDescriptorPool(m_device->getDevice(), m_imguiPool, nullptr);
+
+    m_gpuTimer.reset();
 
     m_combatSystem.reset();
     m_input.reset();
@@ -256,8 +266,6 @@ Renderer::~Renderer() {
 
     if (m_toneMap) m_toneMap->destroy();
     m_toneMap.reset();
-    destroySwapchainFramebuffers();
-    destroySwapchainRenderPass();
     if (m_bloom) m_bloom->destroy();
     m_bloom.reset();
     if (m_hdrFB) m_hdrFB->destroy();
@@ -393,6 +401,8 @@ void Renderer::simulateStep(float dt) {
 
     // Tab toggles debug UI overlay
     if (m_input->wasTabPressed()) m_showDebugUI = !m_showDebugUI;
+    // F3 toggles perf overlay
+    if (m_input->wasF3Pressed()) m_perfOverlay.toggle();
 
     // Pick entity under cursor for highlighting and combat targeting
     m_hoveredEntity = pickEntityUnderCursor();
@@ -924,6 +934,12 @@ void Renderer::renderFrame(float alpha) {
 
     vkResetFences(dev, 1, &fence);
 
+    // ── Resolve GPU timer from the COMPLETED frame (fence guarantees it) ──
+    if (m_gpuTimer && m_gpuTimer->isSupported()) {
+        m_lastGpuResults = m_gpuTimer->resolve(m_currentFrame);
+        m_lastGpuTotalMs = m_gpuTimer->totalMs(m_currentFrame);
+    }
+
     // ── Bone SSBO write (safe after fence — GPU done with this frame's SSBO) ──
     if (m_state != AppState::Launcher) {
         auto animView = m_scene.getRegistry()
@@ -972,6 +988,11 @@ void Renderer::renderFrame(float alpha) {
 
         ImGui::End();
     }
+
+    // ── Perf overlay (F3) ─────────────────────────────────────────────────
+    m_perfOverlay.draw(m_lastGpuResults, m_lastGpuTotalMs,
+                       static_cast<float>(realDt * 1000.0f));
+
     ImGui::Render(); // always call Render() even if no windows built
 
     // ── Click animation ───────────────────────────────────────────────────
@@ -1023,15 +1044,22 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
     VkCommandBufferBeginInfo bi{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
     VK_CHECK(vkBeginCommandBuffer(cmd, &bi), "Begin command buffer");
 
+    // ── Reset GPU timer queries for this frame ──────────────────────────────
+    if (m_gpuTimer) m_gpuTimer->resetFrame(cmd, m_currentFrame);
+
     // ── FoW compute pass ────────────────────────────────────────────────────
     if (m_fogOfWar) {
+        if (m_gpuTimer) m_gpuTimer->beginZone(cmd, m_currentFrame, "FoW");
         m_fogOfWar->dispatch(cmd);
+        if (m_gpuTimer) m_gpuTimer->endZone(cmd, m_currentFrame, "FoW");
     }
 
     // ── VFX compute pass (particle simulation, OUTSIDE render pass) ──────
     if (m_vfxRenderer && m_state != AppState::Launcher) {
+        if (m_gpuTimer) m_gpuTimer->beginZone(cmd, m_currentFrame, "VFX Compute");
         m_vfxRenderer->dispatchCompute(cmd);
         m_vfxRenderer->barrierComputeToGraphics(cmd);
+        if (m_gpuTimer) m_gpuTimer->endZone(cmd, m_currentFrame, "VFX Compute");
     }
 
     auto ext = m_swapchain->getExtent();
@@ -1099,23 +1127,80 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
 
         {
             GLORY_ZONE_N("ShadowPass");
+            if (m_gpuTimer) m_gpuTimer->beginZone(cmd, m_currentFrame, "Shadow");
             m_shadowPass.recordCommands(cmd, drawStaticShadows, nullptr);
+            if (m_gpuTimer) m_gpuTimer->endZone(cmd, m_currentFrame, "Shadow");
         }
     }
 
-    // ── Begin HDR render pass ────────────────────────────────────────────────
-    std::array<VkClearValue, 3> clears{};
-    clears[0].color        = {{ 0.08f, 0.10f, 0.14f, 1.0f }};
-    clears[1].depthStencil = { 0.0f, 0 };                    // reversed-Z: far = 0.0
-    clears[2].color        = {{ 0.0f, 0.0f, 0.0f, 0.0f }};  // charDepth: reversed-Z far = 0.0
+    // ── Begin HDR render pass (dynamic rendering) ──────────────────────────
+    // Transition HDR attachments to attachment-optimal layouts
+    {
+        VkImageMemoryBarrier barriers[3]{};
+        // Color attachment
+        barriers[0] = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        barriers[0].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        barriers[0].newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        barriers[0].srcAccessMask = 0;
+        barriers[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        barriers[0].image = m_hdrFB->colorImage();
+        barriers[0].subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+        // Depth attachment
+        barriers[1] = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        barriers[1].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        barriers[1].newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        barriers[1].srcAccessMask = 0;
+        barriers[1].dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        barriers[1].image = m_hdrFB->depthImage();
+        barriers[1].subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 0, 1};
+        // CharDepth attachment
+        barriers[2] = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        barriers[2].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        barriers[2].newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        barriers[2].srcAccessMask = 0;
+        barriers[2].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        barriers[2].image = m_hdrFB->charDepthImage();
+        barriers[2].subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
-    VkRenderPassBeginInfo rp{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
-    rp.renderPass       = m_hdrFB->renderPass();
-    rp.framebuffer      = m_hdrFB->framebuffer();
-    rp.renderArea       = { {0, 0}, ext };
-    rp.clearValueCount  = static_cast<uint32_t>(clears.size());
-    rp.pClearValues     = clears.data();
-    vkCmdBeginRenderPass(cmd, &rp, VK_SUBPASS_CONTENTS_INLINE);
+        vkCmdPipelineBarrier(cmd,
+            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+            0, 0, nullptr, 0, nullptr, 3, barriers);
+    }
+
+    VkRenderingAttachmentInfo hdrColorAttach{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+    hdrColorAttach.imageView   = m_hdrFB->colorView();
+    hdrColorAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    hdrColorAttach.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    hdrColorAttach.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
+    hdrColorAttach.clearValue.color = {{ 0.08f, 0.10f, 0.14f, 1.0f }};
+
+    VkRenderingAttachmentInfo hdrCharDepthAttach{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+    hdrCharDepthAttach.imageView   = m_hdrFB->characterDepthView();
+    hdrCharDepthAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    hdrCharDepthAttach.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    hdrCharDepthAttach.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
+    hdrCharDepthAttach.clearValue.color = {{ 0.0f, 0.0f, 0.0f, 0.0f }};
+
+    VkRenderingAttachmentInfo hdrColorAttachments[2] = {hdrColorAttach, hdrCharDepthAttach};
+
+    VkRenderingAttachmentInfo hdrDepthAttach{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+    hdrDepthAttach.imageView   = m_hdrFB->depthAttachmentView();
+    hdrDepthAttach.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    hdrDepthAttach.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    hdrDepthAttach.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
+    hdrDepthAttach.clearValue.depthStencil = { 0.0f, 0 }; // reversed-Z: far = 0.0
+
+    VkRenderingInfo hdrRenderInfo{VK_STRUCTURE_TYPE_RENDERING_INFO};
+    hdrRenderInfo.renderArea          = { {0, 0}, ext };
+    hdrRenderInfo.layerCount          = 1;
+    hdrRenderInfo.colorAttachmentCount = 2;
+    hdrRenderInfo.pColorAttachments   = hdrColorAttachments;
+    hdrRenderInfo.pDepthAttachment    = &hdrDepthAttach;
+    hdrRenderInfo.pStencilAttachment  = &hdrDepthAttach;
+
+    vkCmdBeginRendering(cmd, &hdrRenderInfo);
+    if (m_gpuTimer) m_gpuTimer->beginZone(cmd, m_currentFrame, "Geometry");
 
     VkViewport vp{ 0, 0, static_cast<float>(ext.width), static_cast<float>(ext.height), 0, 1 };
     VkRect2D   sc{ {0, 0}, ext };
@@ -1309,20 +1394,98 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
         }
     }
 
-    vkCmdEndRenderPass(cmd);
+    if (m_gpuTimer) m_gpuTimer->endZone(cmd, m_currentFrame, "Geometry");
+    vkCmdEndRendering(cmd);
 
-    // ── Transparent / VFX pass (LOAD_OP_LOAD) ─────────────────────────────
+    // ── Transition HDR attachments after main pass ──────────────────────────
+    {
+        VkImageMemoryBarrier barriers[3]{};
+        // Color → SHADER_READ_ONLY for bloom sampling / copyColor
+        barriers[0] = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        barriers[0].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        barriers[0].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        barriers[0].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        barriers[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        barriers[0].image = m_hdrFB->colorImage();
+        barriers[0].subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+        // Depth → DEPTH_STENCIL_READ_ONLY for load pass read-only depth test
+        barriers[1] = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        barriers[1].oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        barriers[1].newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+        barriers[1].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        barriers[1].dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+        barriers[1].image = m_hdrFB->depthImage();
+        barriers[1].subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 0, 1};
+        // CharDepth → SHADER_READ_ONLY for inking pass sampling
+        barriers[2] = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        barriers[2].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        barriers[2].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        barriers[2].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        barriers[2].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        barriers[2].image = m_hdrFB->charDepthImage();
+        barriers[2].subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+        vkCmdPipelineBarrier(cmd,
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+            0, 0, nullptr, 0, nullptr, 3, barriers);
+    }
+
+    // ── Transparent / VFX pass (LOAD_OP_LOAD, dynamic rendering) ──────────
     if (m_state != AppState::Launcher) {
         // Copy scene color for distortion effects before rendering transparents over it
         if (m_distortionRenderer) {
             m_hdrFB->copyColor(cmd);
         }
 
-        VkRenderPassBeginInfo loadRP{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
-        loadRP.renderPass  = m_hdrFB->loadRenderPass();
-        loadRP.framebuffer = m_hdrFB->framebuffer();
-        loadRP.renderArea  = { {0, 0}, ext };
-        vkCmdBeginRenderPass(cmd, &loadRP, VK_SUBPASS_CONTENTS_INLINE);
+        // Transition color back to attachment for load pass writing
+        {
+            VkImageMemoryBarrier colorToAttach{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+            colorToAttach.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            colorToAttach.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            colorToAttach.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            colorToAttach.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
+            colorToAttach.image = m_hdrFB->colorImage();
+            colorToAttach.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+            vkCmdPipelineBarrier(cmd,
+                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                0, 0, nullptr, 0, nullptr, 1, &colorToAttach);
+        }
+
+        // Load pass: color LOAD (preserve geometry), charDepth read-only (inking reads it),
+        // depth read-only (depth test, no write)
+        VkRenderingAttachmentInfo loadColorAttach{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+        loadColorAttach.imageView   = m_hdrFB->colorView();
+        loadColorAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        loadColorAttach.loadOp      = VK_ATTACHMENT_LOAD_OP_LOAD;
+        loadColorAttach.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
+
+        // charDepth: write-masked to 0 but must be declared for pipeline compatibility
+        VkRenderingAttachmentInfo loadCharDepthAttach{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+        loadCharDepthAttach.imageView   = m_hdrFB->characterDepthView();
+        loadCharDepthAttach.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        loadCharDepthAttach.loadOp      = VK_ATTACHMENT_LOAD_OP_LOAD;
+        loadCharDepthAttach.storeOp     = VK_ATTACHMENT_STORE_OP_NONE;
+
+        VkRenderingAttachmentInfo loadColorAttachments[2] = {loadColorAttach, loadCharDepthAttach};
+
+        VkRenderingAttachmentInfo loadDepthAttach{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+        loadDepthAttach.imageView   = m_hdrFB->depthAttachmentView();
+        loadDepthAttach.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+        loadDepthAttach.loadOp      = VK_ATTACHMENT_LOAD_OP_LOAD;
+        loadDepthAttach.storeOp     = VK_ATTACHMENT_STORE_OP_NONE;
+
+        VkRenderingInfo loadRenderInfo{VK_STRUCTURE_TYPE_RENDERING_INFO};
+        loadRenderInfo.renderArea           = { {0, 0}, ext };
+        loadRenderInfo.layerCount           = 1;
+        loadRenderInfo.colorAttachmentCount = 2;
+        loadRenderInfo.pColorAttachments    = loadColorAttachments;
+        loadRenderInfo.pDepthAttachment     = &loadDepthAttach;
+        loadRenderInfo.pStencilAttachment   = &loadDepthAttach;
+
+        vkCmdBeginRendering(cmd, &loadRenderInfo);
+        if (m_gpuTimer) m_gpuTimer->beginZone(cmd, m_currentFrame, "VFX/Trans");
 
         vkCmdSetViewport(cmd, 0, 1, &vp);
         vkCmdSetScissor(cmd, 0, 1, &sc);
@@ -1406,30 +1569,85 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
             m_distortionRenderer->render(cmd, viewProj, appTime, ext.width, ext.height);
         }
 
-        vkCmdEndRenderPass(cmd);
+        if (m_gpuTimer) m_gpuTimer->endZone(cmd, m_currentFrame, "VFX/Trans");
+        vkCmdEndRendering(cmd);
+
+        // Transition HDR color to SHADER_READ_ONLY for tonemap sampling
+        {
+            VkImageMemoryBarrier colorBarrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+            colorBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            colorBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            colorBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            colorBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            colorBarrier.image = m_hdrFB->colorImage();
+            colorBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+            vkCmdPipelineBarrier(cmd,
+                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                0, 0, nullptr, 0, nullptr, 1, &colorBarrier);
+        }
     }
 
     // ═══════════ PHASE 3: BLOOM (outside render pass) ═══════════
+    if (m_gpuTimer) m_gpuTimer->beginZone(cmd, m_currentFrame, "Bloom");
     m_bloom->dispatch(cmd);
+    if (m_gpuTimer) m_gpuTimer->endZone(cmd, m_currentFrame, "Bloom");
 
-    // ═══════════ PHASE 4: TONE-MAP TO SWAPCHAIN ═══════════
-    VkRenderPassBeginInfo swapRP{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
-    swapRP.renderPass  = m_swapchainRenderPass;
-    swapRP.framebuffer = m_swapchainFramebuffers[imageIndex];
-    swapRP.renderArea  = { {0, 0}, ext };
-    std::array<VkClearValue, 1> swapClears{};
-    swapClears[0].color = {{ 0.0f, 0.0f, 0.0f, 1.0f }};
-    swapRP.clearValueCount = static_cast<uint32_t>(swapClears.size());
-    swapRP.pClearValues = swapClears.data();
+    // ═══════════ PHASE 4: TONE-MAP TO SWAPCHAIN (dynamic rendering) ═══════════
+    // Transition swapchain image to COLOR_ATTACHMENT_OPTIMAL
+    {
+        VkImageMemoryBarrier swapBarrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        swapBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        swapBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        swapBarrier.srcAccessMask = 0;
+        swapBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        swapBarrier.image = m_swapchain->getImages()[imageIndex];
+        swapBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+        vkCmdPipelineBarrier(cmd,
+            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            0, 0, nullptr, 0, nullptr, 1, &swapBarrier);
+    }
 
-    vkCmdBeginRenderPass(cmd, &swapRP, VK_SUBPASS_CONTENTS_INLINE);
+    VkRenderingAttachmentInfo swapColorAttach{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+    swapColorAttach.imageView   = m_swapchain->getImageViews()[imageIndex];
+    swapColorAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    swapColorAttach.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    swapColorAttach.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
+    swapColorAttach.clearValue.color = {{ 0.0f, 0.0f, 0.0f, 1.0f }};
+
+    VkRenderingInfo swapRenderInfo{VK_STRUCTURE_TYPE_RENDERING_INFO};
+    swapRenderInfo.renderArea          = { {0, 0}, ext };
+    swapRenderInfo.layerCount          = 1;
+    swapRenderInfo.colorAttachmentCount = 1;
+    swapRenderInfo.pColorAttachments   = &swapColorAttach;
+
+    vkCmdBeginRendering(cmd, &swapRenderInfo);
+    if (m_gpuTimer) m_gpuTimer->beginZone(cmd, m_currentFrame, "Tonemap");
 
     m_toneMap->render(cmd, /*exposure=*/1.0f, /*bloomStrength=*/0.3f);
+
+    if (m_gpuTimer) m_gpuTimer->endZone(cmd, m_currentFrame, "Tonemap");
 
     // ── ImGui render draw data (last thing inside render pass) ────────────
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
 
-    vkCmdEndRenderPass(cmd);
+    vkCmdEndRendering(cmd);
+
+    // Transition swapchain image to PRESENT_SRC_KHR for presentation
+    {
+        VkImageMemoryBarrier presentBarrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        presentBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        presentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        presentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        presentBarrier.dstAccessMask = 0;
+        presentBarrier.image = m_swapchain->getImages()[imageIndex];
+        presentBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+        vkCmdPipelineBarrier(cmd,
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+            0, 0, nullptr, 0, nullptr, 1, &presentBarrier);
+    }
 
     VK_CHECK(vkEndCommandBuffer(cmd), "End command buffer");
 }
@@ -1919,7 +2137,7 @@ void Renderer::buildScene() {
     {
         uint32_t waterBaseSlot = static_cast<uint32_t>(m_scene.getTextures().size());
         m_waterRenderer = std::make_unique<WaterRenderer>();
-        m_waterRenderer->init(*m_device, m_hdrFB->renderPass(),
+        m_waterRenderer->init(*m_device, m_hdrFB->mainFormats(),
                               m_descriptors->getLayout(),
                               *m_descriptors, waterBaseSlot);
     }
@@ -2009,14 +2227,11 @@ void Renderer::recreateSwapchain() {
     }
     vkDeviceWaitIdle(m_device->getDevice());
     m_swapchain->recreate(extent);
-    m_pipeline->recreateFramebuffers(*m_swapchain); // note: m_ownsRenderPass is false, so this returns early
     m_hdrFB->recreate(extent.width, extent.height);
     m_bloom->recreate(m_hdrFB->colorView(), extent.width, extent.height);
     m_vfxRenderer->setDepthBuffer(m_hdrFB->depthView(), m_hdrFB->sampler());
     m_distortionRenderer->updateDescriptorSet(m_hdrFB->colorCopyView());
     if (m_inkingPass) m_inkingPass->updateInput(m_hdrFB->characterDepthView());
-    destroySwapchainFramebuffers();
-    createSwapchainFramebuffers();
     m_toneMap->updateDescriptorSets(m_hdrFB->colorView(), m_bloom->bloomResultView());
     m_sync->recreateRenderFinishedSemaphores(m_swapchain->getImageCount());
     spdlog::info("Swapchain recreated ({}×{})", extent.width, extent.height);
@@ -2167,7 +2382,10 @@ void Renderer::createGridPipeline() {
     lci.pushConstantRangeCount = 1; lci.pPushConstantRanges = &pc;
     VK_CHECK(vkCreatePipelineLayout(dev, &lci, nullptr, &m_gridPipelineLayout), "grid layout");
 
+    VkPipelineRenderingCreateInfo gridDynCI = m_pipeline->getRenderFormats().pipelineRenderingCI();
+
     VkGraphicsPipelineCreateInfo pci{ VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
+    pci.pNext               = &gridDynCI;
     pci.stageCount          = 2;
     pci.pStages             = stages;
     pci.pVertexInputState   = &vi;
@@ -2179,7 +2397,7 @@ void Renderer::createGridPipeline() {
     pci.pColorBlendState    = &cb;
     pci.pDynamicState       = &dyn;
     pci.layout              = m_gridPipelineLayout;
-    pci.renderPass          = m_pipeline->getRenderPass();
+    pci.renderPass          = VK_NULL_HANDLE;
     VK_CHECK(vkCreateGraphicsPipelines(dev, VK_NULL_HANDLE, 1, &pci, nullptr, &m_gridPipeline), "grid pipeline");
 
     vkDestroyShaderModule(dev, frag, nullptr);
@@ -2282,7 +2500,10 @@ void Renderer::createSkinnedPipeline() {
     lci.pPushConstantRanges    = &pc;
     VK_CHECK(vkCreatePipelineLayout(dev, &lci, nullptr, &m_skinnedPipelineLayout), "skinned layout");
 
+    VkPipelineRenderingCreateInfo skinnedDynCI = m_pipeline->getRenderFormats().pipelineRenderingCI();
+
     VkGraphicsPipelineCreateInfo pci{ VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
+    pci.pNext               = &skinnedDynCI;
     pci.stageCount          = 2;
     pci.pStages             = stages;
     pci.pVertexInputState   = &vi;
@@ -2294,7 +2515,7 @@ void Renderer::createSkinnedPipeline() {
     pci.pColorBlendState    = &cb;
     pci.pDynamicState       = &dyn;
     pci.layout              = m_skinnedPipelineLayout;
-    pci.renderPass          = m_pipeline->getRenderPass();
+    pci.renderPass          = VK_NULL_HANDLE;
     VK_CHECK(vkCreateGraphicsPipelines(dev, VK_NULL_HANDLE, 1, &pci, nullptr, &m_skinnedPipeline), "skinned pipeline");
 
     vkDestroyShaderModule(dev, frag, nullptr);
@@ -2306,80 +2527,6 @@ void Renderer::destroySkinnedPipeline() {
     VkDevice dev = m_device->getDevice();
     if (m_skinnedPipeline)       { vkDestroyPipeline(dev, m_skinnedPipeline, nullptr);            m_skinnedPipeline       = VK_NULL_HANDLE; }
     if (m_skinnedPipelineLayout) { vkDestroyPipelineLayout(dev, m_skinnedPipelineLayout, nullptr); m_skinnedPipelineLayout = VK_NULL_HANDLE; }
-}
-
-void Renderer::createSwapchainRenderPass() {
-    VkAttachmentDescription colorAttachment{};
-    colorAttachment.format         = m_swapchain->getImageFormat();
-    colorAttachment.samples        = VK_SAMPLE_COUNT_1_BIT;
-    colorAttachment.loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachment.storeOp        = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachment.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    colorAttachment.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorAttachment.finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-    VkAttachmentReference colorRef{};
-    colorRef.attachment = 0;
-    colorRef.layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    VkSubpassDescription subpass{};
-    subpass.pipelineBindPoint    = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments    = &colorRef;
-
-    VkSubpassDependency dependency{};
-    dependency.srcSubpass    = VK_SUBPASS_EXTERNAL;
-    dependency.dstSubpass    = 0;
-    dependency.srcStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.srcAccessMask = 0;
-    dependency.dstStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-    VkRenderPassCreateInfo ci{};
-    ci.sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    ci.attachmentCount = 1;
-    ci.pAttachments    = &colorAttachment;
-    ci.subpassCount    = 1;
-    ci.pSubpasses      = &subpass;
-    ci.dependencyCount = 1;
-    ci.pDependencies   = &dependency;
-
-    VK_CHECK(vkCreateRenderPass(m_device->getDevice(), &ci, nullptr, &m_swapchainRenderPass),
-             "Failed to create swapchain render pass");
-}
-
-void Renderer::destroySwapchainRenderPass() {
-    if (m_swapchainRenderPass) {
-        vkDestroyRenderPass(m_device->getDevice(), m_swapchainRenderPass, nullptr);
-        m_swapchainRenderPass = VK_NULL_HANDLE;
-    }
-}
-
-void Renderer::createSwapchainFramebuffers() {
-    const auto& views = m_swapchain->getImageViews();
-    m_swapchainFramebuffers.resize(views.size());
-
-    for (size_t i = 0; i < views.size(); ++i) {
-        VkFramebufferCreateInfo ci{};
-        ci.sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        ci.renderPass      = m_swapchainRenderPass;
-        ci.attachmentCount = 1;
-        ci.pAttachments    = &views[i];
-        ci.width           = m_swapchain->getExtent().width;
-        ci.height          = m_swapchain->getExtent().height;
-        ci.layers          = 1;
-
-        VK_CHECK(vkCreateFramebuffer(m_device->getDevice(), &ci, nullptr, &m_swapchainFramebuffers[i]),
-                 "Failed to create swapchain framebuffer");
-    }
-}
-
-void Renderer::destroySwapchainFramebuffers() {
-    for (auto fb : m_swapchainFramebuffers) {
-        vkDestroyFramebuffer(m_device->getDevice(), fb, nullptr);
-    }
-    m_swapchainFramebuffers.clear();
 }
 
 void Renderer::drawLauncherUI() {

@@ -2,6 +2,7 @@
 
 #include "renderer/Device.h"
 #include "renderer/Image.h"
+#include "renderer/RenderFormats.h"
 
 #include <vulkan/vulkan.h>
 #include <vector>
@@ -29,8 +30,6 @@ private:
 
     // Ping-pong images for blur (half resolution)
     std::vector<Image> m_blurImages;
-    VkRenderPass m_renderPass = VK_NULL_HANDLE;
-    std::vector<VkFramebuffer> m_framebuffers;
 
     VkDescriptorSetLayout m_descriptorSetLayout = VK_NULL_HANDLE;
     VkDescriptorPool m_descriptorPool = VK_NULL_HANDLE;
@@ -52,12 +51,10 @@ private:
     };
 
     void createImages();
-    void createRenderPass();
     void createDescriptorSetLayout();
     void createPipelines();
     void createDescriptorPool();
     void createDescriptorSets();
-    void createFramebuffers();
 
     VkShaderModule createShaderModule(const std::vector<char>& code);
 };

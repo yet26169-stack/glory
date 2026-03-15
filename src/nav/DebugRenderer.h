@@ -1,6 +1,7 @@
 #pragma once
 
 #include "renderer/Buffer.h"
+#include "renderer/RenderFormats.h"
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.h>
 #include <vector>
@@ -20,7 +21,7 @@ public:
   DebugRenderer() = default;
   ~DebugRenderer();
 
-  void init(const Device &device, VkRenderPass renderPass);
+  void init(const Device &device, const RenderFormats &formats);
   void cleanup();
 
   // ── Draw commands (call during update) ──────────────────────────────
@@ -61,7 +62,7 @@ private:
   VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
 
   void ensureCapacity(size_t needed);
-  void createPipeline(const Device &device, VkRenderPass renderPass);
+  void createPipeline(const Device &device, const RenderFormats &formats);
 
   VkShaderModule createShaderModule(VkDevice device,
                                     const std::string &filepath) const;

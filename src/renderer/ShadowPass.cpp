@@ -1,5 +1,6 @@
 #include "renderer/ShadowPass.h"
 #include "renderer/Descriptors.h"
+#include "renderer/RenderFormats.h"
 #include "renderer/VkCheck.h"
 #include "renderer/Buffer.h"
 
@@ -41,8 +42,6 @@ void ShadowPass::init(const Device& device, VkDescriptorSetLayout mainLayout) {
     m_device = &device;
     createAtlasImage();
     createSampler();
-    createRenderPass();
-    createFramebuffer();
     createPipelines(mainLayout);
     spdlog::info("ShadowPass initialized ({}×{}, {} cascades)",
                  SHADOW_MAP_SIZE * CASCADE_COUNT, SHADOW_MAP_SIZE, CASCADE_COUNT);
@@ -55,8 +54,6 @@ void ShadowPass::destroy() {
     if (m_staticPipeline)  vkDestroyPipeline(dev, m_staticPipeline, nullptr);
     if (m_skinnedPipeline) vkDestroyPipeline(dev, m_skinnedPipeline, nullptr);
     if (m_pipelineLayout)  vkDestroyPipelineLayout(dev, m_pipelineLayout, nullptr);
-    if (m_framebuffer)     vkDestroyFramebuffer(dev, m_framebuffer, nullptr);
-    if (m_renderPass)      vkDestroyRenderPass(dev, m_renderPass, nullptr);
     if (m_sampler)         vkDestroySampler(dev, m_sampler, nullptr);
     if (m_atlasView)       vkDestroyImageView(dev, m_atlasView, nullptr);
     if (m_atlasImage) {
@@ -157,17 +154,32 @@ void ShadowPass::updateCascades(const glm::mat4& view, const glm::mat4& proj,
 void ShadowPass::recordCommands(VkCommandBuffer cmd,
                                 DrawFn staticDrawFn,
                                 DrawFn skinnedDrawFn) {
-    VkClearValue clear{};
-    clear.depthStencil = {1.0f, 0};
+    // Transition atlas from UNDEFINED to DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+    VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+    barrier.oldLayout     = VK_IMAGE_LAYOUT_UNDEFINED;
+    barrier.newLayout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    barrier.srcAccessMask = 0;
+    barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    barrier.image         = m_atlasImage;
+    barrier.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+    vkCmdPipelineBarrier(cmd,
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+        0, 0, nullptr, 0, nullptr, 1, &barrier);
 
-    VkRenderPassBeginInfo rpBegin{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
-    rpBegin.renderPass  = m_renderPass;
-    rpBegin.framebuffer = m_framebuffer;
-    rpBegin.renderArea  = {{0, 0}, {SHADOW_MAP_SIZE * CASCADE_COUNT, SHADOW_MAP_SIZE}};
-    rpBegin.clearValueCount = 1;
-    rpBegin.pClearValues    = &clear;
+    VkRenderingAttachmentInfo depthAttach{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+    depthAttach.imageView   = m_atlasView;
+    depthAttach.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    depthAttach.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthAttach.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
+    depthAttach.clearValue.depthStencil = {1.0f, 0};
 
-    vkCmdBeginRenderPass(cmd, &rpBegin, VK_SUBPASS_CONTENTS_INLINE);
+    VkRenderingInfo renderInfo{VK_STRUCTURE_TYPE_RENDERING_INFO};
+    renderInfo.renderArea        = {{0, 0}, {SHADOW_MAP_SIZE * CASCADE_COUNT, SHADOW_MAP_SIZE}};
+    renderInfo.layerCount        = 1;
+    renderInfo.pDepthAttachment  = &depthAttach;
+
+    vkCmdBeginRendering(cmd, &renderInfo);
 
     for (uint32_t c = 0; c < CASCADE_COUNT; ++c) {
         // Set viewport/scissor to this cascade's tile
@@ -202,7 +214,17 @@ void ShadowPass::recordCommands(VkCommandBuffer cmd,
         }
     }
 
-    vkCmdEndRenderPass(cmd);
+    vkCmdEndRendering(cmd);
+
+    // Transition atlas to SHADER_READ_ONLY_OPTIMAL for sampling in main pass
+    barrier.oldLayout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    barrier.newLayout     = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    vkCmdPipelineBarrier(cmd,
+        VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        0, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 
 // ── descriptor binding ──────────────────────────────────────────────────────
@@ -264,68 +286,6 @@ void ShadowPass::createSampler() {
              "Failed to create shadow sampler");
 }
 
-void ShadowPass::createRenderPass() {
-    VkAttachmentDescription depthAttach{};
-    depthAttach.format         = DEPTH_FORMAT;
-    depthAttach.samples        = VK_SAMPLE_COUNT_1_BIT;
-    depthAttach.loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depthAttach.storeOp        = VK_ATTACHMENT_STORE_OP_STORE;
-    depthAttach.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    depthAttach.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttach.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
-    depthAttach.finalLayout    = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-    VkAttachmentReference depthRef{};
-    depthRef.attachment = 0;
-    depthRef.layout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    VkSubpassDescription subpass{};
-    subpass.pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount    = 0;
-    subpass.pDepthStencilAttachment = &depthRef;
-
-    // Dependency: external → depth write, then depth write → fragment read
-    std::array<VkSubpassDependency, 2> deps{};
-    deps[0].srcSubpass    = VK_SUBPASS_EXTERNAL;
-    deps[0].dstSubpass    = 0;
-    deps[0].srcStageMask  = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    deps[0].dstStageMask  = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    deps[0].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    deps[0].dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-    deps[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-
-    deps[1].srcSubpass    = 0;
-    deps[1].dstSubpass    = VK_SUBPASS_EXTERNAL;
-    deps[1].srcStageMask  = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-    deps[1].dstStageMask  = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    deps[1].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-    deps[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    deps[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-
-    VkRenderPassCreateInfo rpCI{VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};
-    rpCI.attachmentCount = 1;
-    rpCI.pAttachments    = &depthAttach;
-    rpCI.subpassCount    = 1;
-    rpCI.pSubpasses      = &subpass;
-    rpCI.dependencyCount = static_cast<uint32_t>(deps.size());
-    rpCI.pDependencies   = deps.data();
-
-    VK_CHECK(vkCreateRenderPass(m_device->getDevice(), &rpCI, nullptr, &m_renderPass),
-             "Failed to create shadow render pass");
-}
-
-void ShadowPass::createFramebuffer() {
-    VkFramebufferCreateInfo fbCI{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
-    fbCI.renderPass      = m_renderPass;
-    fbCI.attachmentCount = 1;
-    fbCI.pAttachments    = &m_atlasView;
-    fbCI.width           = SHADOW_MAP_SIZE * CASCADE_COUNT;
-    fbCI.height          = SHADOW_MAP_SIZE;
-    fbCI.layers          = 1;
-
-    VK_CHECK(vkCreateFramebuffer(m_device->getDevice(), &fbCI, nullptr, &m_framebuffer),
-             "Failed to create shadow framebuffer");
-}
 
 void ShadowPass::createPipelines(VkDescriptorSetLayout mainLayout) {
     VkDevice dev = m_device->getDevice();
@@ -412,7 +372,11 @@ void ShadowPass::createPipelines(VkDescriptorSetLayout mainLayout) {
         viState.vertexAttributeDescriptionCount = static_cast<uint32_t>(attribs.size());
         viState.pVertexAttributeDescriptions    = attribs.data();
 
+        RenderFormats shadowFmts = RenderFormats::depthOnly(DEPTH_FORMAT);
+        VkPipelineRenderingCreateInfo dynCI = shadowFmts.pipelineRenderingCI();
+
         VkGraphicsPipelineCreateInfo ci{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
+        ci.pNext               = &dynCI;
         ci.stageCount          = 1; // vertex only
         ci.pStages             = &vertStage;
         ci.pVertexInputState   = &viState;
@@ -424,8 +388,7 @@ void ShadowPass::createPipelines(VkDescriptorSetLayout mainLayout) {
         ci.pColorBlendState    = &cbState;
         ci.pDynamicState       = &dynState;
         ci.layout              = m_pipelineLayout;
-        ci.renderPass          = m_renderPass;
-        ci.subpass             = 0;
+        ci.renderPass          = VK_NULL_HANDLE;
 
         VK_CHECK(vkCreateGraphicsPipelines(dev, VK_NULL_HANDLE, 1, &ci, nullptr, &m_staticPipeline),
                  "Failed to create static shadow pipeline");
@@ -463,7 +426,11 @@ void ShadowPass::createPipelines(VkDescriptorSetLayout mainLayout) {
         viState.vertexAttributeDescriptionCount = static_cast<uint32_t>(attribs.size());
         viState.pVertexAttributeDescriptions    = attribs.data();
 
+        RenderFormats skinnedShadowFmts = RenderFormats::depthOnly(DEPTH_FORMAT);
+        VkPipelineRenderingCreateInfo skinnedDynCI = skinnedShadowFmts.pipelineRenderingCI();
+
         VkGraphicsPipelineCreateInfo ci{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
+        ci.pNext               = &skinnedDynCI;
         ci.stageCount          = 1;
         ci.pStages             = &vertStage;
         ci.pVertexInputState   = &viState;
@@ -475,8 +442,7 @@ void ShadowPass::createPipelines(VkDescriptorSetLayout mainLayout) {
         ci.pColorBlendState    = &cbState;
         ci.pDynamicState       = &dynState;
         ci.layout              = m_pipelineLayout;
-        ci.renderPass          = m_renderPass;
-        ci.subpass             = 0;
+        ci.renderPass          = VK_NULL_HANDLE;
 
         VK_CHECK(vkCreateGraphicsPipelines(dev, VK_NULL_HANDLE, 1, &ci, nullptr, &m_skinnedPipeline),
                  "Failed to create skinned shadow pipeline");

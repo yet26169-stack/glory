@@ -1,6 +1,7 @@
 #include "renderer/Pipeline.h"
 #include "renderer/Buffer.h"
 #include "renderer/Device.h"
+#include "renderer/RenderFormats.h"
 #include "renderer/Swapchain.h"
 #include "renderer/VkCheck.h"
 
@@ -13,22 +14,10 @@ namespace glory {
 
 Pipeline::Pipeline(const Device& device, const Swapchain& swapchain,
                    VkDescriptorSetLayout descriptorSetLayout,
-                   VkRenderPass externalRenderPass)
-    : m_device(device)
+                   const RenderFormats& formats)
+    : m_device(device), m_formats(formats)
 {
-    m_depthFormat = m_device.findDepthFormat();
-    if (externalRenderPass != VK_NULL_HANDLE) {
-        m_renderPass = externalRenderPass;
-        m_ownsRenderPass = false;
-    } else {
-        createRenderPass(swapchain.getImageFormat());
-        m_ownsRenderPass = true;
-    }
     createGraphicsPipeline(swapchain.getExtent(), descriptorSetLayout);
-    if (m_ownsRenderPass) {
-        createDepthResources(swapchain);
-        createFramebuffers(swapchain);
-    }
 }
 
 Pipeline::~Pipeline() { cleanup(); }
@@ -37,90 +26,14 @@ void Pipeline::cleanup() {
     if (m_cleaned) return;
     m_cleaned = true;
 
-    destroyFramebuffers();
-    m_depthImage = Image{};
-
     if (m_graphicsPipeline != VK_NULL_HANDLE)
         vkDestroyPipeline(m_device.getDevice(), m_graphicsPipeline, nullptr);
     if (m_wireframePipeline != VK_NULL_HANDLE)
         vkDestroyPipeline(m_device.getDevice(), m_wireframePipeline, nullptr);
     if (m_pipelineLayout != VK_NULL_HANDLE)
         vkDestroyPipelineLayout(m_device.getDevice(), m_pipelineLayout, nullptr);
-    if (m_ownsRenderPass && m_renderPass != VK_NULL_HANDLE)
-        vkDestroyRenderPass(m_device.getDevice(), m_renderPass, nullptr);
 
     spdlog::info("Pipeline resources destroyed");
-}
-
-void Pipeline::recreateFramebuffers(const Swapchain& swapchain) {
-    if (!m_ownsRenderPass) return; // framebuffers managed externally
-    destroyFramebuffers();
-    m_depthImage = Image{};
-    createDepthResources(swapchain);
-    createFramebuffers(swapchain);
-}
-
-// ── Render pass ─────────────────────────────────────────────────────────────
-void Pipeline::createRenderPass(VkFormat imageFormat) {
-    VkAttachmentDescription colorAttachment{};
-    colorAttachment.format         = imageFormat;
-    colorAttachment.samples        = VK_SAMPLE_COUNT_1_BIT;
-    colorAttachment.loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachment.storeOp        = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachment.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    colorAttachment.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorAttachment.finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-    VkAttachmentDescription depthAttachment{};
-    depthAttachment.format         = m_depthFormat;
-    depthAttachment.samples        = VK_SAMPLE_COUNT_1_BIT;
-    depthAttachment.loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depthAttachment.storeOp        = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
-    depthAttachment.finalLayout    = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    VkAttachmentReference colorRef{};
-    colorRef.attachment = 0;
-    colorRef.layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    VkAttachmentReference depthRef{};
-    depthRef.attachment = 1;
-    depthRef.layout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    VkSubpassDescription subpass{};
-    subpass.pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount    = 1;
-    subpass.pColorAttachments       = &colorRef;
-    subpass.pDepthStencilAttachment = &depthRef;
-
-    VkSubpassDependency dependency{};
-    dependency.srcSubpass    = VK_SUBPASS_EXTERNAL;
-    dependency.dstSubpass    = 0;
-    dependency.srcStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
-                               VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    dependency.srcAccessMask = 0;
-    dependency.dstStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
-                               VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
-                               VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-
-    std::array<VkAttachmentDescription, 2> attachments = { colorAttachment, depthAttachment };
-
-    VkRenderPassCreateInfo ci{};
-    ci.sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    ci.attachmentCount = static_cast<uint32_t>(attachments.size());
-    ci.pAttachments    = attachments.data();
-    ci.subpassCount    = 1;
-    ci.pSubpasses      = &subpass;
-    ci.dependencyCount = 1;
-    ci.pDependencies   = &dependency;
-
-    VK_CHECK(vkCreateRenderPass(m_device.getDevice(), &ci, nullptr, &m_renderPass),
-             "Failed to create render pass");
-    spdlog::info("Render pass created (with depth)");
 }
 
 // ── Graphics pipeline ───────────────────────────────────────────────────────
@@ -230,8 +143,11 @@ void Pipeline::createGraphicsPipeline(VkExtent2D /*extent*/,
     VK_CHECK(vkCreatePipelineLayout(m_device.getDevice(), &layoutCI, nullptr, &m_pipelineLayout),
              "Failed to create pipeline layout");
 
+    VkPipelineRenderingCreateInfo dynCI = m_formats.pipelineRenderingCI();
+
     VkGraphicsPipelineCreateInfo pipelineCI{};
     pipelineCI.sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineCI.pNext               = &dynCI;
     pipelineCI.stageCount          = 2;
     pipelineCI.pStages             = stages;
     pipelineCI.pVertexInputState   = &vertexInput;
@@ -243,8 +159,7 @@ void Pipeline::createGraphicsPipeline(VkExtent2D /*extent*/,
     pipelineCI.pColorBlendState    = &colorBlend;
     pipelineCI.pDynamicState       = &dynState;
     pipelineCI.layout              = m_pipelineLayout;
-    pipelineCI.renderPass          = m_renderPass;
-    pipelineCI.subpass             = 0;
+    pipelineCI.renderPass          = VK_NULL_HANDLE;
 
     VK_CHECK(vkCreateGraphicsPipelines(m_device.getDevice(), VK_NULL_HANDLE,
                                        1, &pipelineCI, nullptr, &m_graphicsPipeline),
@@ -264,50 +179,6 @@ void Pipeline::createGraphicsPipeline(VkExtent2D /*extent*/,
     vkDestroyShaderModule(m_device.getDevice(), vertModule, nullptr);
 
     spdlog::info("Graphics pipeline created");
-}
-
-// ── Depth resources ─────────────────────────────────────────────────────────
-void Pipeline::createDepthResources(const Swapchain& swapchain) {
-    m_depthImage = Image(
-        m_device,
-        swapchain.getExtent().width,
-        swapchain.getExtent().height,
-        m_depthFormat,
-        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-        VK_IMAGE_ASPECT_DEPTH_BIT);
-    spdlog::trace("Depth image created (format {})", static_cast<int>(m_depthFormat));
-}
-
-// ── Framebuffers ────────────────────────────────────────────────────────────
-void Pipeline::createFramebuffers(const Swapchain& swapchain) {
-    const auto& views = swapchain.getImageViews();
-    m_framebuffers.resize(views.size());
-
-    for (size_t i = 0; i < views.size(); ++i) {
-        std::array<VkImageView, 2> attachments = {
-            views[i], m_depthImage.getImageView()
-        };
-
-        VkFramebufferCreateInfo ci{};
-        ci.sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        ci.renderPass      = m_renderPass;
-        ci.attachmentCount = static_cast<uint32_t>(attachments.size());
-        ci.pAttachments    = attachments.data();
-        ci.width           = swapchain.getExtent().width;
-        ci.height          = swapchain.getExtent().height;
-        ci.layers          = 1;
-
-        VK_CHECK(vkCreateFramebuffer(m_device.getDevice(), &ci, nullptr, &m_framebuffers[i]),
-                 "Failed to create framebuffer");
-    }
-    spdlog::trace("{} framebuffers created", m_framebuffers.size());
-}
-
-void Pipeline::destroyFramebuffers() {
-    for (auto fb : m_framebuffers)
-        if (fb != VK_NULL_HANDLE)
-            vkDestroyFramebuffer(m_device.getDevice(), fb, nullptr);
-    m_framebuffers.clear();
 }
 
 // ── Shader helpers ──────────────────────────────────────────────────────────

@@ -4,6 +4,7 @@
 #include "renderer/Image.h"
 #include "renderer/Buffer.h"
 #include "renderer/Frustum.h"
+#include "renderer/RenderFormats.h"
 
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
@@ -36,15 +37,11 @@ public:
     void destroy();
 
     // Compute cascade matrices from the camera's view/projection.
-    // lightDir: normalized world-space direction the light shines FROM (e.g. sun direction).
     void updateCascades(const glm::mat4& view, const glm::mat4& proj,
                         const glm::vec3& lightDir,
                         float nearClip, float farClip);
 
-    // Record shadow depth rendering commands into cmd.
-    // Caller must have already bound vertex/index/instance buffers.
-    // staticDrawFn: called per cascade with (cmd, cascadeIndex) — draws static meshes
-    // skinnedDrawFn: called per cascade with (cmd, cascadeIndex) — draws skinned meshes
+    // Record shadow depth rendering commands using dynamic rendering.
     using DrawFn = std::function<void(VkCommandBuffer, uint32_t cascadeIndex)>;
     void recordCommands(VkCommandBuffer cmd,
                         DrawFn staticDrawFn,
@@ -56,7 +53,7 @@ public:
     // Per-cascade data for the main-pass shader
     struct CascadeData {
         glm::mat4 lightViewProj;
-        float splitDepth; // view-space far distance for this cascade
+        float splitDepth;
     };
     const std::array<CascadeData, CASCADE_COUNT>& getCascades() const { return m_cascades; }
 
@@ -77,10 +74,6 @@ private:
     VkImageView   m_atlasView  = VK_NULL_HANDLE;
     VkSampler     m_sampler    = VK_NULL_HANDLE;
 
-    // Depth-only render pass + framebuffer
-    VkRenderPass  m_renderPass  = VK_NULL_HANDLE;
-    VkFramebuffer m_framebuffer = VK_NULL_HANDLE;
-
     // Pipelines (depth-only, with push constants for lightViewProj)
     VkPipelineLayout m_pipelineLayout    = VK_NULL_HANDLE;
     VkPipeline       m_staticPipeline    = VK_NULL_HANDLE;
@@ -91,8 +84,6 @@ private:
 
     void createAtlasImage();
     void createSampler();
-    void createRenderPass();
-    void createFramebuffer();
     void createPipelines(VkDescriptorSetLayout mainLayout);
 };
 

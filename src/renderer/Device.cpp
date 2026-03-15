@@ -234,9 +234,17 @@ void Device::createLogicalDevice() {
     vk12Features.runtimeDescriptorArray =
         available12.runtimeDescriptorArray;
 
+    // Vulkan 1.3 features — dynamic rendering, synchronization2, maintenance4
+    VkPhysicalDeviceVulkan13Features vk13Features{};
+    vk13Features.sType              = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+    vk13Features.pNext              = &vk12Features;   // chain 1.2 after 1.3
+    vk13Features.dynamicRendering   = VK_TRUE;
+    vk13Features.synchronization2   = VK_TRUE;
+    vk13Features.maintenance4       = VK_TRUE;
+
     VkDeviceCreateInfo ci{};
     ci.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    ci.pNext                   = &vk12Features;
+    ci.pNext                   = &vk13Features;        // 1.3 → 1.2 chain
     ci.queueCreateInfoCount    = static_cast<uint32_t>(queueCIs.size());
     ci.pQueueCreateInfos       = queueCIs.data();
     ci.pEnabledFeatures        = &features;

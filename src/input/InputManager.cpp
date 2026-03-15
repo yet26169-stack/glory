@@ -26,6 +26,7 @@ bool InputManager::wasRPressed()  { bool p = m_rPressed;  m_rPressed  = false; r
 bool InputManager::wasRightClicked() { bool p = m_rightClicked; m_rightClicked = false; return p; }
 bool InputManager::wasLeftClicked()  { bool p = m_leftClicked;  m_leftClicked  = false; return p; }
 bool InputManager::wasTabPressed()   { bool p = m_tabPressed;   m_tabPressed   = false; return p; }
+bool InputManager::wasF3Pressed()    { bool p = m_f3Pressed;    m_f3Pressed    = false; return p; }
 bool InputManager::wasAPressed()     { bool p = m_aPressed;     m_aPressed     = false; return p; }
 bool InputManager::wasDPressed()     { bool p = m_dPressed;     m_dPressed     = false; return p; }
 bool InputManager::wasSPressed()     { bool p = m_sPressed;     m_sPressed     = false; return p; }
@@ -44,6 +45,7 @@ void InputManager::keyCallback(GLFWwindow* window, int key, int scancode, int ac
   if (key == GLFW_KEY_E   && action == GLFW_PRESS) s_activeInput->m_ePressed  = true;
   if (key == GLFW_KEY_R   && action == GLFW_PRESS) s_activeInput->m_rPressed  = true;
   if (key == GLFW_KEY_TAB && action == GLFW_PRESS) s_activeInput->m_tabPressed = true;
+  if (key == GLFW_KEY_F3  && action == GLFW_PRESS) s_activeInput->m_f3Pressed  = true;
   if (key == GLFW_KEY_A   && action == GLFW_PRESS) s_activeInput->m_aPressed  = true;
   if (key == GLFW_KEY_D   && action == GLFW_PRESS) s_activeInput->m_dPressed  = true;
   if (key == GLFW_KEY_S   && action == GLFW_PRESS) {
