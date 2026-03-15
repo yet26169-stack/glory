@@ -133,7 +133,7 @@ void Descriptors::writeFogOfWar(VkImageView view, VkSampler sampler) {
 
 // ── Private ─────────────────────────────────────────────────────────────────
 void Descriptors::createLayout() {
-    std::array<VkDescriptorSetLayoutBinding, 6> bindings{};
+    std::array<VkDescriptorSetLayoutBinding, 7> bindings{};
 
     // binding 0: UBO (vertex + fragment)
     bindings[0].binding         = 0;
@@ -171,15 +171,22 @@ void Descriptors::createLayout() {
     bindings[5].descriptorCount = 1;
     bindings[5].stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
 
+    // binding 7: per-object scene buffer SSBO (GPU-driven indirect rendering)
+    bindings[6].binding         = 7;
+    bindings[6].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    bindings[6].descriptorCount = 1;
+    bindings[6].stageFlags      = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
     // Binding flags — UPDATE_AFTER_BIND for image bindings that are written
     // at load time and may be updated while sets are bound.
-    std::array<VkDescriptorBindingFlags, 6> bindingFlags{};
+    std::array<VkDescriptorBindingFlags, 7> bindingFlags{};
     bindingFlags[0] = 0;  // UBO
     bindingFlags[1] = 0;  // LightUBO
     bindingFlags[2] = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;  // shadow
     bindingFlags[3] = 0;  // bones
     bindingFlags[4] = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;  // toon ramp
     bindingFlags[5] = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;  // FoW
+    bindingFlags[6] = 0;  // scene buffer (written per-frame before draw)
 
     VkDescriptorSetLayoutBindingFlagsCreateInfo flagsCI{};
     flagsCI.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
@@ -195,7 +202,7 @@ void Descriptors::createLayout() {
 
     VK_CHECK(vkCreateDescriptorSetLayout(m_device.getDevice(), &ci, nullptr, &m_layout),
              "Failed to create descriptor set layout");
-    spdlog::info("Descriptor set layout created (set 0: UBO, LightUBO, shadow, bones, toon, FoW)");
+    spdlog::info("Descriptor set layout created (set 0: UBO, LightUBO, shadow, bones, toon, FoW, scene)");
 }
 
 void Descriptors::createUniformBuffers(uint32_t frameCount) {
@@ -239,7 +246,7 @@ void Descriptors::createPool(uint32_t frameCount) {
     poolSizes[1].type            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     poolSizes[1].descriptorCount = frameCount * 3; // shadow map + toon ramp + FoW
     poolSizes[2].type            = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    poolSizes[2].descriptorCount = frameCount; // bone SSBO per frame
+    poolSizes[2].descriptorCount = frameCount * 2; // bone SSBO + scene buffer SSBO per frame
 
     VkDescriptorPoolCreateInfo ci{};
     ci.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -312,6 +319,23 @@ void Descriptors::createSets(uint32_t frameCount) {
                                writes.data(), 0, nullptr);
     }
     spdlog::info("{} descriptor sets allocated and written", frameCount);
+}
+
+void Descriptors::writeSceneBuffer(uint32_t frameIndex, VkBuffer buffer, VkDeviceSize range) {
+    VkDescriptorBufferInfo bufInfo{};
+    bufInfo.buffer = buffer;
+    bufInfo.offset = 0;
+    bufInfo.range  = range;
+
+    VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+    write.dstSet          = m_sets[frameIndex];
+    write.dstBinding      = 7;
+    write.dstArrayElement = 0;
+    write.descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    write.descriptorCount = 1;
+    write.pBufferInfo     = &bufInfo;
+
+    vkUpdateDescriptorSets(m_device.getDevice(), 1, &write, 0, nullptr);
 }
 
 } // namespace glory

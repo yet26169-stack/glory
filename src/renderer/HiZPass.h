@@ -84,27 +84,39 @@ public:
     void init(const Device& device, uint32_t maxObjects);
     void destroy();
 
-    // Upload per-object AABB data (call once per frame after scene update).
-    struct ObjectAABB {
-        glm::vec4 aabbMin; // xyz + pad
-        glm::vec4 aabbMax; // xyz + pad
-    };
-    void uploadBounds(uint32_t frameIndex, const std::vector<ObjectAABB>& bounds);
+    // GPU-side cull parameters (std140 layout, written per-frame)
+    struct GpuCullParams {
+        glm::mat4 viewProj;          // 64 bytes
+        glm::vec4 frustumPlanes[6];  // 96 bytes
+        glm::vec4 screenSize;        // 16 bytes  (x=w, y=h, z=1/w, w=1/h)
+        uint32_t  objectCount;       // 4 bytes
+        uint32_t  phase;             // 4 bytes
+        uint32_t  _pad[2];           // 8 bytes  (round to 16-byte std140 alignment)
+    }; // total = 192 bytes
 
-    // Run the cull compute shader. Produces an indirect draw buffer.
-    // hizView/hizSampler: the Hi-Z pyramid to read.
-    // viewProj: current camera's view-projection matrix.
-    // screenWidth/Height: for NDC→pixel calculation.
+    struct CullParams {
+        glm::mat4 viewProj;
+        glm::vec4 frustumPlanes[6];
+        uint32_t  screenWidth;
+        uint32_t  screenHeight;
+        uint32_t  objectCount;
+        uint32_t  phase; // 0 = prev HiZ, 1 = new HiZ (disocclusion)
+    };
+
+    // Dispatch the cull compute shader.
+    // sceneBuffer: the per-object SSBO (same buffer as Descriptors binding 7).
     void dispatch(VkCommandBuffer cmd, uint32_t frameIndex,
+                  VkBuffer sceneBuffer, VkDeviceSize sceneBufferSize,
                   VkImageView hizView, VkSampler hizSampler,
-                  const glm::mat4& viewProj,
-                  uint32_t screenWidth, uint32_t screenHeight);
+                  const CullParams& params);
 
     // The output indirect draw buffer for vkCmdDrawIndexedIndirectCount.
-    VkBuffer getIndirectBuffer(uint32_t frameIndex) const;
+    // Commands start at offset sizeof(uint32_t) (byte 4); drawCount at offset 0.
+    VkBuffer     getIndirectBuffer(uint32_t frameIndex) const;
+    VkDeviceSize getIndirectOffset() const { return sizeof(uint32_t); }
 
-    // The draw count buffer (first uint32_t is the count).
-    VkBuffer getCountBuffer(uint32_t frameIndex) const;
+    VkBuffer     getCountBuffer(uint32_t frameIndex) const;
+    VkDeviceSize getCountOffset()  const { return 0; }
 
     uint32_t getMaxObjects() const { return m_maxObjects; }
 
@@ -114,10 +126,9 @@ private:
 
     // Per-frame resources (double-buffered)
     struct FrameResources {
-        Buffer boundsBuffer;     // ObjectAABB[], CPU→GPU
-        Buffer srcDrawBuffer;    // source DrawIndexedIndirectCommand[]
-        Buffer dstDrawBuffer;    // output compacted DrawIndexedIndirectCommand[]
-        Buffer countBuffer;      // uint32_t drawCount
+        Buffer drawBuffer;       // [uint32_t drawCount, DrawCommand[maxObjects]]
+        Buffer visibilityFlags;  // uint32_t[maxObjects] (phase 0 writes, phase 1 reads)
+        Buffer cullParamsBuffer; // GpuCullParams UBO, CPU→GPU
     };
     std::vector<FrameResources> m_frames;
 

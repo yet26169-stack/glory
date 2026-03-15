@@ -340,15 +340,42 @@ void HiZPass::destroyResources() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// GpuCuller — stub implementation (will be completed when indirect draws
-//             are integrated into the main rendering loop)
+// GpuCuller — GPU frustum + occlusion culling via compute shader
 // ═══════════════════════════════════════════════════════════════════════════
 
 void GpuCuller::init(const Device& device, uint32_t maxObjects) {
-    m_device = &device;
+    m_device     = &device;
     m_maxObjects = maxObjects;
-    spdlog::info("GpuCuller initialized (max {} objects)", maxObjects);
-    // Full implementation deferred until indirect draw integration
+
+    VmaAllocator alloc = device.getAllocator();
+    // Draw command size: uint32_t drawCount + maxObjects * VkDrawIndexedIndirectCommand (20 bytes each)
+    VkDeviceSize drawBufSize = sizeof(uint32_t) + maxObjects * 20;
+    VkDeviceSize visBufSize  = maxObjects * sizeof(uint32_t);
+
+    constexpr uint32_t FRAMES = 2;
+    m_frames.reserve(FRAMES);
+    for (uint32_t i = 0; i < FRAMES; ++i) {
+        FrameResources fr;
+        fr.drawBuffer = Buffer(alloc, drawBufSize,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
+            | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VMA_MEMORY_USAGE_GPU_ONLY);
+
+        fr.visibilityFlags = Buffer(alloc, visBufSize,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VMA_MEMORY_USAGE_GPU_ONLY);
+
+        fr.cullParamsBuffer = Buffer(alloc, sizeof(GpuCullParams),
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+        m_frames.push_back(std::move(fr));
+    }
+
+    createComputePipeline();
+    createDescriptors();
+
+    spdlog::info("GpuCuller initialized (max {} objects, {} frames)", maxObjects, FRAMES);
 }
 
 void GpuCuller::destroy() {
@@ -360,39 +387,249 @@ void GpuCuller::destroy() {
     if (m_descPool)   vkDestroyDescriptorPool(dev, m_descPool, nullptr);
     if (m_descLayout) vkDestroyDescriptorSetLayout(dev, m_descLayout, nullptr);
 
-    m_pipeline = VK_NULL_HANDLE;
+    m_pipeline   = VK_NULL_HANDLE;
     m_pipeLayout = VK_NULL_HANDLE;
-    m_descPool = VK_NULL_HANDLE;
+    m_descPool   = VK_NULL_HANDLE;
     m_descLayout = VK_NULL_HANDLE;
     m_frames.clear();
     m_device = nullptr;
 }
 
-void GpuCuller::uploadBounds(uint32_t /*frameIndex*/, const std::vector<ObjectAABB>& /*bounds*/) {
-    // Stub — full implementation with indirect draw integration
+void GpuCuller::dispatch(VkCommandBuffer cmd, uint32_t frameIndex,
+                         VkBuffer sceneBuffer, VkDeviceSize sceneBufferSize,
+                         VkImageView hizView, VkSampler hizSampler,
+                         const CullParams& params) {
+    auto& fr = m_frames[frameIndex];
+    VkDevice dev = m_device->getDevice();
+
+    // Upload cull params
+    GpuCullParams gpu{};
+    gpu.viewProj = params.viewProj;
+    std::memcpy(gpu.frustumPlanes, params.frustumPlanes, sizeof(gpu.frustumPlanes));
+    gpu.screenSize = glm::vec4(
+        static_cast<float>(params.screenWidth),
+        static_cast<float>(params.screenHeight),
+        1.0f / static_cast<float>(params.screenWidth),
+        1.0f / static_cast<float>(params.screenHeight));
+    gpu.objectCount = params.objectCount;
+    gpu.phase       = params.phase;
+    std::memcpy(fr.cullParamsBuffer.map(), &gpu, sizeof(gpu));
+    fr.cullParamsBuffer.flush();
+
+    // Reset drawCount to 0 (first 4 bytes of drawBuffer)
+    vkCmdFillBuffer(cmd, fr.drawBuffer.getBuffer(), 0, sizeof(uint32_t), 0);
+
+    // If phase 0, also clear visibility flags
+    if (params.phase == 0) {
+        vkCmdFillBuffer(cmd, fr.visibilityFlags.getBuffer(), 0,
+                        m_maxObjects * sizeof(uint32_t), 0);
+    }
+
+    // Barrier: fillBuffer → compute shader read
+    VkMemoryBarrier2 fillBarrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+    fillBarrier.srcStageMask  = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+    fillBarrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    fillBarrier.dstStageMask  = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    fillBarrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT;
+
+    VkDependencyInfo depInfo{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+    depInfo.memoryBarrierCount = 1;
+    depInfo.pMemoryBarriers    = &fillBarrier;
+    vkCmdPipelineBarrier2(cmd, &depInfo);
+
+    // Update descriptor set with current frame's scene buffer and HiZ view
+    VkDescriptorBufferInfo sceneBufInfo{};
+    sceneBufInfo.buffer = sceneBuffer;
+    sceneBufInfo.offset = 0;
+    sceneBufInfo.range  = sceneBufferSize;
+
+    VkDescriptorImageInfo hizInfo{};
+    hizInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    hizInfo.imageView   = hizView;
+    hizInfo.sampler     = hizSampler;
+
+    std::array<VkWriteDescriptorSet, 2> writes{};
+    writes[0] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+    writes[0].dstSet          = m_descSets[frameIndex];
+    writes[0].dstBinding      = 0;
+    writes[0].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    writes[0].descriptorCount = 1;
+    writes[0].pBufferInfo     = &sceneBufInfo;
+
+    writes[1] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+    writes[1].dstSet          = m_descSets[frameIndex];
+    writes[1].dstBinding      = 3;
+    writes[1].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writes[1].descriptorCount = 1;
+    writes[1].pImageInfo      = &hizInfo;
+
+    vkUpdateDescriptorSets(dev, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
+
+    // Dispatch
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipeline);
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipeLayout,
+                            0, 1, &m_descSets[frameIndex], 0, nullptr);
+
+    uint32_t groupCount = (params.objectCount + 63) / 64;
+    vkCmdDispatch(cmd, groupCount, 1, 1);
+
+    // Barrier: compute write → indirect draw read
+    VkMemoryBarrier2 computeBarrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+    computeBarrier.srcStageMask  = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    computeBarrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+    computeBarrier.dstStageMask  = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT
+                                 | VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT;
+    computeBarrier.dstAccessMask = VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT
+                                 | VK_ACCESS_2_SHADER_READ_BIT;
+
+    VkDependencyInfo postDep{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+    postDep.memoryBarrierCount = 1;
+    postDep.pMemoryBarriers    = &computeBarrier;
+    vkCmdPipelineBarrier2(cmd, &postDep);
 }
 
-void GpuCuller::dispatch(VkCommandBuffer /*cmd*/, uint32_t /*frameIndex*/,
-                         VkImageView /*hizView*/, VkSampler /*hizSampler*/,
-                         const glm::mat4& /*viewProj*/,
-                         uint32_t /*screenWidth*/, uint32_t /*screenHeight*/) {
-    // Stub — full implementation with indirect draw integration
+VkBuffer GpuCuller::getIndirectBuffer(uint32_t frameIndex) const {
+    return m_frames[frameIndex].drawBuffer.getBuffer();
 }
 
-VkBuffer GpuCuller::getIndirectBuffer(uint32_t /*frameIndex*/) const {
-    return VK_NULL_HANDLE; // Stub
-}
-
-VkBuffer GpuCuller::getCountBuffer(uint32_t /*frameIndex*/) const {
-    return VK_NULL_HANDLE; // Stub
+VkBuffer GpuCuller::getCountBuffer(uint32_t frameIndex) const {
+    return m_frames[frameIndex].drawBuffer.getBuffer();
 }
 
 void GpuCuller::createComputePipeline() {
-    // Stub — created when indirect draws are integrated
+    VkDevice dev = m_device->getDevice();
+    std::string shaderDir = SHADER_DIR;
+
+    // 5 bindings: scene SSBO, draw SSBO, visibility SSBO, HiZ sampler, cull params UBO
+    std::array<VkDescriptorSetLayoutBinding, 5> bindings{};
+    bindings[0].binding         = 0;
+    bindings[0].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    bindings[0].descriptorCount = 1;
+    bindings[0].stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT;
+
+    bindings[1].binding         = 1;
+    bindings[1].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    bindings[1].descriptorCount = 1;
+    bindings[1].stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT;
+
+    bindings[2].binding         = 2;
+    bindings[2].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    bindings[2].descriptorCount = 1;
+    bindings[2].stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT;
+
+    bindings[3].binding         = 3;
+    bindings[3].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[3].descriptorCount = 1;
+    bindings[3].stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT;
+
+    bindings[4].binding         = 4;
+    bindings[4].descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    bindings[4].descriptorCount = 1;
+    bindings[4].stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT;
+
+    VkDescriptorSetLayoutCreateInfo layoutCI{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+    layoutCI.bindingCount = static_cast<uint32_t>(bindings.size());
+    layoutCI.pBindings    = bindings.data();
+
+    VK_CHECK(vkCreateDescriptorSetLayout(dev, &layoutCI, nullptr, &m_descLayout),
+             "Failed to create GpuCuller descriptor layout");
+
+    // No push constants — all params go via UBO
+    VkPipelineLayoutCreateInfo plCI{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+    plCI.setLayoutCount = 1;
+    plCI.pSetLayouts    = &m_descLayout;
+
+    VK_CHECK(vkCreatePipelineLayout(dev, &plCI, nullptr, &m_pipeLayout),
+             "Failed to create GpuCuller pipeline layout");
+
+    auto compCode = readFile(shaderDir + "/occlusion_cull.comp.spv");
+    VkShaderModule compMod = createShaderModule(dev, compCode);
+
+    VkComputePipelineCreateInfo pipeCI{VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
+    pipeCI.stage.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    pipeCI.stage.stage  = VK_SHADER_STAGE_COMPUTE_BIT;
+    pipeCI.stage.module = compMod;
+    pipeCI.stage.pName  = "main";
+    pipeCI.layout       = m_pipeLayout;
+
+    VK_CHECK(vkCreateComputePipelines(dev, VK_NULL_HANDLE, 1, &pipeCI, nullptr, &m_pipeline),
+             "Failed to create GpuCuller compute pipeline");
+
+    vkDestroyShaderModule(dev, compMod, nullptr);
 }
 
 void GpuCuller::createDescriptors() {
-    // Stub — created when indirect draws are integrated
+    VkDevice dev = m_device->getDevice();
+    uint32_t frameCount = static_cast<uint32_t>(m_frames.size());
+
+    std::array<VkDescriptorPoolSize, 3> poolSizes{};
+    poolSizes[0].type            = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    poolSizes[0].descriptorCount = frameCount * 3; // scene + draw + visibility per frame
+    poolSizes[1].type            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizes[1].descriptorCount = frameCount;     // HiZ per frame
+    poolSizes[2].type            = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSizes[2].descriptorCount = frameCount;     // cull params per frame
+
+    VkDescriptorPoolCreateInfo poolCI{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+    poolCI.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+    poolCI.pPoolSizes    = poolSizes.data();
+    poolCI.maxSets       = frameCount;
+
+    VK_CHECK(vkCreateDescriptorPool(dev, &poolCI, nullptr, &m_descPool),
+             "Failed to create GpuCuller descriptor pool");
+
+    std::vector<VkDescriptorSetLayout> layouts(frameCount, m_descLayout);
+    VkDescriptorSetAllocateInfo allocInfo{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+    allocInfo.descriptorPool     = m_descPool;
+    allocInfo.descriptorSetCount = frameCount;
+    allocInfo.pSetLayouts        = layouts.data();
+
+    m_descSets.resize(frameCount);
+    VK_CHECK(vkAllocateDescriptorSets(dev, &allocInfo, m_descSets.data()),
+             "Failed to allocate GpuCuller descriptor sets");
+
+    // Write static bindings (draw buffer, visibility flags, cull params) — scene & HiZ are updated per-dispatch
+    VkDeviceSize drawBufSize = sizeof(uint32_t) + m_maxObjects * 20;
+    VkDeviceSize visBufSize  = m_maxObjects * sizeof(uint32_t);
+
+    for (uint32_t i = 0; i < frameCount; ++i) {
+        VkDescriptorBufferInfo drawInfo{};
+        drawInfo.buffer = m_frames[i].drawBuffer.getBuffer();
+        drawInfo.range  = drawBufSize;
+
+        VkDescriptorBufferInfo visInfo{};
+        visInfo.buffer = m_frames[i].visibilityFlags.getBuffer();
+        visInfo.range  = visBufSize;
+
+        VkDescriptorBufferInfo paramInfo{};
+        paramInfo.buffer = m_frames[i].cullParamsBuffer.getBuffer();
+        paramInfo.range  = sizeof(GpuCullParams);
+
+        std::array<VkWriteDescriptorSet, 3> writes{};
+
+        writes[0] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+        writes[0].dstSet          = m_descSets[i];
+        writes[0].dstBinding      = 1;
+        writes[0].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        writes[0].descriptorCount = 1;
+        writes[0].pBufferInfo     = &drawInfo;
+
+        writes[1] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+        writes[1].dstSet          = m_descSets[i];
+        writes[1].dstBinding      = 2;
+        writes[1].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        writes[1].descriptorCount = 1;
+        writes[1].pBufferInfo     = &visInfo;
+
+        writes[2] = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+        writes[2].dstSet          = m_descSets[i];
+        writes[2].dstBinding      = 4;
+        writes[2].descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        writes[2].descriptorCount = 1;
+        writes[2].pBufferInfo     = &paramInfo;
+
+        vkUpdateDescriptorSets(dev, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
+    }
 }
 
 } // namespace glory

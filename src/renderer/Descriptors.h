@@ -109,6 +109,8 @@ public:
     void writeToonRamp(VkImageView rampView, VkSampler rampSampler);
     // binding 6: FoW visibility texture (512×512 R8_UNORM, compute output)
     void writeFogOfWar(VkImageView fowView, VkSampler fowSampler);
+    // binding 7: per-frame scene object SSBO (GPU-driven indirect rendering)
+    void writeSceneBuffer(uint32_t frameIndex, VkBuffer buffer, VkDeviceSize range);
 
     VkDescriptorSetLayout getLayout() const { return m_layout; }
     VkDescriptorPool      getPool()   const { return m_pool; }

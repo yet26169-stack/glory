@@ -1,22 +1,31 @@
 #version 450
 
-// GPU occlusion culling compute shader.
-// Tests each object's AABB against the Hi-Z depth pyramid.
-// Visible objects are appended to the indirect draw buffer.
+// GPU occlusion + frustum culling compute shader.
+// Phase 0: Test against previous frame's Hi-Z (before new depth is ready).
+// Phase 1: Re-test previously rejected objects against new Hi-Z (disocclusion).
 
 layout(local_size_x = 64) in;
 
-// Per-object AABB data
-struct ObjectBounds {
-    vec4 aabbMin;  // xyz = world-space min, w = padding
-    vec4 aabbMax;  // xyz = world-space max, w = padding
+// Per-object scene data (matches GpuObjectData on the CPU side)
+struct ObjectData {
+    mat4 model;
+    mat4 normalMatrix;
+    vec4 aabbMin;        // xyz = world-space min
+    vec4 aabbMax;        // xyz = world-space max
+    vec4 tint;
+    vec4 params;
+    vec4 texIndices;
+    uint meshVertexOffset;
+    uint meshIndexOffset;
+    uint meshIndexCount;
+    uint _pad;
 };
 
-layout(std430, binding = 0) readonly buffer BoundsBuffer {
-    ObjectBounds bounds[];
+layout(std430, binding = 0) readonly buffer SceneBuffer {
+    ObjectData objects[];
 };
 
-// Source draw commands (one per object, pre-populated)
+// Output: compacted draw commands for visible objects only
 struct DrawCommand {
     uint indexCount;
     uint instanceCount;
@@ -25,28 +34,46 @@ struct DrawCommand {
     uint firstInstance;
 };
 
-layout(std430, binding = 1) readonly buffer SourceDraws {
-    DrawCommand srcCommands[];
-};
-
-// Output: compacted draw commands for visible objects only
-layout(std430, binding = 2) buffer VisibleDraws {
+layout(std430, binding = 1) buffer VisibleDraws {
     uint drawCount;
     DrawCommand dstCommands[];
+};
+
+// Phase 1 only: visibility flags from phase 0 (1 = was visible, 0 = was rejected)
+layout(std430, binding = 2) buffer VisibilityFlags {
+    uint wasVisible[];
 };
 
 // Hi-Z depth pyramid
 layout(binding = 3) uniform sampler2D hizPyramid;
 
-// Camera matrices
-layout(push_constant) uniform PC {
+// Cull parameters (per-frame, same for all invocations)
+layout(std140, binding = 4) uniform CullParams {
     mat4 viewProj;
-    vec4 screenSize;  // x=width, y=height, z=1/width, w=1/height
-} pc;
+    vec4 frustumPlanes[6]; // xyz = normal, w = distance
+    vec4 screenSize;       // x=width, y=height, z=1/width, w=1/height
+    uint objectCount;
+    uint phase;            // 0 = first pass (prev HiZ), 1 = second pass (new HiZ)
+};
 
-// Project AABB to screen-space rectangle, returning min/max in NDC
+// Frustum test: returns true if AABB is at least partially inside the frustum
+bool frustumTest(vec3 aabbMin, vec3 aabbMax) {
+    for (int i = 0; i < 6; ++i) {
+        vec3 n = frustumPlanes[i].xyz;
+        float d = frustumPlanes[i].w;
+        // P-vertex: the corner of the AABB most in the direction of the plane normal
+        vec3 pVertex = vec3(
+            n.x >= 0.0 ? aabbMax.x : aabbMin.x,
+            n.y >= 0.0 ? aabbMax.y : aabbMin.y,
+            n.z >= 0.0 ? aabbMax.z : aabbMin.z
+        );
+        if (dot(n, pVertex) + d < 0.0) return false;
+    }
+    return true;
+}
+
+// Project AABB to screen-space rectangle
 bool projectAABB(vec3 aabbMin, vec3 aabbMax, out vec2 ssMin, out vec2 ssMax, out float nearZ) {
-    // 8 corners of the AABB
     vec4 corners[8];
     corners[0] = vec4(aabbMin.x, aabbMin.y, aabbMin.z, 1.0);
     corners[1] = vec4(aabbMax.x, aabbMin.y, aabbMin.z, 1.0);
@@ -63,8 +90,8 @@ bool projectAABB(vec3 aabbMin, vec3 aabbMax, out vec2 ssMin, out vec2 ssMax, out
     bool anyInFront = false;
 
     for (int i = 0; i < 8; ++i) {
-        vec4 clip = pc.viewProj * corners[i];
-        if (clip.w <= 0.0) continue; // behind camera
+        vec4 clip = viewProj * corners[i];
+        if (clip.w <= 0.0) continue;
         anyInFront = true;
 
         vec3 ndc = clip.xyz / clip.w;
@@ -75,48 +102,47 @@ bool projectAABB(vec3 aabbMin, vec3 aabbMax, out vec2 ssMin, out vec2 ssMax, out
 
     if (!anyInFront) return false;
 
-    // NDC to UV (0-1)
-    ssMin = ssMin * 0.5 + 0.5;
-    ssMax = ssMax * 0.5 + 0.5;
-
-    // Clamp to screen
-    ssMin = clamp(ssMin, vec2(0.0), vec2(1.0));
-    ssMax = clamp(ssMax, vec2(0.0), vec2(1.0));
-
+    ssMin = clamp(ssMin * 0.5 + 0.5, vec2(0.0), vec2(1.0));
+    ssMax = clamp(ssMax * 0.5 + 0.5, vec2(0.0), vec2(1.0));
     return true;
 }
 
 void main() {
     uint idx = gl_GlobalInvocationID.x;
-    if (idx >= srcCommands.length()) return;
+    if (idx >= objectCount) return;
 
-    vec3 aabbMin = bounds[idx].aabbMin.xyz;
-    vec3 aabbMax = bounds[idx].aabbMax.xyz;
+    // Phase 1: only re-test objects that were rejected in phase 0
+    if (phase == 1u && wasVisible[idx] != 0u) return;
 
+    vec3 bMin = objects[idx].aabbMin.xyz;
+    vec3 bMax = objects[idx].aabbMax.xyz;
+
+    // Frustum cull first (cheap)
+    if (!frustumTest(bMin, bMax)) return;
+
+    // Hi-Z occlusion test
     vec2 ssMin, ssMax;
     float nearZ;
-    if (!projectAABB(aabbMin, aabbMax, ssMin, ssMax, nearZ)) {
-        return; // fully behind camera
-    }
+    if (!projectAABB(bMin, bMax, ssMin, ssMax, nearZ)) return;
 
-    // Compute screen-space rect size in pixels
-    vec2 rectSize = (ssMax - ssMin) * pc.screenSize.xy;
-
-    // Choose mip level based on rect size (larger rect → coarser mip)
+    vec2 rectSize = (ssMax - ssMin) * screenSize.xy;
     float maxDim = max(rectSize.x, rectSize.y);
     if (maxDim < 1.0) maxDim = 1.0;
-    float mipLevel = ceil(log2(maxDim));
-    int mip = int(mipLevel);
-    int maxMip = textureQueryLevels(hizPyramid) - 1;
-    mip = clamp(mip, 0, maxMip);
+    int mip = int(ceil(log2(maxDim)));
+    mip = clamp(mip, 0, textureQueryLevels(hizPyramid) - 1);
 
-    // Sample Hi-Z at the chosen mip level
     vec2 center = (ssMin + ssMax) * 0.5;
     float hizDepth = textureLod(hizPyramid, center, float(mip)).r;
 
-    // Object is visible if its nearest depth is in front of (<=) the Hi-Z depth
     if (nearZ <= hizDepth) {
+        // Phase 0: mark as visible
+        if (phase == 0u) wasVisible[idx] = 1u;
+
         uint outIdx = atomicAdd(drawCount, 1);
-        dstCommands[outIdx] = srcCommands[idx];
+        dstCommands[outIdx].indexCount    = objects[idx].meshIndexCount;
+        dstCommands[outIdx].instanceCount = 1;
+        dstCommands[outIdx].firstIndex    = objects[idx].meshIndexOffset;
+        dstCommands[outIdx].vertexOffset  = int(objects[idx].meshVertexOffset);
+        dstCommands[outIdx].firstInstance = idx;
     }
 }

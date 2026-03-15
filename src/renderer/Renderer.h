@@ -30,6 +30,8 @@
 #include "renderer/Sync.h"
 #include "renderer/Texture.h"
 #include "renderer/ShadowPass.h"
+#include "renderer/HiZPass.h"
+#include "renderer/MegaBuffer.h"
 #include "renderer/GpuTimer.h"
 #include "input/InputManager.h"
 #include "scene/Scene.h"
@@ -110,6 +112,28 @@ private:
     Texture m_dummyShadow; // 1×1 white — bound to shadow-map slot so calcShadow()=1
     Texture m_toonRamp;   // 256×1 R8G8B8A8_UNORM gradient — bound to toon-ramp slot (binding 5)
     ShadowPass m_shadowPass;
+
+    // ── GPU-driven indirect rendering ─────────────────────────────────────
+    struct GpuObjectData {
+        glm::mat4 model;
+        glm::mat4 normalMatrix;
+        glm::vec4 aabbMin;        // xyz = world-space min
+        glm::vec4 aabbMax;        // xyz = world-space max
+        glm::vec4 tint;
+        glm::vec4 params;         // x=shininess, y=metallic, z=roughness, w=emissive
+        glm::vec4 texIndices;     // x=diffuseIdx, y=normalIdx
+        uint32_t  meshVertexOffset;
+        uint32_t  meshIndexOffset;
+        uint32_t  meshIndexCount;
+        uint32_t  _pad;
+    }; // 224 bytes, matches shader ObjectData
+    std::unique_ptr<MegaBuffer>  m_megaBuffer;
+    HiZPass                      m_hizPass;
+    GpuCuller                    m_gpuCuller;
+    std::vector<Buffer>          m_sceneBuffers;     // per-frame GpuObjectData[] SSBO
+    std::vector<void*>           m_sceneMapped;      // CPU-mapped pointers
+    // Per-model, per-submesh MeshHandle for mega-buffer offsets
+    std::vector<std::vector<MeshHandle>> m_meshHandles;
 
     // ── VFX system ────────────────────────────────────────────────────────
     std::unique_ptr<VFXEventQueue> m_vfxQueue;        // SPSC bridge game→render (AbilitySystem)

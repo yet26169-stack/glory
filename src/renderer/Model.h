@@ -119,6 +119,8 @@ public:
   uint32_t getMeshCount() const;
   uint32_t getMeshIndexCount(uint32_t meshIdx) const;
   int getMeshMaterialIndex(uint32_t meshIdx) const;
+  Mesh&       getSubMesh(uint32_t idx)       { return m_meshes[idx]; }
+  const Mesh& getSubMesh(uint32_t idx) const { return m_meshes[idx]; }
 
   Model(const Model &) = delete;
   Model &operator=(const Model &) = delete;

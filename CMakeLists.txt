@@ -181,6 +181,7 @@ set(SOURCES
     src/renderer/HDRFramebuffer.cpp
     src/renderer/ShadowPass.cpp
     src/renderer/HiZPass.cpp
+    src/renderer/MegaBuffer.cpp
     src/renderer/BloomPass.cpp
     src/renderer/ToneMapPass.cpp
     src/renderer/GroundDecalRenderer.cpp

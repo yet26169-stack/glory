@@ -9,18 +9,30 @@ layout(binding = 0) uniform UniformBufferObject {
     vec4 cascadeSplits;
 } ubo;
 
+// Per-object data SSBO (GPU-driven indirect rendering)
+struct ObjectData {
+    mat4 model;
+    mat4 normalMatrix;
+    vec4 aabbMin;
+    vec4 aabbMax;
+    vec4 tint;
+    vec4 params;       // x=shininess, y=metallic, z=roughness, w=emissive
+    vec4 texIndices;   // x=diffuseIdx, y=normalIdx
+    uint meshVertexOffset;
+    uint meshIndexOffset;
+    uint meshIndexCount;
+    uint _pad;
+};
+
+layout(std430, binding = 7) readonly buffer SceneBuffer {
+    ObjectData objects[];
+};
+
 // Per-vertex attributes (binding 0)
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inColor;
 layout(location = 2) in vec3 inNormal;
 layout(location = 3) in vec2 inTexCoord;
-
-// Per-instance attributes (binding 1)
-layout(location = 4)  in mat4 inModel;
-layout(location = 8)  in mat4 inNormalMatrix;
-layout(location = 12) in vec4 inTint;
-layout(location = 13) in vec4 inParams;     // x=shininess, y=metallic, z=roughness, w=emissive
-layout(location = 14) in vec4 inTexIndices;  // x=diffuseIdx, y=normalIdx
 
 layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec2 fragTexCoord;
@@ -38,22 +50,24 @@ layout(location = 12) out vec4 fragLightSpacePos2;
 layout(location = 13) out float fragViewDepth;
 
 void main() {
-    vec4 worldPos = inModel * vec4(inPosition, 1.0);
+    ObjectData obj = objects[gl_InstanceIndex];
+
+    vec4 worldPos = obj.model * vec4(inPosition, 1.0);
     vec4 viewPos  = ubo.view * worldPos;
     gl_Position   = ubo.proj * viewPos;
 
-    fragColor          = inColor * inTint.rgb;
+    fragColor          = inColor * obj.tint.rgb;
     fragTexCoord       = inTexCoord;
     fragWorldPos       = worldPos.xyz;
-    fragWorldNormal    = mat3(inNormalMatrix) * inNormal;
+    fragWorldNormal    = mat3(obj.normalMatrix) * inNormal;
     fragLightSpacePos  = ubo.lightSpaceMatrix  * worldPos;
     fragLightSpacePos1 = ubo.lightSpaceMatrix1 * worldPos;
     fragLightSpacePos2 = ubo.lightSpaceMatrix2 * worldPos;
     fragViewDepth      = -viewPos.z;  // positive linear depth in view space
-    fragShininess      = inParams.x;
-    fragMetallic       = inParams.y;
-    fragRoughness      = inParams.z;
-    fragEmissive       = inParams.w;
-    fragDiffuseIdx     = int(inTexIndices.x);
-    fragNormalIdx      = int(inTexIndices.y);
+    fragShininess      = obj.params.x;
+    fragMetallic       = obj.params.y;
+    fragRoughness      = obj.params.z;
+    fragEmissive       = obj.params.w;
+    fragDiffuseIdx     = int(obj.texIndices.x);
+    fragNormalIdx      = int(obj.texIndices.y);
 }

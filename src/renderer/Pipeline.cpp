@@ -61,23 +61,17 @@ void Pipeline::createGraphicsPipeline(VkExtent2D /*extent*/,
 
     VkPipelineShaderStageCreateInfo stages[] = { vertStage, fragStage };
 
-    // Vertex input — binding 0 (per-vertex) + binding 1 (per-instance)
-    std::array<VkVertexInputBindingDescription, 2> bindingDescs = {
-        Vertex::getBindingDescription(),
-        InstanceData::getBindingDescription()
-    };
+    // Vertex input — binding 0 only (per-vertex).
+    // Per-object data comes from scene buffer SSBO via gl_BaseInstance.
+    auto vertexBinding = Vertex::getBindingDescription();
     auto vertexAttrs   = Vertex::getAttributeDescriptions();
-    auto instanceAttrs = InstanceData::getAttributeDescriptions();
-    std::array<VkVertexInputAttributeDescription, 15> allAttrs{};
-    std::copy(vertexAttrs.begin(), vertexAttrs.end(), allAttrs.begin());
-    std::copy(instanceAttrs.begin(), instanceAttrs.end(), allAttrs.begin() + vertexAttrs.size());
 
     VkPipelineVertexInputStateCreateInfo vertexInput{};
     vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInput.vertexBindingDescriptionCount   = static_cast<uint32_t>(bindingDescs.size());
-    vertexInput.pVertexBindingDescriptions      = bindingDescs.data();
-    vertexInput.vertexAttributeDescriptionCount = static_cast<uint32_t>(allAttrs.size());
-    vertexInput.pVertexAttributeDescriptions    = allAttrs.data();
+    vertexInput.vertexBindingDescriptionCount   = 1;
+    vertexInput.pVertexBindingDescriptions      = &vertexBinding;
+    vertexInput.vertexAttributeDescriptionCount = static_cast<uint32_t>(vertexAttrs.size());
+    vertexInput.pVertexAttributeDescriptions    = vertexAttrs.data();
 
     VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
     inputAssembly.sType    = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;

@@ -181,6 +181,31 @@ Renderer::Renderer(Window& window) : m_window(window) {
     m_isoCam.setBounds(glm::vec3(0, 0, 0), glm::vec3(200, 0, 200));
     m_isoCam.setTarget(glm::vec3(100, 0, 100));
 
+    // ── GPU-driven indirect rendering infrastructure ──
+    {
+        m_megaBuffer = std::make_unique<MegaBuffer>();
+        m_megaBuffer->init(*m_device,
+                           /*vertexCapacity=*/2 * 1024 * 1024,   // 2M vertices (~88 MB)
+                           /*indexCapacity=*/4 * 1024 * 1024);    // 4M indices (~16 MB)
+
+        auto ext = m_window.getExtent();
+        m_hizPass.init(*m_device, ext.width, ext.height);
+        m_gpuCuller.init(*m_device, MAX_INSTANCES);
+
+        // Per-frame scene buffer SSBO
+        VkDeviceSize sceneBufSize = MAX_INSTANCES * sizeof(GpuObjectData);
+        m_sceneBuffers.reserve(Sync::MAX_FRAMES_IN_FLIGHT);
+        m_sceneMapped.reserve(Sync::MAX_FRAMES_IN_FLIGHT);
+        for (uint32_t i = 0; i < Sync::MAX_FRAMES_IN_FLIGHT; ++i) {
+            m_sceneBuffers.emplace_back(
+                m_device->getAllocator(), sceneBufSize,
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                VMA_MEMORY_USAGE_CPU_TO_GPU);
+            m_sceneMapped.push_back(m_sceneBuffers.back().map());
+        }
+        spdlog::info("GPU-driven rendering infrastructure initialized");
+    }
+
     buildScene();
 
     // ── InputManager — MUST be created before ImGui so ImGui chains on top ──
@@ -277,6 +302,15 @@ Renderer::~Renderer() {
 
     m_debugRenderer.cleanup();
     destroyInstanceBuffers();
+
+    // GPU-driven indirect rendering cleanup
+    m_gpuCuller.destroy();
+    m_hizPass.destroy();
+    for (auto& buf : m_sceneBuffers) buf.destroy();
+    m_sceneBuffers.clear();
+    m_sceneMapped.clear();
+    if (m_megaBuffer) { m_megaBuffer->destroy(); m_megaBuffer.reset(); }
+
     destroyGridPipeline();
     destroySkinnedPipeline();
     m_dummyShadow = Texture{};
@@ -1233,7 +1267,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
     vkCmdSetScissor(cmd, 0, 1, &sc);
 
     if (m_state != AppState::Launcher) {
-        // ── Static mesh pass ─────────────────────────────────────────────────
+        // ── Fill scene buffer SSBO and draw via GPU-driven indirect ──────────
         VkPipeline mainPipeline = m_wireframe ? m_pipeline->getWireframePipeline()
                                               : m_pipeline->getGraphicsPipeline();
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline);
@@ -1243,33 +1277,76 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
                                 m_pipeline->getPipelineLayout(), 0, 2, sets, 0, nullptr);
 
         auto* instances = static_cast<InstanceData*>(m_instanceMapped[m_currentFrame]);
+        auto* sceneData = static_cast<GpuObjectData*>(m_sceneMapped[m_currentFrame]);
         uint32_t instanceIndex = 0;
+        uint32_t objectCount   = 0;
 
         auto staticView = m_scene.getRegistry()
             .view<TransformComponent, MeshComponent, MaterialComponent>(
                 entt::exclude<GPUSkinnedMeshComponent>);
         for (auto&& [e, t, mc, mat] : staticView.each()) {
-            if (instanceIndex >= MAX_INSTANCES) break;
+            if (objectCount >= MAX_INSTANCES) break;
+
             glm::mat4 model = t.getInterpolatedModelMatrix(m_renderAlpha);
-            instances[instanceIndex].model        = model;
-            instances[instanceIndex].normalMatrix = glm::transpose(glm::inverse(model));
-
-            // Highlight hovered static entities in red
             glm::vec4 tint(1.0f);
-            if (e == m_hoveredEntity) {
-                tint = glm::vec4(1.0f, 0.4f, 0.4f, 1.0f);
-            }
-            instances[instanceIndex].tint = tint;
+            if (e == m_hoveredEntity) tint = glm::vec4(1.0f, 0.4f, 0.4f, 1.0f);
 
-            instances[instanceIndex].params       = glm::vec4(mat.shininess, mat.metallic, mat.roughness, mat.emissive);
-            instances[instanceIndex].texIndices   = glm::vec4(
+            // Fill instance buffer (still needed for shadow pass)
+            instances[objectCount].model        = model;
+            instances[objectCount].normalMatrix = glm::transpose(glm::inverse(model));
+            instances[objectCount].tint         = tint;
+            instances[objectCount].params       = glm::vec4(mat.shininess, mat.metallic, mat.roughness, mat.emissive);
+            instances[objectCount].texIndices   = glm::vec4(
                 static_cast<float>(mat.materialIndex), static_cast<float>(mat.normalMapIndex), 0.0f, 0.0f);
 
-            VkBuffer     instBuf    = m_instanceBuffers[m_currentFrame].getBuffer();
-            VkDeviceSize instOffset = instanceIndex * sizeof(InstanceData);
-            vkCmdBindVertexBuffers(cmd, 1, 1, &instBuf, &instOffset);
-            m_scene.getMesh(mc.meshIndex).draw(cmd);
-            ++instanceIndex;
+            // Fill scene buffer SSBO for GPU-driven vertex shader
+            uint32_t mi = mc.meshIndex;
+            int32_t  si = mc.subMeshIndex < 0 ? 0 : mc.subMeshIndex;
+            if (mi < m_meshHandles.size() && si < static_cast<int32_t>(m_meshHandles[mi].size())) {
+                const auto& mh = m_meshHandles[mi][si];
+                auto& obj = sceneData[objectCount];
+                obj.model        = model;
+                obj.normalMatrix = glm::transpose(glm::inverse(model));
+                // Transform local AABB to world-space (conservative)
+                AABB worldAABB = mc.localAABB.transformed(model);
+                obj.aabbMin      = glm::vec4(worldAABB.min, 0.0f);
+                obj.aabbMax      = glm::vec4(worldAABB.max, 0.0f);
+                obj.tint         = tint;
+                obj.params       = glm::vec4(mat.shininess, mat.metallic, mat.roughness, mat.emissive);
+                obj.texIndices   = glm::vec4(
+                    static_cast<float>(mat.materialIndex), static_cast<float>(mat.normalMapIndex), 0.0f, 0.0f);
+                obj.meshVertexOffset = mh.vertexOffset;
+                obj.meshIndexOffset  = mh.indexOffset;
+                obj.meshIndexCount   = mh.indexCount;
+                obj._pad = 0;
+            }
+            ++objectCount;
+        }
+        instanceIndex = objectCount;
+
+        // Update scene buffer descriptor
+        if (objectCount > 0) {
+            VkDeviceSize usedSize = objectCount * sizeof(GpuObjectData);
+            m_sceneBuffers[m_currentFrame].flush();
+            m_descriptors->writeSceneBuffer(m_currentFrame,
+                m_sceneBuffers[m_currentFrame].getBuffer(), usedSize);
+        }
+
+        // GPU-driven indirect draw: bind mega-buffer and issue indirect draw
+        if (objectCount > 0 && m_megaBuffer) {
+            m_megaBuffer->bind(cmd);
+
+            // For now use a CPU-side fallback: draw each object individually via
+            // the mega-buffer with firstInstance = objectIndex (for SSBO lookup).
+            // Full GpuCuller dispatch + vkCmdDrawIndexedIndirectCount will be wired
+            // in the two-phase culling step once HiZ is integrated into the frame.
+            for (uint32_t i = 0; i < objectCount; ++i) {
+                vkCmdDrawIndexed(cmd,
+                    sceneData[i].meshIndexCount, 1,
+                    sceneData[i].meshIndexOffset,
+                    static_cast<int32_t>(sceneData[i].meshVertexOffset),
+                    i); // firstInstance = object index for gl_InstanceIndex
+            }
         }
 
         // ── GPU-skinned pass ─────────────────────────────────────────────────
@@ -2180,6 +2257,35 @@ void Renderer::buildScene() {
                               m_descriptors->getLayout(),
                               m_bindless->getLayout(),
                               *m_bindless);
+    }
+
+    // ── Mega-buffer: suballocate all scene meshes ────────────────────────
+    if (m_megaBuffer) {
+        const auto& models = m_scene.getMeshes();
+        m_meshHandles.resize(models.size());
+
+        for (uint32_t mi = 0; mi < static_cast<uint32_t>(models.size()); ++mi) {
+            auto& model = m_scene.getMesh(mi);
+            uint32_t subCount = model.getMeshCount();
+            m_meshHandles[mi].resize(subCount);
+
+            for (uint32_t si = 0; si < subCount; ++si) {
+                auto& mesh = model.getSubMesh(si);
+                const auto& verts = mesh.getCPUVertices();
+                const auto& idxs  = mesh.getCPUIndices();
+                if (!verts.empty() && !idxs.empty()) {
+                    m_meshHandles[mi][si] = m_megaBuffer->suballocate(
+                        verts.data(), static_cast<uint32_t>(verts.size()),
+                        idxs.data(),  static_cast<uint32_t>(idxs.size()));
+                }
+                mesh.releaseCPUData();
+            }
+        }
+
+        // One-shot transfer staging → device-local
+        m_megaBuffer->flush();
+        spdlog::info("Mega-buffer: {} models suballocated",
+                     models.size());
     }
 }
 
