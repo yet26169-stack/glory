@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan.h>
 
+#include <array>
 #include <cstdint>
 #include <vector>
 
@@ -24,20 +25,34 @@ public:
 
     VkCommandBuffer getCommandBuffer(uint32_t frame)            const { return m_commandBuffers[frame]; }
     VkSemaphore     getImageAvailableSemaphore(uint32_t frame)  const { return m_imageAvailable[frame]; }
-    VkFence         getInFlightFence(uint32_t frame)            const { return m_inFlightFences[frame]; }
 
     // Indexed by swapchain image index (not frame index) to avoid
     // reusing a semaphore still held by the presentation engine.
     VkSemaphore     getRenderFinishedSemaphore(uint32_t imageIndex) const { return m_renderFinished[imageIndex]; }
 
+    // ── Timeline semaphore (replaces VkFence for CPU–GPU frame sync) ─────
+    VkSemaphore getTimelineSemaphore() const { return m_timeline; }
+
+    // Block the CPU until the GPU finishes the previous work submitted
+    // for the given frame slot.
+    void     waitForFrame(uint32_t frame);
+
+    // Increment the monotonic counter, record the new value against
+    // this frame slot, and return it (caller passes it to VkSubmitInfo2).
+    uint64_t nextSignalValue(uint32_t frame);
+
 private:
     const Device& m_device;
 
-    VkCommandPool              m_commandPool = VK_NULL_HANDLE;
+    VkCommandPool                m_commandPool = VK_NULL_HANDLE;
     std::vector<VkCommandBuffer> m_commandBuffers;
-    std::vector<VkSemaphore>     m_imageAvailable;
-    std::vector<VkSemaphore>     m_renderFinished;  // per swapchain image
-    std::vector<VkFence>         m_inFlightFences;
+    std::vector<VkSemaphore>     m_imageAvailable;   // binary, per frame-in-flight
+    std::vector<VkSemaphore>     m_renderFinished;   // binary, per swapchain image
+    VkSemaphore                  m_timeline = VK_NULL_HANDLE; // timeline, single
+
+    uint64_t m_timelineCounter = 0;
+    std::array<uint64_t, MAX_FRAMES_IN_FLIGHT> m_timelineValues{};
+
     bool m_cleaned = false;
 
     void createCommandPool();

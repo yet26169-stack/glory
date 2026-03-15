@@ -921,8 +921,7 @@ void Renderer::renderFrame(float alpha) {
 
     // ── GPU: wait + acquire swapchain image ─────────────────────────────────
     VkDevice dev = m_device->getDevice();
-    VkFence fence = m_sync->getInFlightFence(m_currentFrame);
-    vkWaitForFences(dev, 1, &fence, VK_TRUE, UINT64_MAX);
+    m_sync->waitForFrame(m_currentFrame);
 
     uint32_t imageIndex = 0;
     VkSemaphore imgSem = m_sync->getImageAvailableSemaphore(m_currentFrame);
@@ -932,9 +931,7 @@ void Renderer::renderFrame(float alpha) {
     if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
         throw std::runtime_error("Failed to acquire swapchain image");
 
-    vkResetFences(dev, 1, &fence);
-
-    // ── Resolve GPU timer from the COMPLETED frame (fence guarantees it) ──
+    // ── Resolve GPU timer from the COMPLETED frame (timeline guarantees it) ──
     if (m_gpuTimer && m_gpuTimer->isSupported()) {
         m_lastGpuResults = m_gpuTimer->resolve(m_currentFrame);
         m_lastGpuTotalMs = m_gpuTimer->totalMs(m_currentFrame);
@@ -1006,26 +1003,43 @@ void Renderer::renderFrame(float alpha) {
     vkResetCommandBuffer(cmd, 0);
     recordCommandBuffer(cmd, imageIndex, realDt);
 
-    VkSemaphore     waitSems[]   = { imgSem };
-    VkPipelineStageFlags stages[]= { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-    VkSemaphore     sigSems[]    = { m_sync->getRenderFinishedSemaphore(imageIndex) };
+    // ── Submit via Synchronization2 (vkQueueSubmit2 + timeline semaphore) ──
+    uint64_t signalValue = m_sync->nextSignalValue(m_currentFrame);
 
-    VkSubmitInfo si{};
-    si.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    si.waitSemaphoreCount   = 1;
-    si.pWaitSemaphores      = waitSems;
-    si.pWaitDstStageMask    = stages;
-    si.commandBufferCount   = 1;
-    si.pCommandBuffers      = &cmd;
-    si.signalSemaphoreCount = 1;
-    si.pSignalSemaphores    = sigSems;
-    VK_CHECK(vkQueueSubmit(m_device->getGraphicsQueue(), 1, &si, fence), "Queue submit failed");
+    VkSemaphoreSubmitInfo waitSemInfo{VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO};
+    waitSemInfo.semaphore = imgSem;
+    waitSemInfo.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
 
+    VkCommandBufferSubmitInfo cmdBufInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO};
+    cmdBufInfo.commandBuffer = cmd;
+
+    VkSemaphoreSubmitInfo signalSemInfos[2]{};
+    // Binary semaphore for presentation engine
+    signalSemInfos[0]           = {VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO};
+    signalSemInfos[0].semaphore = m_sync->getRenderFinishedSemaphore(imageIndex);
+    signalSemInfos[0].stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    // Timeline semaphore for CPU frame synchronization
+    signalSemInfos[1]           = {VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO};
+    signalSemInfos[1].semaphore = m_sync->getTimelineSemaphore();
+    signalSemInfos[1].value     = signalValue;
+    signalSemInfos[1].stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+
+    VkSubmitInfo2 submitInfo{VK_STRUCTURE_TYPE_SUBMIT_INFO_2};
+    submitInfo.waitSemaphoreInfoCount   = 1;
+    submitInfo.pWaitSemaphoreInfos      = &waitSemInfo;
+    submitInfo.commandBufferInfoCount   = 1;
+    submitInfo.pCommandBufferInfos      = &cmdBufInfo;
+    submitInfo.signalSemaphoreInfoCount = 2;
+    submitInfo.pSignalSemaphoreInfos    = signalSemInfos;
+    VK_CHECK(vkQueueSubmit2(m_device->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE),
+             "Queue submit failed");
+
+    VkSemaphore renderFinished = m_sync->getRenderFinishedSemaphore(imageIndex);
     VkSwapchainKHR swapchains[] = { m_swapchain->getSwapchain() };
     VkPresentInfoKHR pi{};
     pi.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     pi.waitSemaphoreCount = 1;
-    pi.pWaitSemaphores    = sigSems;
+    pi.pWaitSemaphores    = &renderFinished;
     pi.swapchainCount     = 1;
     pi.pSwapchains        = swapchains;
     pi.pImageIndices      = &imageIndex;
@@ -1136,36 +1150,42 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
     // ── Begin HDR render pass (dynamic rendering) ──────────────────────────
     // Transition HDR attachments to attachment-optimal layouts
     {
-        VkImageMemoryBarrier barriers[3]{};
+        VkImageMemoryBarrier2 barriers[3]{};
         // Color attachment
-        barriers[0] = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        barriers[0] = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
+        barriers[0].srcStageMask  = VK_PIPELINE_STAGE_2_NONE;
+        barriers[0].srcAccessMask = VK_ACCESS_2_NONE;
+        barriers[0].dstStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+        barriers[0].dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
         barriers[0].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         barriers[0].newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        barriers[0].srcAccessMask = 0;
-        barriers[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
         barriers[0].image = m_hdrFB->colorImage();
         barriers[0].subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
         // Depth attachment
-        barriers[1] = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        barriers[1] = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
+        barriers[1].srcStageMask  = VK_PIPELINE_STAGE_2_NONE;
+        barriers[1].srcAccessMask = VK_ACCESS_2_NONE;
+        barriers[1].dstStageMask  = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT;
+        barriers[1].dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
         barriers[1].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         barriers[1].newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-        barriers[1].srcAccessMask = 0;
-        barriers[1].dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
         barriers[1].image = m_hdrFB->depthImage();
         barriers[1].subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 0, 1};
         // CharDepth attachment
-        barriers[2] = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        barriers[2] = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
+        barriers[2].srcStageMask  = VK_PIPELINE_STAGE_2_NONE;
+        barriers[2].srcAccessMask = VK_ACCESS_2_NONE;
+        barriers[2].dstStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+        barriers[2].dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
         barriers[2].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         barriers[2].newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        barriers[2].srcAccessMask = 0;
-        barriers[2].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
         barriers[2].image = m_hdrFB->charDepthImage();
         barriers[2].subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
-        vkCmdPipelineBarrier(cmd,
-            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-            0, 0, nullptr, 0, nullptr, 3, barriers);
+        VkDependencyInfo depInfo{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        depInfo.imageMemoryBarrierCount = 3;
+        depInfo.pImageMemoryBarriers    = barriers;
+        vkCmdPipelineBarrier2(cmd, &depInfo);
     }
 
     VkRenderingAttachmentInfo hdrColorAttach{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
@@ -1399,36 +1419,42 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
 
     // ── Transition HDR attachments after main pass ──────────────────────────
     {
-        VkImageMemoryBarrier barriers[3]{};
+        VkImageMemoryBarrier2 barriers[3]{};
         // Color → SHADER_READ_ONLY for bloom sampling / copyColor
-        barriers[0] = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        barriers[0] = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
+        barriers[0].srcStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+        barriers[0].srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+        barriers[0].dstStageMask  = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+        barriers[0].dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
         barriers[0].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         barriers[0].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        barriers[0].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-        barriers[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
         barriers[0].image = m_hdrFB->colorImage();
         barriers[0].subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
         // Depth → DEPTH_STENCIL_READ_ONLY for load pass read-only depth test
-        barriers[1] = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        barriers[1] = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
+        barriers[1].srcStageMask  = VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+        barriers[1].srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        barriers[1].dstStageMask  = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT;
+        barriers[1].dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
         barriers[1].oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
         barriers[1].newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-        barriers[1].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-        barriers[1].dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
         barriers[1].image = m_hdrFB->depthImage();
         barriers[1].subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 0, 1};
         // CharDepth → SHADER_READ_ONLY for inking pass sampling
-        barriers[2] = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        barriers[2] = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
+        barriers[2].srcStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+        barriers[2].srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+        barriers[2].dstStageMask  = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+        barriers[2].dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
         barriers[2].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         barriers[2].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        barriers[2].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-        barriers[2].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
         barriers[2].image = m_hdrFB->charDepthImage();
         barriers[2].subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
-        vkCmdPipelineBarrier(cmd,
-            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-            0, 0, nullptr, 0, nullptr, 3, barriers);
+        VkDependencyInfo depInfo{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        depInfo.imageMemoryBarrierCount = 3;
+        depInfo.pImageMemoryBarriers    = barriers;
+        vkCmdPipelineBarrier2(cmd, &depInfo);
     }
 
     // ── Transparent / VFX pass (LOAD_OP_LOAD, dynamic rendering) ──────────
@@ -1440,17 +1466,20 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
 
         // Transition color back to attachment for load pass writing
         {
-            VkImageMemoryBarrier colorToAttach{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+            VkImageMemoryBarrier2 colorToAttach{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
+            colorToAttach.srcStageMask  = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+            colorToAttach.srcAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_TRANSFER_READ_BIT;
+            colorToAttach.dstStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+            colorToAttach.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT;
             colorToAttach.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             colorToAttach.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-            colorToAttach.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-            colorToAttach.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
             colorToAttach.image = m_hdrFB->colorImage();
             colorToAttach.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-            vkCmdPipelineBarrier(cmd,
-                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
-                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                0, 0, nullptr, 0, nullptr, 1, &colorToAttach);
+
+            VkDependencyInfo depInfo{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+            depInfo.imageMemoryBarrierCount = 1;
+            depInfo.pImageMemoryBarriers    = &colorToAttach;
+            vkCmdPipelineBarrier2(cmd, &depInfo);
         }
 
         // Load pass: color LOAD (preserve geometry), charDepth read-only (inking reads it),
@@ -1574,17 +1603,20 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
 
         // Transition HDR color to SHADER_READ_ONLY for tonemap sampling
         {
-            VkImageMemoryBarrier colorBarrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+            VkImageMemoryBarrier2 colorBarrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
+            colorBarrier.srcStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+            colorBarrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+            colorBarrier.dstStageMask  = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+            colorBarrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
             colorBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
             colorBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            colorBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-            colorBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
             colorBarrier.image = m_hdrFB->colorImage();
             colorBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-            vkCmdPipelineBarrier(cmd,
-                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                0, 0, nullptr, 0, nullptr, 1, &colorBarrier);
+
+            VkDependencyInfo depInfo{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+            depInfo.imageMemoryBarrierCount = 1;
+            depInfo.pImageMemoryBarriers    = &colorBarrier;
+            vkCmdPipelineBarrier2(cmd, &depInfo);
         }
     }
 
@@ -1596,17 +1628,20 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
     // ═══════════ PHASE 4: TONE-MAP TO SWAPCHAIN (dynamic rendering) ═══════════
     // Transition swapchain image to COLOR_ATTACHMENT_OPTIMAL
     {
-        VkImageMemoryBarrier swapBarrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        VkImageMemoryBarrier2 swapBarrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
+        swapBarrier.srcStageMask  = VK_PIPELINE_STAGE_2_NONE;
+        swapBarrier.srcAccessMask = VK_ACCESS_2_NONE;
+        swapBarrier.dstStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+        swapBarrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
         swapBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         swapBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        swapBarrier.srcAccessMask = 0;
-        swapBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
         swapBarrier.image = m_swapchain->getImages()[imageIndex];
         swapBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-        vkCmdPipelineBarrier(cmd,
-            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-            0, 0, nullptr, 0, nullptr, 1, &swapBarrier);
+
+        VkDependencyInfo depInfo{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        depInfo.imageMemoryBarrierCount = 1;
+        depInfo.pImageMemoryBarriers    = &swapBarrier;
+        vkCmdPipelineBarrier2(cmd, &depInfo);
     }
 
     VkRenderingAttachmentInfo swapColorAttach{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
@@ -1636,17 +1671,20 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
 
     // Transition swapchain image to PRESENT_SRC_KHR for presentation
     {
-        VkImageMemoryBarrier presentBarrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        VkImageMemoryBarrier2 presentBarrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
+        presentBarrier.srcStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+        presentBarrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+        presentBarrier.dstStageMask  = VK_PIPELINE_STAGE_2_NONE;
+        presentBarrier.dstAccessMask = VK_ACCESS_2_NONE;
         presentBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         presentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-        presentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-        presentBarrier.dstAccessMask = 0;
         presentBarrier.image = m_swapchain->getImages()[imageIndex];
         presentBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-        vkCmdPipelineBarrier(cmd,
-            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-            VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-            0, 0, nullptr, 0, nullptr, 1, &presentBarrier);
+
+        VkDependencyInfo depInfo{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        depInfo.imageMemoryBarrierCount = 1;
+        depInfo.pImageMemoryBarriers    = &presentBarrier;
+        vkCmdPipelineBarrier2(cmd, &depInfo);
     }
 
     VK_CHECK(vkEndCommandBuffer(cmd), "End command buffer");

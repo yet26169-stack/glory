@@ -69,7 +69,11 @@ void HiZPass::resize(uint32_t width, uint32_t height) {
 
 void HiZPass::generate(VkCommandBuffer cmd, VkImageView sourceDepthView) {
     // Transition pyramid image to general for compute writes
-    VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+    VkImageMemoryBarrier2 barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
+    barrier.srcStageMask  = VK_PIPELINE_STAGE_2_NONE;
+    barrier.srcAccessMask = VK_ACCESS_2_NONE;
+    barrier.dstStageMask  = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    barrier.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
     barrier.oldLayout     = VK_IMAGE_LAYOUT_UNDEFINED;
     barrier.newLayout     = VK_IMAGE_LAYOUT_GENERAL;
     barrier.image         = m_pyramidImage;
@@ -78,13 +82,11 @@ void HiZPass::generate(VkCommandBuffer cmd, VkImageView sourceDepthView) {
     barrier.subresourceRange.levelCount     = m_mipLevels;
     barrier.subresourceRange.baseArrayLayer = 0;
     barrier.subresourceRange.layerCount     = 1;
-    barrier.srcAccessMask = 0;
-    barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 
-    vkCmdPipelineBarrier(cmd,
-        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        0, 0, nullptr, 0, nullptr, 1, &barrier);
+    VkDependencyInfo depInfo{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+    depInfo.imageMemoryBarrierCount = 1;
+    depInfo.pImageMemoryBarriers    = &barrier;
+    vkCmdPipelineBarrier2(cmd, &depInfo);
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipeline);
 
@@ -100,7 +102,11 @@ void HiZPass::generate(VkCommandBuffer cmd, VkImageView sourceDepthView) {
         vkCmdDispatch(cmd, groupsX, groupsY, 1);
 
         // Barrier between mip levels
-        VkImageMemoryBarrier mipBarrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        VkImageMemoryBarrier2 mipBarrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
+        mipBarrier.srcStageMask  = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        mipBarrier.srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+        mipBarrier.dstStageMask  = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+        mipBarrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
         mipBarrier.oldLayout     = VK_IMAGE_LAYOUT_GENERAL;
         mipBarrier.newLayout     = VK_IMAGE_LAYOUT_GENERAL;
         mipBarrier.image         = m_pyramidImage;
@@ -109,27 +115,26 @@ void HiZPass::generate(VkCommandBuffer cmd, VkImageView sourceDepthView) {
         mipBarrier.subresourceRange.levelCount     = 1;
         mipBarrier.subresourceRange.baseArrayLayer = 0;
         mipBarrier.subresourceRange.layerCount     = 1;
-        mipBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-        mipBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-        vkCmdPipelineBarrier(cmd,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            0, 0, nullptr, 0, nullptr, 1, &mipBarrier);
+        VkDependencyInfo mipDepInfo{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        mipDepInfo.imageMemoryBarrierCount = 1;
+        mipDepInfo.pImageMemoryBarriers    = &mipBarrier;
+        vkCmdPipelineBarrier2(cmd, &mipDepInfo);
     }
 
     // Final transition to shader-read for the cull pass
+    barrier.srcStageMask  = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    barrier.srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+    barrier.dstStageMask  = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    barrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
     barrier.oldLayout     = VK_IMAGE_LAYOUT_GENERAL;
     barrier.newLayout     = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     barrier.subresourceRange.baseMipLevel = 0;
     barrier.subresourceRange.levelCount   = m_mipLevels;
 
-    vkCmdPipelineBarrier(cmd,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        0, 0, nullptr, 0, nullptr, 1, &barrier);
+    depInfo.imageMemoryBarrierCount = 1;
+    depInfo.pImageMemoryBarriers    = &barrier;
+    vkCmdPipelineBarrier2(cmd, &depInfo);
 }
 
 // ── private ─────────────────────────────────────────────────────────────────

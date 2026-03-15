@@ -20,8 +20,7 @@ void Sync::cleanup() {
 
     VkDevice dev = m_device.getDevice();
 
-    for (auto& fence : m_inFlightFences)
-        if (fence != VK_NULL_HANDLE) vkDestroyFence(dev, fence, nullptr);
+    if (m_timeline != VK_NULL_HANDLE) vkDestroySemaphore(dev, m_timeline, nullptr);
     for (auto& sem : m_renderFinished)
         if (sem != VK_NULL_HANDLE) vkDestroySemaphore(dev, sem, nullptr);
     for (auto& sem : m_imageAvailable)
@@ -63,28 +62,49 @@ void Sync::createCommandBuffers() {
 void Sync::createSyncObjects(uint32_t swapchainImageCount) {
     m_imageAvailable.resize(MAX_FRAMES_IN_FLIGHT);
     m_renderFinished.resize(swapchainImageCount);
-    m_inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
 
     VkSemaphoreCreateInfo semCI{};
     semCI.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
-    VkFenceCreateInfo fenceCI{};
-    fenceCI.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    fenceCI.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
     VkDevice dev = m_device.getDevice();
     for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
         VK_CHECK(vkCreateSemaphore(dev, &semCI, nullptr, &m_imageAvailable[i]),
                  "Failed to create image-available semaphore");
-        VK_CHECK(vkCreateFence(dev, &fenceCI, nullptr, &m_inFlightFences[i]),
-                 "Failed to create in-flight fence");
     }
     for (uint32_t i = 0; i < swapchainImageCount; ++i) {
         VK_CHECK(vkCreateSemaphore(dev, &semCI, nullptr, &m_renderFinished[i]),
                  "Failed to create render-finished semaphore");
     }
-    spdlog::info("Sync objects created ({} frames in flight, {} render semaphores)",
+
+    // Timeline semaphore — replaces per-frame VkFence for CPU–GPU sync
+    VkSemaphoreTypeCreateInfo timelineCI{VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO};
+    timelineCI.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+    timelineCI.initialValue  = 0;
+
+    VkSemaphoreCreateInfo tlSemCI{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+    tlSemCI.pNext = &timelineCI;
+    VK_CHECK(vkCreateSemaphore(dev, &tlSemCI, nullptr, &m_timeline),
+             "Failed to create timeline semaphore");
+
+    spdlog::info("Sync objects created ({} frames in flight, {} render sems, 1 timeline)",
                  MAX_FRAMES_IN_FLIGHT, swapchainImageCount);
+}
+
+void Sync::waitForFrame(uint32_t frame) {
+    uint64_t waitValue = m_timelineValues[frame];
+    if (waitValue == 0) return; // first frame in this slot — nothing submitted yet
+
+    VkSemaphoreWaitInfo waitInfo{VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO};
+    waitInfo.semaphoreCount = 1;
+    waitInfo.pSemaphores    = &m_timeline;
+    waitInfo.pValues        = &waitValue;
+    VK_CHECK(vkWaitSemaphores(m_device.getDevice(), &waitInfo, UINT64_MAX),
+             "Timeline semaphore wait failed");
+}
+
+uint64_t Sync::nextSignalValue(uint32_t frame) {
+    m_timelineValues[frame] = ++m_timelineCounter;
+    return m_timelineCounter;
 }
 
 void Sync::recreateRenderFinishedSemaphores(uint32_t swapchainImageCount) {

@@ -62,8 +62,8 @@ private:
     // Helper: record an image layout transition into cmd
     static void imageBarrier(VkCommandBuffer cmd, VkImage image,
                               VkImageLayout oldLayout, VkImageLayout newLayout,
-                              VkAccessFlags srcAccess, VkAccessFlags dstAccess,
-                              VkPipelineStageFlags srcStage, VkPipelineStageFlags dstStage);
+                              VkAccessFlags2 srcAccess, VkAccessFlags2 dstAccess,
+                              VkPipelineStageFlags2 srcStage, VkPipelineStageFlags2 dstStage);
 };
 
 } // namespace glory

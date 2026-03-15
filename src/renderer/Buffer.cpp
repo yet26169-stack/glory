@@ -276,12 +276,16 @@ Buffer Buffer::createDeviceLocal(
 
     vkEndCommandBuffer(cmd);
 
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers    = &cmd;
+    VkCommandBufferSubmitInfo cmdInfo{};
+    cmdInfo.sType         = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+    cmdInfo.commandBuffer = cmd;
 
-    vkQueueSubmit(device.getTransferQueue(), 1, &submitInfo, VK_NULL_HANDLE);
+    VkSubmitInfo2 submitInfo{};
+    submitInfo.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+    submitInfo.commandBufferInfoCount = 1;
+    submitInfo.pCommandBufferInfos  = &cmdInfo;
+
+    vkQueueSubmit2(device.getTransferQueue(), 1, &submitInfo, VK_NULL_HANDLE);
     vkQueueWaitIdle(device.getTransferQueue());
 
     vkFreeCommandBuffers(device.getDevice(), device.getTransferCommandPool(), 1, &cmd);
