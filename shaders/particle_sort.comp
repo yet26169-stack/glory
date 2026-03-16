@@ -1,0 +1,56 @@
+#version 450
+
+// ── GPU Bitonic Sort for Particles (back-to-front by camera distance) ───────
+// Dispatched with (particleCount / 2 / 64) workgroups per pass.
+// Each pass requires a different (k, j) pair via push constants.
+
+layout(local_size_x = 64) in;
+
+struct Particle {
+    vec4 posLife;   // xyz = world position, w = remaining lifetime
+    vec4 velAge;    // xyz = velocity, w = age
+    vec4 color;     // rgba
+    vec4 params;    // x=size, y=rotation, z=angularVel, w=active
+};
+
+layout(std430, set = 0, binding = 0) buffer ParticleSSBO {
+    Particle particles[];
+};
+
+layout(push_constant) uniform SortPC {
+    vec4  cameraPos;    // xyz = camera world pos
+    uint  count;        // total particle count (rounded up to power of 2)
+    uint  k;            // bitonic sort outer loop param
+    uint  j;            // bitonic sort inner loop param
+    uint  _pad;
+};
+
+// Compute squared distance to camera (dead particles sort to front = closest)
+float sortKey(uint idx) {
+    Particle p = particles[idx];
+    if (p.params.w < 0.1) return -1e20; // dead → sort to front (will be skipped in draw)
+    vec3 d = p.posLife.xyz - cameraPos.xyz;
+    return -(d.x * d.x + d.y * d.y + d.z * d.z); // negate for back-to-front
+}
+
+void main() {
+    uint i = gl_GlobalInvocationID.x;
+
+    // Bitonic compare-and-swap
+    uint l = i ^ j;
+    if (l <= i) return;  // only one thread per pair
+    if (i >= count || l >= count) return;
+
+    float keyI = sortKey(i);
+    float keyL = sortKey(l);
+
+    // Determine sort direction: ascending if (i & k) == 0
+    bool ascending = ((i & k) == 0);
+
+    if ((ascending && keyI > keyL) || (!ascending && keyI < keyL)) {
+        // Swap entire particles
+        Particle tmp = particles[i];
+        particles[i] = particles[l];
+        particles[l] = tmp;
+    }
+}

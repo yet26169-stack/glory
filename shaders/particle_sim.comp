@@ -1,6 +1,7 @@
 #version 450
 
-// ── GPU Particle Simulation Compute Shader (Upgraded) ───────────────────────
+// ── GPU Particle Simulation Compute Shader ──────────────────────────────────
+// Force types: 0=linear gravity, 1=point attractor, 2=vortex, 3=noise turbulence
 
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
@@ -25,9 +26,27 @@ layout(set = 0, binding = 2) uniform EmitterUBO {
     vec4  wind_dt;        // xyz=windDir*strength, w=dt
     vec4  phys;           // x=gravity, y=drag, z=alphaCurve, w=count
     vec4  size;           // x=sizeMin, y=sizeMax, z=sizeEnd, w=reserved
+    vec4  forceParams;    // x=forceType, y=forceStrength, z/w=reserved
+    vec4  attractorPos;   // xyz=attractor world pos, w=reserved
     uint  colorKeyCount;
     GpuColorKey colorKeys[8];
 } emitter;
+
+// Simple 3D hash-based noise for turbulence (fast, GPU-friendly)
+vec3 hash3(vec3 p) {
+    p = vec3(dot(p, vec3(127.1, 311.7, 74.7)),
+             dot(p, vec3(269.5, 183.3, 246.1)),
+             dot(p, vec3(113.5, 271.9, 124.6)));
+    return fract(sin(p) * 43758.5453123) * 2.0 - 1.0;
+}
+
+vec3 noiseTurbulence(vec3 pos, float time) {
+    vec3 p = pos * 1.5 + time * 0.3;
+    vec3 n = hash3(floor(p));
+    n += hash3(floor(p * 2.0)) * 0.5;
+    n += hash3(floor(p * 4.0)) * 0.25;
+    return normalize(n + 0.001);
+}
 
 void main() {
     uint i = gl_GlobalInvocationID.x;
@@ -52,14 +71,48 @@ void main() {
     }
 
     float totalLife = p.posLife.w + p.velAge.w;
-    float lifeFrac  = (totalLife > 0.0) ? (p.velAge.w / totalLife) : 1.0; // 0.0 (spawn) to 1.0 (death)
+    float lifeFrac  = (totalLife > 0.0) ? (p.velAge.w / totalLife) : 1.0;
 
-    // Physics
     // Drag / Damping
     p.velAge.xyz *= (1.0 - emitter.phys.y * dt);
-    
-    // Gravity
-    p.velAge.y -= emitter.phys.x * dt;
+
+    // Force application based on type
+    uint  forceType = uint(emitter.forceParams.x);
+    float strength  = emitter.forceParams.y;
+
+    if (forceType == 0u) {
+        // Linear gravity (original behavior)
+        p.velAge.y -= emitter.phys.x * dt;
+    } else if (forceType == 1u) {
+        // Point attractor — radial pull toward attractorPos
+        vec3 toAttractor = emitter.attractorPos.xyz - p.posLife.xyz;
+        float dist = length(toAttractor);
+        if (dist > 0.01) {
+            vec3 dir = toAttractor / dist;
+            float falloff = strength / max(dist * dist, 0.1);
+            p.velAge.xyz += dir * falloff * dt;
+        }
+        p.velAge.y -= emitter.phys.x * dt * 0.25; // reduced gravity
+    } else if (forceType == 2u) {
+        // Vortex — tangential rotation around attractorPos (Y-axis)
+        vec3 toCenter = p.posLife.xyz - emitter.attractorPos.xyz;
+        toCenter.y = 0.0;
+        float dist = length(toCenter);
+        if (dist > 0.01) {
+            vec3 tangent = normalize(vec3(-toCenter.z, 0.0, toCenter.x));
+            float vortexSpeed = strength / max(dist, 0.5);
+            p.velAge.xyz += tangent * vortexSpeed * dt;
+            // Slight inward pull to keep particles from flying away
+            p.velAge.xyz -= normalize(toCenter) * strength * 0.1 * dt;
+        }
+        p.velAge.y -= emitter.phys.x * dt * 0.1; // minimal gravity
+    } else if (forceType == 3u) {
+        // Noise turbulence — pseudo-random 3D force field
+        float time = emitter.wind_dt.w; // use dt as proxy; actual time comes via age
+        vec3 turb = noiseTurbulence(p.posLife.xyz, p.velAge.w);
+        p.velAge.xyz += turb * strength * dt;
+        p.velAge.y -= emitter.phys.x * dt;
+    }
 
     // Wind
     p.velAge.xyz += emitter.wind_dt.xyz * dt;
@@ -70,25 +123,9 @@ void main() {
     // Rotation over lifetime
     p.params.y += p.params.z * dt;
 
-    // Size over lifetime
-    float startSize = p.params.x; // Initial size stored at spawn
-    if (emitter.size.z > 0.0) {
-        // Interpolate between start size and sizeEnd
-        // We use a simple linear lerp. For random variation, we'd need to store startSize.
-        // Actually p.params.x IS the startSize if we don't overwrite it.
-        // But we need to output the CURRENT size for the vertex shader.
-        // Let's assume params.x is the INITIAL size and we calculate current size on the fly in VS,
-        // OR we update params.x here. Let's update it here so VS is simpler.
-        // Wait, if I update it here, I lose the initial size.
-        // Let's use a convention: p.params.x is INITIAL size, but we can't easily change that.
-        // Actually, let's just use lifeFrac to interpolate.
-        // p.params.x = mix(initialSize, initialSize * (sizeEnd/sizeMin), lifeFrac)? No.
-        // Let's just interpolate.
-    }
-
     // Alpha Curve
     float alpha = pow(1.0 - lifeFrac, emitter.phys.z);
-    
+
     // Color Curve evaluation
     vec4 targetColor = vec4(1.0);
     if (emitter.colorKeyCount > 0) {

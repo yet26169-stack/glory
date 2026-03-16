@@ -20,6 +20,7 @@ VFXRenderer::VFXRenderer(const Device& device, const RenderFormats& formats)
     createDescriptorLayoutAndPool();
     createComputePipeline();
     createCompactPipeline();
+    createSortPipeline();
     createRenderPipeline(formats);
 
     // Default white-pixel atlas (fallback for effects without a texture)
@@ -50,6 +51,10 @@ VFXRenderer::~VFXRenderer() {
         vkDestroyPipeline(dev, m_compactPipeline, nullptr);
     if (m_compactLayout   != VK_NULL_HANDLE)
         vkDestroyPipelineLayout(dev, m_compactLayout, nullptr);
+    if (m_sortPipeline    != VK_NULL_HANDLE)
+        vkDestroyPipeline(dev, m_sortPipeline, nullptr);
+    if (m_sortLayout      != VK_NULL_HANDLE)
+        vkDestroyPipelineLayout(dev, m_sortLayout, nullptr);
     if (m_computePipeline != VK_NULL_HANDLE)
         vkDestroyPipeline(dev, m_computePipeline, nullptr);
     if (m_computeLayout   != VK_NULL_HANDLE)
@@ -185,6 +190,38 @@ void VFXRenderer::createCompactPipeline() {
     pipeCI.stage.pName  = "main";
 
     vkCreateComputePipelines(dev, VK_NULL_HANDLE, 1, &pipeCI, nullptr, &m_compactPipeline);
+    vkDestroyShaderModule(dev, mod, nullptr);
+}
+
+// ── createSortPipeline ────────────────────────────────────────────────────────
+void VFXRenderer::createSortPipeline() {
+    VkDevice dev = m_device.getDevice();
+
+    VkPushConstantRange pcRange{};
+    pcRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    pcRange.offset     = 0;
+    pcRange.size       = sizeof(SortPC);
+
+    VkPipelineLayoutCreateInfo layoutCI{};
+    layoutCI.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    layoutCI.setLayoutCount         = 1;
+    layoutCI.pSetLayouts            = &m_descLayout;
+    layoutCI.pushConstantRangeCount = 1;
+    layoutCI.pPushConstantRanges    = &pcRange;
+    vkCreatePipelineLayout(dev, &layoutCI, nullptr, &m_sortLayout);
+
+    auto code = readSPV(std::string(SHADER_DIR) + "particle_sort.comp.spv");
+    VkShaderModule mod = createShaderModule(code);
+
+    VkComputePipelineCreateInfo pipeCI{};
+    pipeCI.sType        = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    pipeCI.layout       = m_sortLayout;
+    pipeCI.stage.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    pipeCI.stage.stage  = VK_SHADER_STAGE_COMPUTE_BIT;
+    pipeCI.stage.module = mod;
+    pipeCI.stage.pName  = "main";
+
+    vkCreateComputePipelines(dev, VK_NULL_HANDLE, 1, &pipeCI, nullptr, &m_sortPipeline);
     vkDestroyShaderModule(dev, mod, nullptr);
 }
 
@@ -368,15 +405,22 @@ void VFXRenderer::dispatchCompute(VkCommandBuffer cmd) {
     depInfo.pMemoryBarriers    = &barrier;
     vkCmdPipelineBarrier2(cmd, &depInfo);
 
-    // 2. Simulation pass
+    // 2. Simulation pass (with LOD: skip distant emitters on some frames)
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_computePipeline);
     for (auto& ps : m_effects) {
+        // LOD: compute distance-based skip mask
+        float dist = glm::length(ps->worldPosition() - m_cameraPos);
+        uint32_t lodMask = 0; // every frame
+        if      (dist > 80.0f) lodMask = 3; // every 4th frame
+        else if (dist > 40.0f) lodMask = 1; // every 2nd frame
+        if ((m_frameCount & lodMask) != 0) continue;
+
         VkDescriptorSet ds = ps->descSet();
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
                                 m_computeLayout, 0, 1, &ds, 0, nullptr);
 
         SimPC pc{};
-        pc.dt       = m_currentDt; 
+        pc.dt       = m_currentDt;
         pc.gravity  = 4.0f;
         pc.count    = ps->maxParticles();
         pc._pad     = 0.f;
@@ -388,14 +432,26 @@ void VFXRenderer::dispatchCompute(VkCommandBuffer cmd) {
         vkCmdDispatch(cmd, groups, 1, 1);
     }
 
-    // Barrier between simulation and compaction
+    // Barrier between simulation and sort/compaction
     barrier.srcStageMask  = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
     barrier.srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
     barrier.dstStageMask  = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
     barrier.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
     vkCmdPipelineBarrier2(cmd, &depInfo);
 
-    // 3. Compaction pass
+    // 3. Bitonic sort pass (back-to-front for correct alpha blending)
+    for (auto& ps : m_effects) {
+        if (ps->blendMode() == EmitterDef::BlendMode::Additive) continue; // additive doesn't need sorting
+        VkDescriptorSet ds = ps->descSet();
+        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
+                                m_sortLayout, 0, 1, &ds, 0, nullptr);
+        dispatchSort(cmd, ps->maxParticles());
+    }
+
+    // Barrier between sort and compaction
+    vkCmdPipelineBarrier2(cmd, &depInfo);
+
+    // 4. Compaction pass
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_compactPipeline);
     for (auto& ps : m_effects) {
         VkDescriptorSet ds = ps->descSet();
@@ -409,6 +465,144 @@ void VFXRenderer::dispatchCompute(VkCommandBuffer cmd) {
         const uint32_t groups = (ps->maxParticles() + 63) / 64;
         vkCmdDispatch(cmd, groups, 1, 1);
     }
+}
+
+// ── dispatchSort (bitonic merge sort) ────────────────────────────────────────
+void VFXRenderer::dispatchSort(VkCommandBuffer cmd, uint32_t maxParticles) {
+    if (maxParticles <= 1) return;
+
+    uint32_t n = nextPowerOf2(maxParticles);
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_sortPipeline);
+
+    // For each emitter we need to bind its descriptor set before the sort loop.
+    // The caller already handles this by calling dispatchSort per-emitter after
+    // binding the appropriate descriptor set. However, since sort uses the same
+    // SSBO (binding 0), the descriptor set from the sim pass is still bound.
+
+    for (uint32_t k = 2; k <= n; k <<= 1) {
+        for (uint32_t j = k >> 1; j > 0; j >>= 1) {
+            SortPC pc{};
+            pc.cameraPos = glm::vec4(m_cameraPos, 0.0f);
+            pc.count = n;
+            pc.k     = k;
+            pc.j     = j;
+            pc._pad  = 0;
+
+            vkCmdPushConstants(cmd, m_sortLayout, VK_SHADER_STAGE_COMPUTE_BIT,
+                               0, sizeof(SortPC), &pc);
+
+            const uint32_t groups = (n / 2 + 63) / 64;
+            vkCmdDispatch(cmd, groups, 1, 1);
+
+            // Barrier between sort passes
+            VkMemoryBarrier2 bar{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+            bar.srcStageMask  = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+            bar.srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+            bar.dstStageMask  = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+            bar.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+
+            VkDependencyInfo dep{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+            dep.memoryBarrierCount = 1;
+            dep.pMemoryBarriers    = &bar;
+            vkCmdPipelineBarrier2(cmd, &dep);
+        }
+    }
+}
+
+uint32_t VFXRenderer::nextPowerOf2(uint32_t n) const {
+    n--;
+    n |= n >> 1;
+    n |= n >> 2;
+    n |= n >> 4;
+    n |= n >> 8;
+    n |= n >> 16;
+    return n + 1;
+}
+
+// ── dispatchComputeAsync ─────────────────────────────────────────────────────
+void VFXRenderer::dispatchComputeAsync(VkCommandBuffer computeCmd,
+                                        uint32_t srcQueueFamily,
+                                        uint32_t dstQueueFamily)
+{
+    if (m_effects.empty()) return;
+
+    // Record same sim+compact+sort work but on the async compute command buffer.
+    // The indirect buffer clears, sim, sort, and compact are recorded identically.
+    dispatchCompute(computeCmd);
+
+    // If queue families differ, release ownership of particle buffers to graphics queue
+    if (srcQueueFamily != dstQueueFamily) {
+        std::vector<VkBufferMemoryBarrier2> releases;
+        releases.reserve(m_effects.size() * 2);
+
+        for (auto& ps : m_effects) {
+            VkBufferMemoryBarrier2 bar{VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2};
+            bar.srcStageMask       = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+            bar.srcAccessMask      = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+            bar.dstStageMask       = VK_PIPELINE_STAGE_2_NONE;
+            bar.dstAccessMask      = VK_ACCESS_2_NONE;
+            bar.srcQueueFamilyIndex = srcQueueFamily;
+            bar.dstQueueFamilyIndex = dstQueueFamily;
+
+            // Release SSBO
+            bar.buffer = ps->ssbo();
+            bar.offset = 0;
+            bar.size   = VK_WHOLE_SIZE;
+            releases.push_back(bar);
+
+            // Release indirect buffer
+            bar.buffer = ps->indirectBuffer();
+            releases.push_back(bar);
+        }
+
+        VkDependencyInfo dep{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        dep.bufferMemoryBarrierCount = static_cast<uint32_t>(releases.size());
+        dep.pBufferMemoryBarriers    = releases.data();
+        vkCmdPipelineBarrier2(computeCmd, &dep);
+    }
+}
+
+// ── acquireFromCompute ───────────────────────────────────────────────────────
+void VFXRenderer::acquireFromCompute(VkCommandBuffer graphicsCmd,
+                                      uint32_t srcQueueFamily,
+                                      uint32_t dstQueueFamily)
+{
+    if (m_effects.empty()) return;
+    if (srcQueueFamily == dstQueueFamily) {
+        // Same queue family — just a regular memory barrier
+        barrierComputeToGraphics(graphicsCmd);
+        return;
+    }
+
+    std::vector<VkBufferMemoryBarrier2> acquires;
+    acquires.reserve(m_effects.size() * 2);
+
+    for (auto& ps : m_effects) {
+        VkBufferMemoryBarrier2 bar{VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2};
+        bar.srcStageMask       = VK_PIPELINE_STAGE_2_NONE;
+        bar.srcAccessMask      = VK_ACCESS_2_NONE;
+        bar.dstStageMask       = VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT |
+                                 VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT;
+        bar.dstAccessMask      = VK_ACCESS_2_SHADER_STORAGE_READ_BIT |
+                                 VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT;
+        bar.srcQueueFamilyIndex = srcQueueFamily;
+        bar.dstQueueFamilyIndex = dstQueueFamily;
+
+        // Acquire SSBO
+        bar.buffer = ps->ssbo();
+        bar.offset = 0;
+        bar.size   = VK_WHOLE_SIZE;
+        acquires.push_back(bar);
+
+        // Acquire indirect buffer
+        bar.buffer = ps->indirectBuffer();
+        acquires.push_back(bar);
+    }
+
+    VkDependencyInfo dep{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+    dep.bufferMemoryBarrierCount = static_cast<uint32_t>(acquires.size());
+    dep.pBufferMemoryBarriers    = acquires.data();
+    vkCmdPipelineBarrier2(graphicsCmd, &dep);
 }
 
 // ── barrierComputeToGraphics ──────────────────────────────────────────────────

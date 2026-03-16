@@ -66,6 +66,8 @@ ParticleSystem::ParticleSystem(const Device&          device,
     m_emitterParams->wind_dt = {def.windDirection * def.windStrength, 0.0f}; // dt set in update/render
     m_emitterParams->phys    = {def.gravity, def.drag, def.alphaCurve, static_cast<float>(m_maxParticles)};
     m_emitterParams->size    = {def.sizeMin, def.sizeMax, def.sizeEnd, 0.0f};
+    m_emitterParams->forceParams  = {static_cast<float>(def.forceType), def.forceStrength, 0.0f, 0.0f};
+    m_emitterParams->attractorPos = {def.attractorPos.x, def.attractorPos.y, def.attractorPos.z, 0.0f};
 
     const uint32_t keyCount = std::min(static_cast<uint32_t>(def.colorOverLifetime.size()), 8u);
     m_emitterParams->colorKeyCount = keyCount;

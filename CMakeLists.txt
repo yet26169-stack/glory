@@ -97,6 +97,7 @@ set(SHADER_SOURCES
     ${CMAKE_SOURCE_DIR}/shaders/water.vert
     ${CMAKE_SOURCE_DIR}/shaders/water.frag
     ${CMAKE_SOURCE_DIR}/shaders/particle_compact.comp
+    ${CMAKE_SOURCE_DIR}/shaders/particle_sort.comp
     ${CMAKE_SOURCE_DIR}/shaders/shadow.vert
     ${CMAKE_SOURCE_DIR}/shaders/shadow_skinned.vert
     ${CMAKE_SOURCE_DIR}/shaders/depth_only.vert
@@ -182,6 +183,7 @@ set(SOURCES
     src/renderer/ShadowPass.cpp
     src/renderer/HiZPass.cpp
     src/renderer/MegaBuffer.cpp
+    src/renderer/AsyncComputeManager.cpp
     src/renderer/BloomPass.cpp
     src/renderer/ToneMapPass.cpp
     src/renderer/GroundDecalRenderer.cpp

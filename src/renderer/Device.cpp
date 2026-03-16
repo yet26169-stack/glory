@@ -42,6 +42,7 @@ Device::Device(VkInstance instance, VkSurfaceKHR surface)
     createAllocator();
     createTransferCommandPool();
     createGraphicsCommandPool();
+    createComputeCommandPool();
 }
 
 Device::~Device() { cleanup(); }
@@ -54,6 +55,9 @@ void Device::cleanup() {
     }
     if (m_graphicsCommandPool != VK_NULL_HANDLE) {
         vkDestroyCommandPool(m_device, m_graphicsCommandPool, nullptr);
+    }
+    if (m_computeCommandPool != VK_NULL_HANDLE) {
+        vkDestroyCommandPool(m_device, m_computeCommandPool, nullptr);
     }
     if (m_allocator != VK_NULL_HANDLE) {
         vmaDestroyAllocator(m_allocator);
@@ -160,12 +164,24 @@ QueueFamilyIndices Device::findQueueFamilies(VkPhysicalDevice device) const {
             indices.transferFamily = i;
         }
 
+        // Prefer a queue that supports COMPUTE but NOT GRAPHICS — dedicated
+        // async compute (NVIDIA: queue family 2, AMD: queue family 1).
+        if ((families[i].queueFlags & VK_QUEUE_COMPUTE_BIT) &&
+            !(families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) &&
+            !indices.computeFamily.has_value()) {
+            indices.computeFamily = i;
+        }
+
         if (indices.isComplete()) break;
     }
 
     // Fall back to graphics family if no dedicated transfer found
     if (!indices.transferFamily.has_value())
         indices.transferFamily = indices.graphicsFamily;
+
+    // Fall back to graphics family if no dedicated compute found
+    if (!indices.computeFamily.has_value())
+        indices.computeFamily = indices.graphicsFamily;
 
     return indices;
 }
@@ -175,7 +191,8 @@ void Device::createLogicalDevice() {
     std::set<uint32_t> uniqueFamilies = {
         m_indices.graphicsFamily.value(),
         m_indices.presentFamily.value(),
-        m_indices.transferFamily.value()  // may equal graphicsFamily — set deduplicates
+        m_indices.transferFamily.value(),  // may equal graphicsFamily — set deduplicates
+        m_indices.computeFamily.value()    // may equal graphicsFamily — set deduplicates
     };
 
     float priority = 1.0f;
@@ -270,10 +287,15 @@ void Device::createLogicalDevice() {
     vkGetDeviceQueue(m_device, m_indices.graphicsFamily.value(), 0, &m_graphicsQueue);
     vkGetDeviceQueue(m_device, m_indices.presentFamily.value(),  0, &m_presentQueue);
     vkGetDeviceQueue(m_device, m_indices.transferFamily.value(), 0, &m_transferQueue);
+    vkGetDeviceQueue(m_device, m_indices.computeFamily.value(),  0, &m_computeQueue);
     m_dedicatedTransfer = (m_indices.transferFamily.value() != m_indices.graphicsFamily.value());
+    m_dedicatedCompute  = (m_indices.computeFamily.value()  != m_indices.graphicsFamily.value());
     spdlog::info("Transfer queue: family {} ({})",
                  m_indices.transferFamily.value(),
                  m_dedicatedTransfer ? "dedicated DMA" : "shared with graphics");
+    spdlog::info("Compute queue: family {} ({})",
+                 m_indices.computeFamily.value(),
+                 m_dedicatedCompute ? "dedicated async" : "shared with graphics");
 
     spdlog::info("Logical device created (graphics: {}, present: {})",
                  m_indices.graphicsFamily.value(),
@@ -344,6 +366,17 @@ void Device::createGraphicsCommandPool() {
 
     VK_CHECK(vkCreateCommandPool(m_device, &ci, nullptr, &m_graphicsCommandPool),
              "Failed to create graphics command pool");
+}
+
+void Device::createComputeCommandPool() {
+    VkCommandPoolCreateInfo ci{};
+    ci.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    ci.flags            = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT |
+                          VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    ci.queueFamilyIndex = m_indices.computeFamily.value();
+
+    VK_CHECK(vkCreateCommandPool(m_device, &ci, nullptr, &m_computeCommandPool),
+             "Failed to create compute command pool");
 }
 
 VkFormat Device::findSupportedFormat(const std::vector<VkFormat>& candidates,

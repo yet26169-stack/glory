@@ -124,6 +124,9 @@ Renderer::Renderer(Window& window) : m_window(window) {
     m_vfxRenderer->setDepthBuffer(m_hdrFB->depthView(), m_hdrFB->sampler());
     m_vfxRenderer->loadEmitterDirectory(std::string(ASSET_DIR) + "vfx/");
 
+    // Async compute for particle simulation
+    m_asyncCompute.init(*m_device);
+
     m_trailRenderer = std::make_unique<TrailRenderer>(*m_device, m_hdrFB->mainFormats());
 
     // Original fireball trail (kept for backward compatibility with existing IDs)
@@ -286,6 +289,7 @@ Renderer::~Renderer() {
     m_explosionRenderer.reset();
     m_spriteEffectRenderer.reset();
     m_vfxRenderer.reset();
+    m_asyncCompute.destroy();
     m_trailRenderer.reset();
     m_meshEffectRenderer.reset();
     m_vfxQueue.reset();
@@ -1040,14 +1044,40 @@ void Renderer::renderFrame(float alpha) {
 
     VkCommandBuffer cmd = m_sync->getCommandBuffer(m_currentFrame);
     vkResetCommandBuffer(cmd, 0);
+
+    // ── Async compute: particle simulation on dedicated compute queue ─────
+    uint64_t computeSignal = 0;
+    if (m_vfxRenderer && m_state != AppState::Launcher) {
+        m_asyncCompute.waitForCompute(m_currentFrame); // wait for prev frame's compute
+        m_vfxRenderer->setCameraPosition(m_isoCam.getPosition());
+
+        VkCommandBuffer computeCmd = m_asyncCompute.begin(m_currentFrame);
+        uint32_t computeFamily = m_asyncCompute.getQueueFamilyIndex();
+        uint32_t graphicsFamily = m_device->getQueueFamilies().graphicsFamily.value();
+        m_vfxRenderer->dispatchComputeAsync(computeCmd, computeFamily, graphicsFamily);
+        computeSignal = m_asyncCompute.submit(m_currentFrame);
+    }
+
     recordCommandBuffer(cmd, imageIndex, realDt);
 
     // ── Submit via Synchronization2 (vkQueueSubmit2 + timeline semaphore) ──
     uint64_t signalValue = m_sync->nextSignalValue(m_currentFrame);
 
-    VkSemaphoreSubmitInfo waitSemInfo{VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO};
-    waitSemInfo.semaphore = imgSem;
-    waitSemInfo.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    // Wait semaphores: image acquire + (optionally) async compute completion
+    VkSemaphoreSubmitInfo waitSemInfos[2]{};
+    uint32_t waitCount = 1;
+    waitSemInfos[0] = {VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO};
+    waitSemInfos[0].semaphore = imgSem;
+    waitSemInfos[0].stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+
+    if (computeSignal > 0) {
+        waitSemInfos[1] = {VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO};
+        waitSemInfos[1].semaphore = m_asyncCompute.getTimelineSemaphore();
+        waitSemInfos[1].value     = computeSignal;
+        waitSemInfos[1].stageMask = VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT |
+                                    VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT;
+        waitCount = 2;
+    }
 
     VkCommandBufferSubmitInfo cmdBufInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO};
     cmdBufInfo.commandBuffer = cmd;
@@ -1064,8 +1094,8 @@ void Renderer::renderFrame(float alpha) {
     signalSemInfos[1].stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
 
     VkSubmitInfo2 submitInfo{VK_STRUCTURE_TYPE_SUBMIT_INFO_2};
-    submitInfo.waitSemaphoreInfoCount   = 1;
-    submitInfo.pWaitSemaphoreInfos      = &waitSemInfo;
+    submitInfo.waitSemaphoreInfoCount   = waitCount;
+    submitInfo.pWaitSemaphoreInfos      = waitSemInfos;
     submitInfo.commandBufferInfoCount   = 1;
     submitInfo.pCommandBufferInfos      = &cmdBufInfo;
     submitInfo.signalSemaphoreInfoCount = 2;
@@ -1107,12 +1137,13 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
         if (m_gpuTimer) m_gpuTimer->endZone(cmd, m_currentFrame, "FoW");
     }
 
-    // ── VFX compute pass (particle simulation, OUTSIDE render pass) ──────
+    // ── VFX: acquire particle buffers from async compute queue ──────────
     if (m_vfxRenderer && m_state != AppState::Launcher) {
-        if (m_gpuTimer) m_gpuTimer->beginZone(cmd, m_currentFrame, "VFX Compute");
-        m_vfxRenderer->dispatchCompute(cmd);
-        m_vfxRenderer->barrierComputeToGraphics(cmd);
-        if (m_gpuTimer) m_gpuTimer->endZone(cmd, m_currentFrame, "VFX Compute");
+        if (m_gpuTimer) m_gpuTimer->beginZone(cmd, m_currentFrame, "VFX Acquire");
+        uint32_t computeFamily = m_asyncCompute.getQueueFamilyIndex();
+        uint32_t graphicsFamily = m_device->getQueueFamilies().graphicsFamily.value();
+        m_vfxRenderer->acquireFromCompute(cmd, computeFamily, graphicsFamily);
+        if (m_gpuTimer) m_gpuTimer->endZone(cmd, m_currentFrame, "VFX Acquire");
     }
 
     auto ext = m_swapchain->getExtent();

@@ -50,8 +50,21 @@ public:
     // Dispatch compute shaders to simulate live particles (call OUTSIDE render pass).
     void dispatchCompute(VkCommandBuffer cmd);
 
+    // Dispatch compute on a separate command buffer (for async compute path).
+    void dispatchComputeAsync(VkCommandBuffer computeCmd,
+                              uint32_t srcQueueFamily,
+                              uint32_t dstQueueFamily);
+
+    // Acquire ownership of particle buffers on the graphics queue after async compute.
+    void acquireFromCompute(VkCommandBuffer graphicsCmd,
+                            uint32_t srcQueueFamily,
+                            uint32_t dstQueueFamily);
+
     // Insert pipeline barrier: SSBO write (compute) → SSBO read (vertex shader).
     void barrierComputeToGraphics(VkCommandBuffer cmd);
+
+    // Set camera position for LOD + sorting.
+    void setCameraPosition(const glm::vec3& pos) { m_cameraPos = pos; }
 
     // Draw all alive particle effects as alpha-blended billboards.
     void render(VkCommandBuffer cmd,
@@ -81,11 +94,13 @@ private:
     // ── One shared pool with MAX_CONCURRENT_EMITTERS sets pre-allocated ────
     VkDescriptorPool       m_descPool   = VK_NULL_HANDLE;
 
-    // ── Compute pipelines (simulation + compaction) ───────────────────────
+    // ── Compute pipelines (simulation + compaction + sort) ───────────────────
     VkPipelineLayout       m_computeLayout   = VK_NULL_HANDLE;
     VkPipeline             m_computePipeline = VK_NULL_HANDLE;
     VkPipelineLayout       m_compactLayout   = VK_NULL_HANDLE;
     VkPipeline             m_compactPipeline = VK_NULL_HANDLE;
+    VkPipelineLayout       m_sortLayout      = VK_NULL_HANDLE;
+    VkPipeline             m_sortPipeline    = VK_NULL_HANDLE;
 
 
     struct SimPC {
@@ -113,6 +128,19 @@ private:
     struct CompactPC {
         uint32_t totalCount;
     };
+
+    struct SortPC {
+        glm::vec4 cameraPos;  // xyz = camera world pos
+        uint32_t  count;      // particle count (rounded to power-of-2)
+        uint32_t  k;          // bitonic outer loop param
+        uint32_t  j;          // bitonic inner loop param
+        uint32_t  _pad;
+    };
+    static_assert(sizeof(SortPC) <= 32, "SortPC too large");
+
+    // ── Particle LOD: skip sim on distant emitters ─────────────────────────
+    // lodSkipMask per emitter: 0=every frame, 1=every 2nd, 3=every 4th
+    glm::vec3 m_cameraPos{0.0f};  // set each frame for sort + LOD
 
     // ── Default particle atlas (white 1×1 fallback) ────────────────────────
     Texture                m_defaultAtlas;
@@ -146,7 +174,11 @@ private:
     void createDescriptorLayoutAndPool();
     void createComputePipeline();
     void createCompactPipeline();
+    void createSortPipeline();
     void createRenderPipeline(const RenderFormats& formats);
+
+    void dispatchSort(VkCommandBuffer cmd, uint32_t maxParticles);
+    uint32_t nextPowerOf2(uint32_t n) const;
 
     // Returns existing or loaded atlas texture for a given path
     Texture* getOrLoadAtlas(const std::string& texturePath);

@@ -46,6 +46,8 @@ struct alignas(16) EmitterParams {
     glm::vec4  wind_dt;        // xyz=windDir*strength, w=dt
     glm::vec4  phys;           // x=gravity, y=drag, z=alphaCurve, w=count
     glm::vec4  size;           // x=sizeMin, y=sizeMax, z=sizeEnd, w=reserved
+    glm::vec4  forceParams;    // x=forceType (0-3), y=forceStrength, z/w=reserved
+    glm::vec4  attractorPos;   // xyz=attractor world position, w=reserved
     uint32_t   colorKeyCount;
     float      _pad[3];
     GpuColorKey colorKeys[8];
@@ -87,6 +89,11 @@ struct EmitterDef {
     float        alphaCurve      = 1.0f;    // 1.0 = linear, >1.0 = fast fade in, etc.
     glm::vec3    windDirection   {0.0f};
     float        windStrength    = 0.0f;
+
+    // Force types: 0=linear gravity, 1=point attractor, 2=vortex, 3=noise turbulence
+    uint32_t     forceType       = 0;
+    float        forceStrength   = 1.0f;
+    glm::vec3    attractorPos    {0.0f};    // world position of attractor (type 1,2)
 
     // Visual curves
     std::vector<ColorKey> colorOverLifetime;  // Evaluated on GPU if not empty

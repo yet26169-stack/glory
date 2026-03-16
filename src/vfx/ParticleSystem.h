@@ -68,6 +68,7 @@ public:
     VkBuffer        indirectBuffer() const { return m_indirectBuffer.getBuffer(); }
     VkDescriptorSet descSet()     const { return m_descSet; }
     uint32_t        maxParticles()const { return m_maxParticles; }
+    glm::vec3       worldPosition() const { return m_position; }
 
 private:
     const Device*      m_device     = nullptr;
