@@ -63,6 +63,9 @@
 #include "audio/AudioEngine.h"
 #include "audio/AudioResourceManager.h"
 #include "audio/GameAudioEvents.h"
+#include "core/FrameAllocator.h"
+#include "core/PoolAllocator.h"
+#include "renderer/StagingPool.h"
 #include "hud/HUD.h"
 #include "hud/PerfOverlay.h"
 #include "map/MapTypes.h"
@@ -161,6 +164,10 @@ private:
     // ── LOD & Impostor ────────────────────────────────────────────────────
     LODSystem       m_lodSystem;
     ImpostorSystem  m_impostorSystem;
+
+    // ── Memory allocators ─────────────────────────────────────────────────
+    FrameAllocator  m_frameAllocator;       // 16 MB linear bump, reset each frame
+    StagingPool     m_stagingPool;          // ring-buffer staging for CPU→GPU uploads
 
     // ── VFX system ────────────────────────────────────────────────────────
     std::unique_ptr<VFXEventQueue> m_vfxQueue;        // SPSC bridge game→render (AbilitySystem)

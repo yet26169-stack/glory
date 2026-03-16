@@ -203,6 +203,9 @@ Renderer::Renderer(Window& window) : m_window(window) {
 
     m_gpuCollision.init(*m_device);
 
+    // ── Staging pool for CPU→GPU uploads ──────────────────────────────────
+    m_stagingPool.init(m_device->getAllocator());
+
     m_bloom = std::make_unique<BloomPass>();
     m_bloom->init(*m_device, m_hdrFB->colorView(), m_hdrFB->sampler(), m_window.getExtent().width, m_window.getExtent().height);
 
@@ -345,6 +348,8 @@ Renderer::~Renderer() {
         vkDestroyDescriptorPool(m_device->getDevice(), m_imguiPool, nullptr);
 
     m_gpuTimer.reset();
+
+    m_stagingPool.destroy();
 
     m_combatSystem.reset();
     m_gpuCollision.destroy();
@@ -1063,6 +1068,12 @@ void Renderer::renderFrame(float alpha) {
     VkDevice dev = m_device->getDevice();
     m_sync->waitForFrame(m_currentFrame);
 
+    // ── Per-frame allocator housekeeping ─────────────────────────────────────
+    m_frameAllocator.reset();
+    // After waitForFrame(), the previous submission for this frame slot is complete.
+    // Use m_currentFrame as a simple generation counter for staging reclaim.
+    m_stagingPool.reclaimCompleted(m_currentFrame);
+
     uint32_t imageIndex = 0;
     VkSemaphore imgSem = m_sync->getImageAvailableSemaphore(m_currentFrame);
     VkResult result = vkAcquireNextImageKHR(dev, m_swapchain->getSwapchain(),
@@ -1518,7 +1529,10 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
         uint32_t     boneBase;
         uint32_t     meshIdx;
     };
-    std::vector<SkinnedDrawInfo> skinnedDraws;
+    // Use frame allocator instead of std::vector for transient draw list
+    constexpr uint32_t MAX_SKINNED_DRAWS = 512;
+    auto* skinnedDrawData = m_frameAllocator.alloc<SkinnedDrawInfo>(MAX_SKINNED_DRAWS);
+    uint32_t skinnedDrawCount = 0;
     uint32_t objectCount   = 0;
     uint32_t instanceIndex = 0;
 
@@ -1619,7 +1633,8 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
             VkDeviceSize instOffset = instanceIndex * sizeof(InstanceData);
             uint32_t boneBase = ssm.boneSlot * Descriptors::MAX_BONES;
 
-            skinnedDraws.push_back({e, instBuf, instOffset, boneBase, ssm.staticSkinnedMeshIndex});
+            if (skinnedDrawCount < MAX_SKINNED_DRAWS)
+                skinnedDrawData[skinnedDrawCount++] = {e, instBuf, instOffset, boneBase, ssm.staticSkinnedMeshIndex};
             ++instanceIndex;
         }
     }
@@ -1659,10 +1674,10 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
 
         // Record skinned mesh draws in parallel
         ParallelRecordResult skinnedResult;
-        if (!skinnedDraws.empty()) {
+        if (skinnedDrawCount > 0) {
             skinnedResult = ParallelRecorder::record(
                 m_threadPool, m_cmdPools, m_currentFrame, hdrFormats,
-                static_cast<uint32_t>(skinnedDraws.size()),
+                skinnedDrawCount,
                 [&](VkCommandBuffer scmd, uint32_t start, uint32_t end) {
                     VkViewport lvp{ 0, 0, static_cast<float>(ext.width), static_cast<float>(ext.height), 0, 1 };
                     VkRect2D lsc{ {0,0}, ext };
@@ -1673,7 +1688,7 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
                     vkCmdBindDescriptorSets(scmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                             m_skinnedPipelineLayout, 0, 2, sets, 0, nullptr);
                     for (uint32_t i = start; i < end; ++i) {
-                        auto& info = skinnedDraws[i];
+                        auto& info = skinnedDrawData[i];
                         vkCmdBindVertexBuffers(scmd, 1, 1, &info.instBuf, &info.instOffset);
                         vkCmdPushConstants(scmd, m_skinnedPipelineLayout,
                                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -1757,7 +1772,7 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
             VkDescriptorSet sets[2] = { ds, m_bindless->getSet() };
 
             // ── Team-colored outlines (LoL Stage 8) ─────────────────────────
-            if (m_outlineRenderer && !skinnedDraws.empty()) {
+            if (m_outlineRenderer && skinnedDrawCount > 0) {
                 auto& reg = m_scene.getRegistry();
 
                 entt::entity attackTarget = entt::null;
@@ -1767,7 +1782,8 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
                     if (!reg.valid(attackTarget)) attackTarget = entt::null;
                 }
 
-                for (const auto& info : skinnedDraws) {
+                for (uint32_t si = 0; si < skinnedDrawCount; ++si) {
+                    const auto& info = skinnedDrawData[si];
                     entt::entity e      = info.entity;
                     bool isHovered      = (e == m_hoveredEntity);
                     bool isSelected     = reg.all_of<SelectableComponent>(e) &&

@@ -215,6 +215,8 @@ set(SOURCES
     src/core/SimulationLoop.cpp
     src/core/SystemScheduler.cpp
     src/core/GameSystems.cpp
+    src/core/FrameAllocator.cpp
+    src/core/PoolAllocator.cpp
     src/physics/PhysicsSystem.cpp
     src/window/Window.cpp
     src/camera/Camera.cpp
@@ -249,6 +251,7 @@ set(SOURCES
     src/renderer/MegaBuffer.cpp
     src/renderer/LODSystem.cpp
     src/renderer/ImpostorSystem.cpp
+    src/renderer/StagingPool.cpp
     src/renderer/AsyncComputeManager.cpp
     src/renderer/BloomPass.cpp
     src/renderer/ToneMapPass.cpp
