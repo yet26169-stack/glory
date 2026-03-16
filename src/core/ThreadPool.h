@@ -1,6 +1,7 @@
 #pragma once
 #include <functional>
 #include <future>
+#include <latch>
 #include <mutex>
 #include <condition_variable>
 #include <queue>
@@ -61,6 +62,32 @@ public:
     }
 
     uint32_t workerCount() const { return static_cast<uint32_t>(m_workers.size()); }
+
+    // Divide [begin, end) evenly across worker threads.
+    // Each thread calls fn(i) for its assigned indices. Uses std::latch to
+    // synchronise completion before returning.
+    void parallelFor(uint32_t begin, uint32_t end, std::function<void(uint32_t)> fn) {
+        if (begin >= end) return;
+        uint32_t count   = end - begin;
+        uint32_t threads = std::min(workerCount(), count);
+        if (threads <= 1) {
+            for (uint32_t i = begin; i < end; ++i) fn(i);
+            return;
+        }
+
+        uint32_t perThread = (count + threads - 1) / threads;
+        std::latch done(threads);
+
+        for (uint32_t t = 0; t < threads; ++t) {
+            uint32_t s = begin + t * perThread;
+            uint32_t e = std::min(s + perThread, end);
+            submit([fn, s, e, &done]() {
+                for (uint32_t i = s; i < e; ++i) fn(i);
+                done.count_down();
+            });
+        }
+        done.wait();
+    }
 
 private:
     void workerLoop(std::stop_token st) {

@@ -127,6 +127,11 @@ Renderer::Renderer(Window& window) : m_window(window) {
     // Async compute for particle simulation
     m_asyncCompute.init(*m_device);
 
+    // Per-thread command pools for multi-threaded secondary CB recording
+    m_cmdPools.init(m_device->getDevice(),
+                    m_device->getQueueFamilies().graphicsFamily.value(),
+                    m_threadPool.workerCount());
+
     m_trailRenderer = std::make_unique<TrailRenderer>(*m_device, m_hdrFB->mainFormats());
 
     // Original fireball trail (kept for backward compatibility with existing IDs)
@@ -290,6 +295,7 @@ Renderer::~Renderer() {
     m_spriteEffectRenderer.reset();
     m_vfxRenderer.reset();
     m_asyncCompute.destroy();
+    m_cmdPools.destroy();
     m_trailRenderer.reset();
     m_meshEffectRenderer.reset();
     m_vfxQueue.reset();
@@ -1127,6 +1133,8 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
     VkCommandBufferBeginInfo bi{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
     VK_CHECK(vkBeginCommandBuffer(cmd, &bi), "Begin command buffer");
 
+    m_cmdPools.resetFrame(m_currentFrame);
+
     // ── Reset GPU timer queries for this frame ──────────────────────────────
     if (m_gpuTimer) m_gpuTimer->resetFrame(cmd, m_currentFrame);
 
@@ -1190,29 +1198,68 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
     if (m_state != AppState::Launcher) {
         VkDescriptorSet ds = m_descriptors->getSet(m_currentFrame);
 
-        auto drawStaticShadows = [&](VkCommandBuffer scmd, uint32_t /*cascade*/) {
-            auto* instances = static_cast<InstanceData*>(m_instanceMapped[m_currentFrame]);
-            uint32_t instanceIndex = 0;
-
+        // Pre-collect static entities for random-access indexing
+        struct ShadowEntity { uint32_t meshIndex; glm::mat4 model; };
+        std::vector<ShadowEntity> shadowEntities;
+        {
             auto staticView = m_scene.getRegistry()
                 .view<TransformComponent, MeshComponent, MaterialComponent>(
                     entt::exclude<GPUSkinnedMeshComponent>);
             for (auto&& [e, t, mc, mat] : staticView.each()) {
-                if (instanceIndex >= MAX_INSTANCES) break;
-                instances[instanceIndex].model = t.getInterpolatedModelMatrix(m_renderAlpha);
-
-                VkBuffer     instBuf    = m_instanceBuffers[m_currentFrame].getBuffer();
-                VkDeviceSize instOffset = instanceIndex * sizeof(InstanceData);
-                vkCmdBindVertexBuffers(scmd, 1, 1, &instBuf, &instOffset);
-                m_scene.getMesh(mc.meshIndex).draw(scmd);
-                ++instanceIndex;
+                if (shadowEntities.size() >= MAX_INSTANCES) break;
+                shadowEntities.push_back({mc.meshIndex, t.getInterpolatedModelMatrix(m_renderAlpha)});
             }
-        };
+        }
+
+        // Pre-fill instance buffer model matrices for shadow
+        auto* instances = static_cast<InstanceData*>(m_instanceMapped[m_currentFrame]);
+        for (uint32_t i = 0; i < shadowEntities.size(); ++i) {
+            instances[i].model = shadowEntities[i].model;
+        }
 
         {
             GLORY_ZONE_N("ShadowPass");
             if (m_gpuTimer) m_gpuTimer->beginZone(cmd, m_currentFrame, "Shadow");
-            m_shadowPass.recordCommands(cmd, drawStaticShadows, nullptr);
+
+            if (shadowEntities.size() >= PARALLEL_THRESHOLD) {
+                auto shadowFormats = RenderFormats::depthOnly(ShadowPass::DEPTH_FORMAT);
+                VkBuffer instBuf = m_instanceBuffers[m_currentFrame].getBuffer();
+
+                auto parallelStaticFn = [&](uint32_t /*cascade*/, const glm::mat4& lvp,
+                                            VkViewport vp, VkRect2D sc) -> std::vector<VkCommandBuffer> {
+                    auto result = ParallelRecorder::record(
+                        m_threadPool, m_cmdPools, m_currentFrame, shadowFormats,
+                        static_cast<uint32_t>(shadowEntities.size()),
+                        [&](VkCommandBuffer scmd, uint32_t start, uint32_t end) {
+                            vkCmdSetViewport(scmd, 0, 1, &vp);
+                            vkCmdSetScissor(scmd, 0, 1, &sc);
+                            vkCmdBindPipeline(scmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                              m_shadowPass.getStaticPipeline());
+                            vkCmdPushConstants(scmd, m_shadowPass.getPipelineLayout(),
+                                               VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &lvp);
+                            for (uint32_t i = start; i < end; ++i) {
+                                VkDeviceSize instOffset = i * sizeof(InstanceData);
+                                vkCmdBindVertexBuffers(scmd, 1, 1, &instBuf, &instOffset);
+                                m_scene.getMesh(shadowEntities[i].meshIndex).draw(scmd);
+                            }
+                        });
+                    return result.secondaryBuffers;
+                };
+
+                m_shadowPass.recordCommandsParallel(cmd, parallelStaticFn, nullptr);
+            } else {
+                // Fall back to single-threaded recording
+                auto drawStaticShadows = [&](VkCommandBuffer scmd, uint32_t /*cascade*/) {
+                    VkBuffer instBuf = m_instanceBuffers[m_currentFrame].getBuffer();
+                    for (uint32_t i = 0; i < static_cast<uint32_t>(shadowEntities.size()); ++i) {
+                        VkDeviceSize instOffset = i * sizeof(InstanceData);
+                        vkCmdBindVertexBuffers(scmd, 1, 1, &instBuf, &instOffset);
+                        m_scene.getMesh(shadowEntities[i].meshIndex).draw(scmd);
+                    }
+                };
+                m_shadowPass.recordCommands(cmd, drawStaticShadows, nullptr);
+            }
+
             if (m_gpuTimer) m_gpuTimer->endZone(cmd, m_currentFrame, "Shadow");
         }
     }
@@ -1289,29 +1336,27 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
     hdrRenderInfo.pDepthAttachment    = &hdrDepthAttach;
     hdrRenderInfo.pStencilAttachment  = &hdrDepthAttach;
 
-    vkCmdBeginRendering(cmd, &hdrRenderInfo);
-    if (m_gpuTimer) m_gpuTimer->beginZone(cmd, m_currentFrame, "Geometry");
-
     VkViewport vp{ 0, 0, static_cast<float>(ext.width), static_cast<float>(ext.height), 0, 1 };
     VkRect2D   sc{ {0, 0}, ext };
-    vkCmdSetViewport(cmd, 0, 1, &vp);
-    vkCmdSetScissor(cmd, 0, 1, &sc);
+
+    // ── Phase 1: CPU data fill (sequential, before rendering) ──────────────
+    struct SkinnedDrawInfo {
+        entt::entity entity;
+        VkBuffer     instBuf;
+        VkDeviceSize instOffset;
+        uint32_t     boneBase;
+        uint32_t     meshIdx;
+    };
+    std::vector<SkinnedDrawInfo> skinnedDraws;
+    uint32_t objectCount   = 0;
+    uint32_t instanceIndex = 0;
 
     if (m_state != AppState::Launcher) {
-        // ── Fill scene buffer SSBO and draw via GPU-driven indirect ──────────
-        VkPipeline mainPipeline = m_wireframe ? m_pipeline->getWireframePipeline()
-                                              : m_pipeline->getGraphicsPipeline();
-        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline);
-        VkDescriptorSet ds = m_descriptors->getSet(m_currentFrame);
-        VkDescriptorSet sets[2] = { ds, m_bindless->getSet() };
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                m_pipeline->getPipelineLayout(), 0, 2, sets, 0, nullptr);
-
         auto* instances = static_cast<InstanceData*>(m_instanceMapped[m_currentFrame]);
         auto* sceneData = static_cast<GpuObjectData*>(m_sceneMapped[m_currentFrame]);
-        uint32_t instanceIndex = 0;
-        uint32_t objectCount   = 0;
+        VkDescriptorSet ds = m_descriptors->getSet(m_currentFrame);
 
+        // ── Static entities ──────────────────────────────────────────────────
         auto staticView = m_scene.getRegistry()
             .view<TransformComponent, MeshComponent, MaterialComponent>(
                 entt::exclude<GPUSkinnedMeshComponent>);
@@ -1322,7 +1367,6 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
             glm::vec4 tint(1.0f);
             if (e == m_hoveredEntity) tint = glm::vec4(1.0f, 0.4f, 0.4f, 1.0f);
 
-            // Fill instance buffer (still needed for shadow pass)
             instances[objectCount].model        = model;
             instances[objectCount].normalMatrix = glm::transpose(glm::inverse(model));
             instances[objectCount].tint         = tint;
@@ -1330,7 +1374,6 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
             instances[objectCount].texIndices   = glm::vec4(
                 static_cast<float>(mat.materialIndex), static_cast<float>(mat.normalMapIndex), 0.0f, 0.0f);
 
-            // Fill scene buffer SSBO for GPU-driven vertex shader
             uint32_t mi = mc.meshIndex;
             int32_t  si = mc.subMeshIndex < 0 ? 0 : mc.subMeshIndex;
             if (mi < m_meshHandles.size() && si < static_cast<int32_t>(m_meshHandles[mi].size())) {
@@ -1338,7 +1381,6 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
                 auto& obj = sceneData[objectCount];
                 obj.model        = model;
                 obj.normalMatrix = glm::transpose(glm::inverse(model));
-                // Transform local AABB to world-space (conservative)
                 AABB worldAABB = mc.localAABB.transformed(model);
                 obj.aabbMin      = glm::vec4(worldAABB.min, 0.0f);
                 obj.aabbMax      = glm::vec4(worldAABB.max, 0.0f);
@@ -1355,7 +1397,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
         }
         instanceIndex = objectCount;
 
-        // Update scene buffer descriptor
+        // Flush scene buffer descriptor
         if (objectCount > 0) {
             VkDeviceSize usedSize = objectCount * sizeof(GpuObjectData);
             m_sceneBuffers[m_currentFrame].flush();
@@ -1363,85 +1405,172 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
                 m_sceneBuffers[m_currentFrame].getBuffer(), usedSize);
         }
 
-        // GPU-driven indirect draw: bind mega-buffer and issue indirect draw
-        if (objectCount > 0 && m_megaBuffer) {
-            m_megaBuffer->bind(cmd);
+        // ── Skinned entities ─────────────────────────────────────────────────
+        auto skinnedView = m_scene.getRegistry()
+            .view<TransformComponent, MaterialComponent, GPUSkinnedMeshComponent>();
+        for (auto&& [e, t, mat, ssm] : skinnedView.each()) {
+            if (instanceIndex >= MAX_INSTANCES) break;
+            glm::mat4 model = t.getInterpolatedModelMatrix(m_renderAlpha);
+            instances[instanceIndex].model        = model;
+            instances[instanceIndex].normalMatrix = glm::transpose(glm::inverse(model));
 
-            // For now use a CPU-side fallback: draw each object individually via
-            // the mega-buffer with firstInstance = objectIndex (for SSBO lookup).
-            // Full GpuCuller dispatch + vkCmdDrawIndexedIndirectCount will be wired
-            // in the two-phase culling step once HiZ is integrated into the frame.
-            for (uint32_t i = 0; i < objectCount; ++i) {
-                vkCmdDrawIndexed(cmd,
-                    sceneData[i].meshIndexCount, 1,
-                    sceneData[i].meshIndexOffset,
-                    static_cast<int32_t>(sceneData[i].meshVertexOffset),
-                    i); // firstInstance = object index for gl_InstanceIndex
+            glm::vec4 tint(1.0f);
+            if (e == m_hoveredEntity) {
+                tint = glm::vec4(1.0f, 0.6f, 0.6f, 1.0f);
             }
+            instances[instanceIndex].tint = tint;
+            instances[instanceIndex].params = glm::vec4(mat.shininess, mat.metallic, mat.roughness, mat.emissive);
+            instances[instanceIndex].texIndices = glm::vec4(
+                static_cast<float>(mat.materialIndex), static_cast<float>(mat.normalMapIndex), 0.0f, 0.0f);
+
+            VkBuffer     instBuf    = m_instanceBuffers[m_currentFrame].getBuffer();
+            VkDeviceSize instOffset = instanceIndex * sizeof(InstanceData);
+            uint32_t boneBase = ssm.boneSlot * Descriptors::MAX_BONES;
+
+            skinnedDraws.push_back({e, instBuf, instOffset, boneBase, ssm.staticSkinnedMeshIndex});
+            ++instanceIndex;
+        }
+    }
+
+    // ── Phase 2: HDR Scope 1 — parallel geometry draws ──────────────────────
+    if (m_gpuTimer) m_gpuTimer->beginZone(cmd, m_currentFrame, "Geometry");
+
+    if (m_state != AppState::Launcher) {
+        VkDescriptorSet ds = m_descriptors->getSet(m_currentFrame);
+        auto* sceneData = static_cast<GpuObjectData*>(m_sceneMapped[m_currentFrame]);
+        RenderFormats hdrFormats = m_hdrFB->mainFormats();
+
+        // Record static mesh draws in parallel
+        ParallelRecordResult staticResult;
+        if (objectCount > 0) {
+            staticResult = ParallelRecorder::record(
+                m_threadPool, m_cmdPools, m_currentFrame, hdrFormats, objectCount,
+                [&](VkCommandBuffer scmd, uint32_t start, uint32_t end) {
+                    VkViewport vp{ 0, 0, static_cast<float>(ext.width), static_cast<float>(ext.height), 0, 1 };
+                    VkRect2D sc{ {0,0}, ext };
+                    vkCmdSetViewport(scmd, 0, 1, &vp);
+                    vkCmdSetScissor(scmd, 0, 1, &sc);
+                    VkPipeline mainPipeline = m_wireframe ? m_pipeline->getWireframePipeline()
+                                                          : m_pipeline->getGraphicsPipeline();
+                    vkCmdBindPipeline(scmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline);
+                    VkDescriptorSet sets[2] = { ds, m_bindless->getSet() };
+                    vkCmdBindDescriptorSets(scmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                            m_pipeline->getPipelineLayout(), 0, 2, sets, 0, nullptr);
+                    m_megaBuffer->bind(scmd);
+                    for (uint32_t i = start; i < end; ++i) {
+                        vkCmdDrawIndexed(scmd, sceneData[i].meshIndexCount, 1,
+                            sceneData[i].meshIndexOffset,
+                            static_cast<int32_t>(sceneData[i].meshVertexOffset), i);
+                    }
+                });
         }
 
-        // ── GPU-skinned pass ─────────────────────────────────────────────────
-        if (m_skinnedPipeline != VK_NULL_HANDLE) {
-            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_skinnedPipeline);
-            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    m_skinnedPipelineLayout, 0, 2, sets, 0, nullptr);
+        // Record skinned mesh draws in parallel
+        ParallelRecordResult skinnedResult;
+        if (!skinnedDraws.empty()) {
+            skinnedResult = ParallelRecorder::record(
+                m_threadPool, m_cmdPools, m_currentFrame, hdrFormats,
+                static_cast<uint32_t>(skinnedDraws.size()),
+                [&](VkCommandBuffer scmd, uint32_t start, uint32_t end) {
+                    VkViewport vp{ 0, 0, static_cast<float>(ext.width), static_cast<float>(ext.height), 0, 1 };
+                    VkRect2D sc{ {0,0}, ext };
+                    vkCmdSetViewport(scmd, 0, 1, &vp);
+                    vkCmdSetScissor(scmd, 0, 1, &sc);
+                    vkCmdBindPipeline(scmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_skinnedPipeline);
+                    VkDescriptorSet sets[2] = { ds, m_bindless->getSet() };
+                    vkCmdBindDescriptorSets(scmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                            m_skinnedPipelineLayout, 0, 2, sets, 0, nullptr);
+                    for (uint32_t i = start; i < end; ++i) {
+                        auto& info = skinnedDraws[i];
+                        vkCmdBindVertexBuffers(scmd, 1, 1, &info.instBuf, &info.instOffset);
+                        vkCmdPushConstants(scmd, m_skinnedPipelineLayout,
+                                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                                           0, sizeof(uint32_t), &info.boneBase);
+                        const auto& mesh = m_scene.getStaticSkinnedMesh(info.meshIdx);
+                        mesh.bind(scmd);
+                        mesh.draw(scmd);
+                    }
+                });
+        }
 
-            // Collect per-entity draw parameters so the outline pass can replay
-            // them after all geometry is drawn (avoids mid-loop pipeline switches).
-            struct SkinnedDrawInfo {
-                entt::entity entity;
-                VkBuffer     instBuf;
-                VkDeviceSize instOffset;
-                uint32_t     boneBase;
-                uint32_t     meshIdx; // staticSkinnedMeshIndex
-            };
-            std::vector<SkinnedDrawInfo> skinnedDraws;
+        bool hasSecondaries = !staticResult.secondaryBuffers.empty() ||
+                              !skinnedResult.secondaryBuffers.empty();
 
-            auto skinnedView = m_scene.getRegistry()
-                .view<TransformComponent, MaterialComponent, GPUSkinnedMeshComponent>();
-            for (auto&& [e, t, mat, ssm] : skinnedView.each()) {
-                if (instanceIndex >= MAX_INSTANCES) break;
-                glm::mat4 model = t.getInterpolatedModelMatrix(m_renderAlpha);
-                instances[instanceIndex].model        = model;
-                instances[instanceIndex].normalMatrix = glm::transpose(glm::inverse(model));
+        // Set SECONDARY_COMMAND_BUFFERS flag only when we have secondaries
+        if (hasSecondaries)
+            hdrRenderInfo.flags = VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT;
 
-                // Tint: hover turns slightly red so the outline is still the
-                // canonical highlight; selected green tint is now replaced by
-                // the outline system entirely.
-                glm::vec4 tint(1.0f);
-                if (e == m_hoveredEntity) {
-                    tint = glm::vec4(1.0f, 0.6f, 0.6f, 1.0f); // subtle hover tint
-                }
-                instances[instanceIndex].tint = tint;
+        vkCmdBeginRendering(cmd, &hdrRenderInfo);
+        if (!staticResult.secondaryBuffers.empty())
+            vkCmdExecuteCommands(cmd, static_cast<uint32_t>(staticResult.secondaryBuffers.size()),
+                                 staticResult.secondaryBuffers.data());
+        if (!skinnedResult.secondaryBuffers.empty())
+            vkCmdExecuteCommands(cmd, static_cast<uint32_t>(skinnedResult.secondaryBuffers.size()),
+                                 skinnedResult.secondaryBuffers.data());
+        vkCmdEndRendering(cmd);
 
-                instances[instanceIndex].params = glm::vec4(mat.shininess, mat.metallic, mat.roughness, mat.emissive);
-                instances[instanceIndex].texIndices = glm::vec4(
-                    static_cast<float>(mat.materialIndex), static_cast<float>(mat.normalMapIndex), 0.0f, 0.0f);
+        // ── Self-synchronizing barrier between scope 1 and scope 2 ──────────
+        {
+            VkMemoryBarrier2 memBarrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+            memBarrier.srcStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT
+                                     | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+            memBarrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT
+                                     | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            memBarrier.dstStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT
+                                     | VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT;
+            memBarrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT
+                                     | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT
+                                     | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT
+                                     | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            VkDependencyInfo dep{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+            dep.memoryBarrierCount = 1;
+            dep.pMemoryBarriers = &memBarrier;
+            vkCmdPipelineBarrier2(cmd, &dep);
+        }
 
-                VkBuffer     instBuf    = m_instanceBuffers[m_currentFrame].getBuffer();
-                VkDeviceSize instOffset = instanceIndex * sizeof(InstanceData);
-                vkCmdBindVertexBuffers(cmd, 1, 1, &instBuf, &instOffset);
+        // ── Phase 3: HDR Scope 2 (inline, LOAD_OP_LOAD) — outlines + extras ─
+        {
+            VkRenderingAttachmentInfo loadColorAttach{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+            loadColorAttach.imageView   = m_hdrFB->colorView();
+            loadColorAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            loadColorAttach.loadOp      = VK_ATTACHMENT_LOAD_OP_LOAD;
+            loadColorAttach.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
 
-                uint32_t boneBase = ssm.boneSlot * Descriptors::MAX_BONES;
-                vkCmdPushConstants(cmd, m_skinnedPipelineLayout,
-                                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                                   0, sizeof(uint32_t), &boneBase);
+            VkRenderingAttachmentInfo loadCharDepthAttach{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+            loadCharDepthAttach.imageView   = m_hdrFB->characterDepthView();
+            loadCharDepthAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            loadCharDepthAttach.loadOp      = VK_ATTACHMENT_LOAD_OP_LOAD;
+            loadCharDepthAttach.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
 
-                const auto& mesh = m_scene.getStaticSkinnedMesh(ssm.staticSkinnedMeshIndex);
-                mesh.bind(cmd);
-                mesh.draw(cmd);
+            VkRenderingAttachmentInfo loadColorAttachments[2] = {loadColorAttach, loadCharDepthAttach};
 
-                skinnedDraws.push_back({e, instBuf, instOffset, boneBase, ssm.staticSkinnedMeshIndex});
-                ++instanceIndex;
-            }
+            VkRenderingAttachmentInfo loadDepthAttach{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+            loadDepthAttach.imageView   = m_hdrFB->depthAttachmentView();
+            loadDepthAttach.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            loadDepthAttach.loadOp      = VK_ATTACHMENT_LOAD_OP_LOAD;
+            loadDepthAttach.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
+
+            VkRenderingInfo loadRenderInfo{VK_STRUCTURE_TYPE_RENDERING_INFO};
+            loadRenderInfo.renderArea          = { {0, 0}, ext };
+            loadRenderInfo.layerCount          = 1;
+            loadRenderInfo.colorAttachmentCount = 2;
+            loadRenderInfo.pColorAttachments   = loadColorAttachments;
+            loadRenderInfo.pDepthAttachment    = &loadDepthAttach;
+            loadRenderInfo.pStencilAttachment  = &loadDepthAttach;
+
+            vkCmdBeginRendering(cmd, &loadRenderInfo);
+
+            VkViewport vp{ 0, 0, static_cast<float>(ext.width), static_cast<float>(ext.height), 0, 1 };
+            VkRect2D   sc{ {0, 0}, ext };
+            vkCmdSetViewport(cmd, 0, 1, &vp);
+            vkCmdSetScissor(cmd, 0, 1, &sc);
+
+            VkDescriptorSet sets[2] = { ds, m_bindless->getSet() };
 
             // ── Team-colored outlines (LoL Stage 8) ──────────────────────────
-            // Run after ALL skinned geometry so stencil writes don't interfere
-            // with subsequent normal draws.
             if (m_outlineRenderer && !skinnedDraws.empty()) {
                 auto& reg = m_scene.getRegistry();
 
-                // Determine the player's current attack target (for red outline).
                 entt::entity attackTarget = entt::null;
                 if (reg.valid(m_playerEntity) &&
                     reg.all_of<CombatComponent>(m_playerEntity)) {
@@ -1458,7 +1587,6 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
 
                     const auto& mesh = m_scene.getStaticSkinnedMesh(info.meshIdx);
 
-                    // Priority: hovered > attack-target > selected.
                     if (isHovered) {
                         m_outlineRenderer->renderOutline(
                             cmd, ds, info.instBuf, info.instOffset,
@@ -1482,54 +1610,58 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
                 vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                         m_skinnedPipelineLayout, 0, 2, sets, 0, nullptr);
             }
-        }
 
-        // ── Debug grid ───────────────────────────────────────────────────────
-        if (m_showGrid && m_gridPipeline != VK_NULL_HANDLE) {
-            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_gridPipeline);
-            struct GridPC { glm::mat4 viewProj; float gridY; } gridPC;
-            gridPC.viewProj = m_isoCam.getProjectionMatrix(aspect) * m_isoCam.getViewMatrix();
-            gridPC.gridY    = 0.0f;
-            vkCmdPushConstants(cmd, m_gridPipelineLayout,
-                               VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                               0, sizeof(GridPC), &gridPC);
-            vkCmdDraw(cmd, 6, 1, 0, 0);
-        }
+            // ── Debug grid ───────────────────────────────────────────────────
+            if (m_showGrid && m_gridPipeline != VK_NULL_HANDLE) {
+                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_gridPipeline);
+                struct GridPC { glm::mat4 viewProj; float gridY; } gridPC;
+                gridPC.viewProj = m_isoCam.getProjectionMatrix(aspect) * m_isoCam.getViewMatrix();
+                gridPC.gridY    = 0.0f;
+                vkCmdPushConstants(cmd, m_gridPipelineLayout,
+                                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                                   0, sizeof(GridPC), &gridPC);
+                vkCmdDraw(cmd, 6, 1, 0, 0);
+            }
 
-        // ── Ground decals (depth test ON, depth write OFF, alpha blend) ──────
-        if (m_groundDecalRenderer) {
-            float aspect = static_cast<float>(ext.width) / static_cast<float>(ext.height);
-            glm::mat4 vp = m_isoCam.getProjectionMatrix(aspect) * m_isoCam.getViewMatrix();
-            float appTime = static_cast<float>(glfwGetTime());
-            m_groundDecalRenderer->render(cmd, vp, appTime);
-        }
+            // ── Ground decals (depth test ON, depth write OFF, alpha blend) ──
+            if (m_groundDecalRenderer) {
+                float aspect = static_cast<float>(ext.width) / static_cast<float>(ext.height);
+                glm::mat4 vp = m_isoCam.getProjectionMatrix(aspect) * m_isoCam.getViewMatrix();
+                float appTime = static_cast<float>(glfwGetTime());
+                m_groundDecalRenderer->render(cmd, vp, appTime);
+            }
 
-        // ── Click indicator ───────────────────────────────────────────────────
-        if (m_clickAnim && m_clickIndicatorRenderer) {
-            float t_norm = m_clickAnim->lifetime / m_clickAnim->maxLife;
-            glm::mat4 vp = m_isoCam.getProjectionMatrix(aspect) * m_isoCam.getViewMatrix();
-            m_clickIndicatorRenderer->render(cmd, vp, m_clickAnim->position, t_norm, 1.5f);
-        }
+            // ── Click indicator ──────────────────────────────────────────────
+            if (m_clickAnim && m_clickIndicatorRenderer) {
+                float t_norm = m_clickAnim->lifetime / m_clickAnim->maxLife;
+                glm::mat4 vp = m_isoCam.getProjectionMatrix(aspect) * m_isoCam.getViewMatrix();
+                m_clickIndicatorRenderer->render(cmd, vp, m_clickAnim->position, t_norm, 1.5f);
+            }
 
-        // ── Debug Renderer (Marquee Box) ──────────────────────────────────────
-        glm::mat4 viewProj = m_isoCam.getProjectionMatrix(aspect) * m_isoCam.getViewMatrix();
-        m_debugRenderer.render(cmd, viewProj);
+            // ── Debug Renderer (Marquee Box) ─────────────────────────────────
+            glm::mat4 viewProj = m_isoCam.getProjectionMatrix(aspect) * m_isoCam.getViewMatrix();
+            m_debugRenderer.render(cmd, viewProj);
 
-        // ── Water surface (alpha-blend, depth-test ON, depth-write OFF) ───
-        if (m_waterRenderer) {
-            float appTime = static_cast<float>(glfwGetTime());
-            glm::mat4 waterModel = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.25f, 0.0f))
-                                 * glm::scale(glm::mat4(1.0f), glm::vec3(200.0f, 1.0f, 200.0f));
-            m_waterRenderer->render(cmd, ds, m_bindless->getSet(), appTime, waterModel);
-            // Restore main pipeline after water hijacked the pipeline bind point
-            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_skinnedPipeline);
-            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    m_skinnedPipelineLayout, 0, 2, sets, 0, nullptr);
+            // ── Water surface (alpha-blend, depth-test ON, depth-write OFF) ──
+            if (m_waterRenderer) {
+                float appTime = static_cast<float>(glfwGetTime());
+                glm::mat4 waterModel = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.25f, 0.0f))
+                                     * glm::scale(glm::mat4(1.0f), glm::vec3(200.0f, 1.0f, 200.0f));
+                m_waterRenderer->render(cmd, ds, m_bindless->getSet(), appTime, waterModel);
+                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_skinnedPipeline);
+                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                        m_skinnedPipelineLayout, 0, 2, sets, 0, nullptr);
+            }
+
+            vkCmdEndRendering(cmd);
         }
+    } else {
+        // Launcher mode: just clear the HDR framebuffer
+        vkCmdBeginRendering(cmd, &hdrRenderInfo);
+        vkCmdEndRendering(cmd);
     }
 
     if (m_gpuTimer) m_gpuTimer->endZone(cmd, m_currentFrame, "Geometry");
-    vkCmdEndRendering(cmd);
 
     // ── Transition HDR attachments after main pass ──────────────────────────
     {

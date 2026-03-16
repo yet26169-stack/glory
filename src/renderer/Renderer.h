@@ -34,6 +34,8 @@
 #include "renderer/MegaBuffer.h"
 #include "renderer/AsyncComputeManager.h"
 #include "renderer/GpuTimer.h"
+#include "renderer/ParallelRecorder.h"
+#include "renderer/ThreadedCommandPool.h"
 #include "input/InputManager.h"
 #include "scene/Scene.h"
 #include "terrain/IsometricCamera.h"
@@ -143,6 +145,8 @@ private:
     std::unique_ptr<TrailRenderer> m_trailRenderer;   // connected ribbon trails
     std::unique_ptr<MeshEffectRenderer> m_meshEffectRenderer; // geometric mesh VFX
     AsyncComputeManager            m_asyncCompute;    // async compute queue for particles
+    ThreadPool                     m_threadPool;      // worker threads for parallel CB recording
+    ThreadedCommandPoolManager     m_cmdPools;        // per-thread Vulkan command pools
     std::unique_ptr<AbilitySystem> m_abilitySystem;   // ability state machine
     std::unique_ptr<ProjectileSystem> m_projectileSystem; // moves projectile entities
     std::unique_ptr<CombatSystem>  m_combatSystem;    // auto-attack / shield / trick

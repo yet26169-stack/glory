@@ -1,18 +1,20 @@
 #pragma once
+#include "renderer/RenderFormats.h"
 #include <vulkan/vulkan.h>
 #include <array>
 #include <vector>
 #include <cstdint>
+#include <cassert>
 
 namespace glory {
 
-// Each worker thread needs its own VkCommandPool (Vulkan spec requirement).
-// This struct holds a pool + secondary command buffers for each frame-in-flight.
 static constexpr uint32_t MAX_FRAMES = 2;
+static constexpr uint32_t CBS_PER_FRAME = 8; // up to 8 secondary CBs per thread per frame
 
 struct ThreadCommandResources {
     VkCommandPool pool = VK_NULL_HANDLE;
-    std::array<VkCommandBuffer, MAX_FRAMES> secondaryBuffers{};
+    std::array<std::array<VkCommandBuffer, CBS_PER_FRAME>, MAX_FRAMES> secondaryBuffers{};
+    std::array<uint32_t, MAX_FRAMES> nextCB{};
 
     void init(VkDevice device, uint32_t graphicsQueueFamily) {
         VkCommandPoolCreateInfo ci{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
@@ -20,11 +22,13 @@ struct ThreadCommandResources {
         ci.queueFamilyIndex = graphicsQueueFamily;
         vkCreateCommandPool(device, &ci, nullptr, &pool);
 
-        VkCommandBufferAllocateInfo allocInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
-        allocInfo.commandPool = pool;
-        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
-        allocInfo.commandBufferCount = MAX_FRAMES;
-        vkAllocateCommandBuffers(device, &allocInfo, secondaryBuffers.data());
+        for (uint32_t f = 0; f < MAX_FRAMES; ++f) {
+            VkCommandBufferAllocateInfo allocInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+            allocInfo.commandPool = pool;
+            allocInfo.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
+            allocInfo.commandBufferCount = CBS_PER_FRAME;
+            vkAllocateCommandBuffers(device, &allocInfo, secondaryBuffers[f].data());
+        }
     }
 
     void destroy(VkDevice device) {
@@ -34,16 +38,30 @@ struct ThreadCommandResources {
         }
     }
 
-    void reset(VkDevice device, uint32_t frameIndex) {
-        vkResetCommandBuffer(secondaryBuffers[frameIndex], 0);
+    void resetFrame(uint32_t frameIndex) {
+        for (uint32_t i = 0; i < nextCB[frameIndex]; ++i) {
+            vkResetCommandBuffer(secondaryBuffers[frameIndex][i], 0);
+        }
+        nextCB[frameIndex] = 0;
     }
 
-    VkCommandBuffer begin(uint32_t frameIndex, VkRenderPass renderPass, VkFramebuffer framebuffer) {
-        VkCommandBuffer cmd = secondaryBuffers[frameIndex];
+    // Begin the next available secondary command buffer for this frame using
+    // VkCommandBufferInheritanceRenderingInfo (Vulkan 1.3 dynamic rendering).
+    VkCommandBuffer begin(uint32_t frameIndex, const RenderFormats& formats) {
+        uint32_t idx = nextCB[frameIndex]++;
+        assert(idx < CBS_PER_FRAME);
+        VkCommandBuffer cmd = secondaryBuffers[frameIndex][idx];
+
+        VkCommandBufferInheritanceRenderingInfo inheritRendering{
+            VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO};
+        inheritRendering.colorAttachmentCount    = formats.colorCount;
+        inheritRendering.pColorAttachmentFormats = formats.colorFormats;
+        inheritRendering.depthAttachmentFormat   = formats.depthFormat;
+        inheritRendering.stencilAttachmentFormat = formats.stencilFormat;
+        inheritRendering.rasterizationSamples    = VK_SAMPLE_COUNT_1_BIT;
 
         VkCommandBufferInheritanceInfo inherit{VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO};
-        inherit.renderPass = renderPass;
-        inherit.framebuffer = framebuffer;
+        inherit.pNext = &inheritRendering;
 
         VkCommandBufferBeginInfo beginInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
@@ -53,8 +71,8 @@ struct ThreadCommandResources {
         return cmd;
     }
 
-    void end(uint32_t frameIndex) {
-        vkEndCommandBuffer(secondaryBuffers[frameIndex]);
+    static void end(VkCommandBuffer cmd) {
+        vkEndCommandBuffer(cmd);
     }
 };
 
@@ -74,6 +92,12 @@ public:
             res.destroy(m_device);
         }
         m_resources.clear();
+    }
+
+    void resetFrame(uint32_t frameIndex) {
+        for (auto& res : m_resources) {
+            res.resetFrame(frameIndex);
+        }
     }
 
     ThreadCommandResources& getResources(uint32_t threadIndex) {

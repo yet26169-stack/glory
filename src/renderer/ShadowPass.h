@@ -47,6 +47,17 @@ public:
                         DrawFn staticDrawFn,
                         DrawFn skinnedDrawFn);
 
+    // Record shadow depth using secondary command buffers (multi-threaded).
+    // Each SecondaryDrawFn returns a vector of pre-recorded secondary CBs for the
+    // given cascade. Cascade setup (viewport, scissor, pipeline, push constants)
+    // must be recorded inside each secondary CB by the caller.
+    using SecondaryDrawFn = std::function<std::vector<VkCommandBuffer>(
+        uint32_t cascadeIndex, const glm::mat4& lightViewProj,
+        VkViewport viewport, VkRect2D scissor)>;
+    void recordCommandsParallel(VkCommandBuffer cmd,
+                                SecondaryDrawFn staticDrawFn,
+                                SecondaryDrawFn skinnedDrawFn);
+
     // Bind the shadow atlas to descriptor binding 3 for sampling in the main pass.
     void bindToDescriptors(Descriptors& descriptors);
 

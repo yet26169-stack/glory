@@ -2,9 +2,9 @@
 #include "core/ThreadPool.h"
 #include "renderer/ThreadedCommandPool.h"
 #include <functional>
+#include <latch>
 #include <vector>
 #include <algorithm>
-#include <spdlog/spdlog.h>
 
 namespace glory {
 
@@ -16,7 +16,7 @@ struct ParallelRecordResult {
 };
 
 // Records work across multiple threads using secondary command buffers.
-// Falls back to single-threaded inline recording below PARALLEL_THRESHOLD.
+// Falls back to single-threaded recording below PARALLEL_THRESHOLD.
 class ParallelRecorder {
 public:
     using RecordFn = std::function<void(VkCommandBuffer cmd, uint32_t startIdx, uint32_t endIdx)>;
@@ -28,8 +28,7 @@ public:
         ThreadPool& pool,
         ThreadedCommandPoolManager& cmdPools,
         uint32_t frameIndex,
-        VkRenderPass renderPass,
-        VkFramebuffer framebuffer,
+        const RenderFormats& formats,
         uint32_t entityCount,
         RecordFn recordFn)
     {
@@ -45,26 +44,24 @@ public:
 
         result.secondaryBuffers.resize(actualThreads);
 
-        std::vector<std::future<void>> futures;
-        futures.reserve(actualThreads);
+        std::latch done(actualThreads);
 
         for (uint32_t t = 0; t < actualThreads; ++t) {
             uint32_t start = t * entitiesPerThread;
             uint32_t end = std::min(start + entitiesPerThread, entityCount);
 
-            futures.push_back(pool.submit([&, t, start, end]() {
+            pool.submit([&cmdPools, &formats, &recordFn, &result, &done,
+                         t, start, end, frameIndex]() {
                 auto& res = cmdPools.getResources(t);
-                res.reset(VK_NULL_HANDLE, frameIndex);
-                VkCommandBuffer cmd = res.begin(frameIndex, renderPass, framebuffer);
+                VkCommandBuffer cmd = res.begin(frameIndex, formats);
                 recordFn(cmd, start, end);
-                res.end(frameIndex);
+                ThreadCommandResources::end(cmd);
                 result.secondaryBuffers[t] = cmd;
-            }));
+                done.count_down();
+            });
         }
 
-        // Wait for all threads to complete
-        for (auto& f : futures) f.get();
-
+        done.wait();
         return result;
     }
 };

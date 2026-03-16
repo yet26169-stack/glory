@@ -229,7 +229,78 @@ void ShadowPass::recordCommands(VkCommandBuffer cmd,
     vkCmdPipelineBarrier2(cmd, &depInfo);
 }
 
-// ── descriptor binding ──────────────────────────────────────────────────────
+// ── parallel recording variant ──────────────────────────────────────────────
+
+void ShadowPass::recordCommandsParallel(VkCommandBuffer cmd,
+                                        SecondaryDrawFn staticDrawFn,
+                                        SecondaryDrawFn skinnedDrawFn) {
+    // Transition atlas from UNDEFINED to DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+    VkImageMemoryBarrier2 barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
+    barrier.srcStageMask  = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+    barrier.srcAccessMask = VK_ACCESS_2_NONE;
+    barrier.dstStageMask  = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT;
+    barrier.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    barrier.oldLayout     = VK_IMAGE_LAYOUT_UNDEFINED;
+    barrier.newLayout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    barrier.image         = m_atlasImage;
+    barrier.subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1};
+
+    VkDependencyInfo depInfo{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+    depInfo.imageMemoryBarrierCount = 1;
+    depInfo.pImageMemoryBarriers    = &barrier;
+    vkCmdPipelineBarrier2(cmd, &depInfo);
+
+    VkRenderingAttachmentInfo depthAttach{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+    depthAttach.imageView   = m_atlasView;
+    depthAttach.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    depthAttach.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthAttach.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
+    depthAttach.clearValue.depthStencil = {1.0f, 0};
+
+    VkRenderingInfo renderInfo{VK_STRUCTURE_TYPE_RENDERING_INFO};
+    renderInfo.flags             = VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT;
+    renderInfo.renderArea        = {{0, 0}, {SHADOW_MAP_SIZE * CASCADE_COUNT, SHADOW_MAP_SIZE}};
+    renderInfo.layerCount        = 1;
+    renderInfo.pDepthAttachment  = &depthAttach;
+
+    vkCmdBeginRendering(cmd, &renderInfo);
+
+    for (uint32_t c = 0; c < CASCADE_COUNT; ++c) {
+        VkViewport vp{};
+        vp.x        = static_cast<float>(c * SHADOW_MAP_SIZE);
+        vp.y        = 0.0f;
+        vp.width    = static_cast<float>(SHADOW_MAP_SIZE);
+        vp.height   = static_cast<float>(SHADOW_MAP_SIZE);
+        vp.minDepth = 0.0f;
+        vp.maxDepth = 1.0f;
+
+        VkRect2D scissor{};
+        scissor.offset = {static_cast<int32_t>(c * SHADOW_MAP_SIZE), 0};
+        scissor.extent = {SHADOW_MAP_SIZE, SHADOW_MAP_SIZE};
+
+        if (staticDrawFn) {
+            auto cbs = staticDrawFn(c, m_cascades[c].lightViewProj, vp, scissor);
+            if (!cbs.empty())
+                vkCmdExecuteCommands(cmd, static_cast<uint32_t>(cbs.size()), cbs.data());
+        }
+        if (skinnedDrawFn) {
+            auto cbs = skinnedDrawFn(c, m_cascades[c].lightViewProj, vp, scissor);
+            if (!cbs.empty())
+                vkCmdExecuteCommands(cmd, static_cast<uint32_t>(cbs.size()), cbs.data());
+        }
+    }
+
+    vkCmdEndRendering(cmd);
+
+    // Transition atlas to SHADER_READ_ONLY_OPTIMAL for sampling in main pass
+    barrier.srcStageMask  = VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+    barrier.srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    barrier.dstStageMask  = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+    barrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+    barrier.oldLayout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    barrier.newLayout     = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    vkCmdPipelineBarrier2(cmd, &depInfo);
+}
 
 void ShadowPass::bindToDescriptors(Descriptors& descriptors) {
     descriptors.updateShadowMap(m_atlasView, m_sampler);
