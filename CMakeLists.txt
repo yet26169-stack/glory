@@ -109,6 +109,8 @@ set(SHADER_SOURCES
     ${CMAKE_SOURCE_DIR}/shaders/ssao_blur.comp
     ${CMAKE_SOURCE_DIR}/shaders/ssr.comp
     ${CMAKE_SOURCE_DIR}/shaders/flow_field.comp
+    ${CMAKE_SOURCE_DIR}/shaders/impostor_billboard.vert
+    ${CMAKE_SOURCE_DIR}/shaders/impostor_billboard.frag
 )
 
 foreach(SHADER ${SHADER_SOURCES})
@@ -245,6 +247,8 @@ set(SOURCES
     src/renderer/ShadowPass.cpp
     src/renderer/HiZPass.cpp
     src/renderer/MegaBuffer.cpp
+    src/renderer/LODSystem.cpp
+    src/renderer/ImpostorSystem.cpp
     src/renderer/AsyncComputeManager.cpp
     src/renderer/BloomPass.cpp
     src/renderer/ToneMapPass.cpp

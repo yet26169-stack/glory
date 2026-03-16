@@ -33,6 +33,8 @@
 #include "renderer/ShadowPass.h"
 #include "renderer/HiZPass.h"
 #include "renderer/MegaBuffer.h"
+#include "renderer/LODSystem.h"
+#include "renderer/ImpostorSystem.h"
 #include "renderer/AsyncComputeManager.h"
 #include "renderer/SSAOPass.h"
 #include "renderer/SSRPass.h"
@@ -155,6 +157,10 @@ private:
     std::vector<void*>           m_sceneMapped;      // CPU-mapped pointers
     // Per-model, per-submesh MeshHandle for mega-buffer offsets
     std::vector<std::vector<MeshHandle>> m_meshHandles;
+
+    // ── LOD & Impostor ────────────────────────────────────────────────────
+    LODSystem       m_lodSystem;
+    ImpostorSystem  m_impostorSystem;
 
     // ── VFX system ────────────────────────────────────────────────────────
     std::unique_ptr<VFXEventQueue> m_vfxQueue;        // SPSC bridge game→render (AbilitySystem)

@@ -1,0 +1,29 @@
+{
+    "lod": {
+        "performance": {
+            "lod1Distance": 25.0,
+            "lod2Distance": 40.0,
+            "lod3Distance": 55.0,
+            "impostorDistance": 70.0
+        },
+        "high_quality": {
+            "lod1Distance": 35.0,
+            "lod2Distance": 55.0,
+            "lod3Distance": 75.0,
+            "impostorDistance": 100.0
+        },
+        "ultra": {
+            "lod1Distance": 50.0,
+            "lod2Distance": 80.0,
+            "lod3Distance": 110.0,
+            "impostorDistance": 140.0
+        }
+    },
+    "impostor": {
+        "angleCount": 8,
+        "atlasSize": 2048,
+        "cellSize": 128,
+        "defaultWorldHeight": 2.0,
+        "defaultWorldWidth": 1.5
+    }
+}

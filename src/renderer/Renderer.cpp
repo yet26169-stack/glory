@@ -1528,6 +1528,9 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
         VkDescriptorSet ds = m_descriptors->getSet(m_currentFrame);
 
         // ── Static entities ─────────────────────────────────────────────────
+        m_impostorSystem.beginFrame();
+        glm::vec3 camPos = m_isoCam.getPosition();
+
         auto staticView = m_scene.getRegistry()
             .view<TransformComponent, MeshComponent, MaterialComponent>(
                 entt::exclude<GPUSkinnedMeshComponent>);
@@ -1535,8 +1538,19 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
             if (objectCount >= MAX_INSTANCES) break;
 
             glm::mat4 model = t.getInterpolatedModelMatrix(m_renderAlpha);
+            glm::vec3 worldPos = glm::vec3(model[3]);
+            float dist = glm::length(worldPos - camPos);
+
             glm::vec4 tint(1.0f);
             if (e == m_hoveredEntity) tint = glm::vec4(1.0f, 0.4f, 0.4f, 1.0f);
+
+            // Beyond impostor distance → render as billboard, skip mesh
+            if (m_lodSystem.shouldBeImpostor(dist)) {
+                auto inst = m_impostorSystem.buildInstance(
+                    "default", worldPos, camPos, tint);
+                m_impostorSystem.addInstance(inst);
+                continue;
+            }
 
             instances[objectCount].model        = model;
             instances[objectCount].normalMatrix = glm::transpose(glm::inverse(model));
@@ -1549,6 +1563,13 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
             int32_t  si = mc.subMeshIndex < 0 ? 0 : mc.subMeshIndex;
             if (mi < m_meshHandles.size() && si < static_cast<int32_t>(m_meshHandles[mi].size())) {
                 const auto& mh = m_meshHandles[mi][si];
+
+                // CPU-side LOD selection by distance
+                LODLevel lod = m_lodSystem.getLODLevel(mi, static_cast<uint32_t>(si), dist);
+                uint32_t vOff  = (lod.indexCount > 0) ? lod.vertexOffset : mh.vertexOffset;
+                uint32_t iOff  = (lod.indexCount > 0) ? lod.indexOffset  : mh.indexOffset;
+                uint32_t iCnt  = (lod.indexCount > 0) ? lod.indexCount   : mh.indexCount;
+
                 auto& obj = sceneData[objectCount];
                 obj.model        = model;
                 obj.normalMatrix = glm::transpose(glm::inverse(model));
@@ -1559,9 +1580,9 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
                 obj.params       = glm::vec4(mat.shininess, mat.metallic, mat.roughness, mat.emissive);
                 obj.texIndices   = glm::vec4(
                     static_cast<float>(mat.materialIndex), static_cast<float>(mat.normalMapIndex), 0.0f, 0.0f);
-                obj.meshVertexOffset = mh.vertexOffset;
-                obj.meshIndexOffset  = mh.indexOffset;
-                obj.meshIndexCount   = mh.indexCount;
+                obj.meshVertexOffset = vOff;
+                obj.meshIndexOffset  = iOff;
+                obj.meshIndexCount   = iCnt;
                 obj._pad = 0;
             }
             ++objectCount;
@@ -2624,6 +2645,21 @@ void Renderer::buildScene() {
         m_megaBuffer->flush();
         spdlog::info("Mega-buffer: {} models suballocated",
                      models.size());
+    }
+
+    // ── LOD system: load config + register chains from cooked LOD data ───
+    {
+        m_lodSystem.loadConfig(std::string(ASSET_DIR) + "config/render_settings.json");
+        m_lodSystem.setQuality(static_cast<int>(m_renderQuality));
+        spdlog::info("[Renderer] LODSystem initialised (quality={})",
+                     static_cast<int>(m_renderQuality));
+    }
+
+    // ── Impostor system ──────────────────────────────────────────────────
+    {
+        RenderFormats impostorFmts = m_hdrFB->mainFormats();
+        m_impostorSystem.init(*m_device, impostorFmts);
+        m_impostorSystem.generateAtlas();
     }
 }
 

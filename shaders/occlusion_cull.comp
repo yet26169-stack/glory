@@ -3,6 +3,7 @@
 // GPU occlusion + frustum culling compute shader.
 // Phase 0: Test against previous frame's Hi-Z (before new depth is ready).
 // Phase 1: Re-test previously rejected objects against new Hi-Z (disocclusion).
+// LOD selection: picks mesh offsets based on projected screen-space pixel size.
 
 layout(local_size_x = 64) in;
 
@@ -54,6 +55,28 @@ layout(std140, binding = 4) uniform CullParams {
     vec4 screenSize;       // x=width, y=height, z=1/width, w=1/height
     uint objectCount;
     uint phase;            // 0 = first pass (prev HiZ), 1 = second pass (new HiZ)
+};
+
+// ── LOD data (binding 5) ───────────────────────────────────────────────────
+// Per-object LOD alternatives.  Up to 3 extra LOD levels per object.
+// If lodCount == 0, the object has no LOD chain — use base mesh offsets.
+struct LODEntry {
+    uint vertexOffset;
+    uint indexOffset;
+    uint indexCount;
+    float maxScreenPixels; // use this LOD when projected size <= this many pixels
+};
+
+struct ObjectLOD {
+    uint     lodCount;      // 0–3
+    uint     _pad0;
+    uint     _pad1;
+    uint     _pad2;
+    LODEntry lods[3];       // sorted ascending by maxScreenPixels
+};
+
+layout(std430, binding = 5) readonly buffer LODBuffer {
+    ObjectLOD objectLODs[];
 };
 
 // Frustum test: returns true if AABB is at least partially inside the frustum
@@ -138,11 +161,31 @@ void main() {
         // Phase 0: mark as visible
         if (phase == 0u) wasVisible[idx] = 1u;
 
+        // ── LOD selection based on projected screen-space size ──────────
+        uint vertOff  = objects[idx].meshVertexOffset;
+        uint idxOff   = objects[idx].meshIndexOffset;
+        uint idxCount = objects[idx].meshIndexCount;
+
+        uint lodCount = objectLODs[idx].lodCount;
+        if (lodCount > 0u) {
+            // Pick the coarsest LOD whose maxScreenPixels >= projected size.
+            // LODs are sorted ascending by maxScreenPixels.
+            for (uint i = 0u; i < lodCount; ++i) {
+                if (maxDim <= objectLODs[idx].lods[i].maxScreenPixels) {
+                    vertOff  = objectLODs[idx].lods[i].vertexOffset;
+                    idxOff   = objectLODs[idx].lods[i].indexOffset;
+                    idxCount = objectLODs[idx].lods[i].indexCount;
+                    break;
+                }
+            }
+            // If maxDim > all LOD thresholds, use base mesh (already set)
+        }
+
         uint outIdx = atomicAdd(drawCount, 1);
-        dstCommands[outIdx].indexCount    = objects[idx].meshIndexCount;
+        dstCommands[outIdx].indexCount    = idxCount;
         dstCommands[outIdx].instanceCount = 1;
-        dstCommands[outIdx].firstIndex    = objects[idx].meshIndexOffset;
-        dstCommands[outIdx].vertexOffset  = int(objects[idx].meshVertexOffset);
+        dstCommands[outIdx].firstIndex    = idxOff;
+        dstCommands[outIdx].vertexOffset  = int(vertOff);
         dstCommands[outIdx].firstInstance = idx;
     }
 }
