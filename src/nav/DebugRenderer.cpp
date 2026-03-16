@@ -1,4 +1,5 @@
 #include "nav/DebugRenderer.h"
+#include "nav/FlowField.h"
 #include "renderer/Device.h"
 #include <spdlog/spdlog.h>
 #include <vk_mem_alloc.h>
@@ -77,6 +78,38 @@ void DebugRenderer::drawSphere(const glm::vec3 &center, float radius, const glm:
       drawLine(center + glm::vec3(r0 * x0, z0, r0 * y0), center + glm::vec3(r1 * x0, z1, r1 * y0), color);
     }
   }
+}
+
+void DebugRenderer::drawFlowField(const FlowField &field, const glm::vec4 &color,
+                                   int subsample, float arrowLen, float y) {
+    if (!m_enabled) return;
+
+    float cs = field.cellSize();
+    glm::vec2 wMin = field.worldMin();
+
+    for (int cz = 0; cz < field.gridH(); cz += subsample) {
+        for (int cx = 0; cx < field.gridW(); cx += subsample) {
+            glm::vec2 dir = field.cellDirection(cx, cz);
+            if (glm::length(dir) < 0.01f) continue;
+
+            float wx = wMin.x + (cx + 0.5f) * cs;
+            float wz = wMin.y + (cz + 0.5f) * cs;
+
+            glm::vec3 from(wx, y, wz);
+            glm::vec3 to(wx + dir.x * arrowLen * cs, y, wz + dir.y * arrowLen * cs);
+            drawLine(from, to, color);
+
+            // Small arrowhead
+            glm::vec2 perp(-dir.y, dir.x);
+            float headLen = arrowLen * cs * 0.25f;
+            glm::vec3 h1(to.x - dir.x * headLen + perp.x * headLen * 0.5f, y,
+                         to.z - dir.y * headLen + perp.y * headLen * 0.5f);
+            glm::vec3 h2(to.x - dir.x * headLen - perp.x * headLen * 0.5f, y,
+                         to.z - dir.y * headLen - perp.y * headLen * 0.5f);
+            drawLine(to, h1, color);
+            drawLine(to, h2, color);
+        }
+    }
 }
 
 void DebugRenderer::clear() { m_vertices.clear(); }

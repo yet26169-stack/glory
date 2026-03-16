@@ -12,6 +12,7 @@
 #include "ability/AbilityComponents.h"
 #include "scripting/LuaBindings.h"
 #include "map/MapLoader.h"
+#include "nav/NavMeshBuilder.h"
 #include "window/Window.h"
 
 #include "imgui.h"
@@ -451,6 +452,10 @@ void Renderer::simulateStep(float dt) {
 
     // ── GPU collision: read back previous frame's results ────────────────
     m_gpuCollision.readResults(m_currentFrame);
+
+    // ── Navigation: update obstacles + regenerate dirty flow fields ──────
+    m_dynamicObstacles.update(dt);
+    m_pathfinding.updateFlowFields(&m_dynamicObstacles);
 
     // ── Simulation tick (gameplay + VFX updates, decoupled from rendering) ─
     {
@@ -2107,6 +2112,15 @@ void Renderer::buildScene() {
     } catch (const std::exception& e) {
         spdlog::warn("Could not load map JSON: {} — using default bounds", e.what());
         // m_mapData keeps its default values (200×200, center 100,0,100)
+    }
+
+    // ── Navigation: init flow fields from map lane endpoints ─────────────
+    {
+        NavMeshData emptyNav;  // stub navmesh for now
+        m_dynamicObstacles.init();
+        m_pathfinding.init(emptyNav);
+        m_pathfinding.initFlowFields(m_mapData);
+        spdlog::info("[Renderer] Flow fields ready for {} lanes x 2 teams", 3);
     }
 
     // Default textures

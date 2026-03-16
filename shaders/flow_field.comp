@@ -1,0 +1,128 @@
+#version 450
+#extension GL_KHR_shader_subgroup_ballot : enable
+
+// GPU wavefront BFS for flow field generation.
+//
+// Pass 1 (PHASE_COST):  Run BFS from goal, writing integer cost per cell.
+// Pass 2 (PHASE_DIR):   For each cell, pick the lowest-cost neighbour → direction.
+//
+// Dispatched iteratively from CPU:
+//   for each wavefront step, dispatch PHASE_COST, barrier, repeat until no more expansion.
+//   Then dispatch PHASE_DIR once.
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+layout(push_constant) uniform PushConstants {
+    int   gridW;
+    int   gridH;
+    int   goalX;
+    int   goalZ;
+    int   phase;       // 0 = cost init, 1 = cost expand, 2 = direction
+    int   iteration;
+};
+
+layout(set = 0, binding = 0) buffer ObstacleGrid {
+    uint obstacles[];  // 1 = blocked, 0 = passable
+};
+
+layout(set = 0, binding = 1) buffer CostField {
+    uint costs[];      // BFS cost per cell (0xFFFFFFFF = unreachable)
+};
+
+layout(set = 0, binding = 2) buffer DirectionField {
+    vec2 directions[]; // normalised direction per cell
+};
+
+layout(set = 0, binding = 3) buffer ChangeCounter {
+    uint changeCount;  // atomic: cells expanded this iteration
+};
+
+const int DX[8] = int[](-1,  0,  1, -1, 1, -1, 0, 1);
+const int DZ[8] = int[](-1, -1, -1,  0, 0,  1, 1, 1);
+
+bool inBounds(int x, int z) {
+    return x >= 0 && x < gridW && z >= 0 && z < gridH;
+}
+
+int cellIdx(int x, int z) {
+    return z * gridW + x;
+}
+
+void main() {
+    int cx = int(gl_GlobalInvocationID.x);
+    int cz = int(gl_GlobalInvocationID.y);
+    if (cx >= gridW || cz >= gridH) return;
+
+    int ci = cellIdx(cx, cz);
+
+    // ── Phase 0: Initialise cost field ────────────────────────────────────
+    if (phase == 0) {
+        if (cx == goalX && cz == goalZ && obstacles[ci] == 0) {
+            costs[ci] = 0;
+        } else {
+            costs[ci] = 0xFFFFFFFFu;
+        }
+        directions[ci] = vec2(0.0);
+        return;
+    }
+
+    // ── Phase 1: BFS cost expansion (one wavefront step) ──────────────────
+    if (phase == 1) {
+        if (obstacles[ci] == 1) return;
+
+        uint myCost = costs[ci];
+        if (myCost == 0xFFFFFFFFu) return; // not yet reached
+
+        // Expected cost for this iteration
+        // Only expand from cells that were reached in the previous wavefront
+        uint expectedBase = uint(iteration - 1) * 10u;
+        if (myCost > expectedBase + 14u) return; // not from previous wavefront
+
+        for (int n = 0; n < 8; ++n) {
+            int nx = cx + DX[n];
+            int nz = cz + DZ[n];
+            if (!inBounds(nx, nz)) continue;
+
+            int ni = cellIdx(nx, nz);
+            if (obstacles[ni] == 1) continue;
+
+            uint moveCost = (DX[n] != 0 && DZ[n] != 0) ? 14u : 10u;
+            uint newCost = myCost + moveCost;
+
+            uint oldCost = atomicMin(costs[ni], newCost);
+            if (newCost < oldCost) {
+                atomicAdd(changeCount, 1u);
+            }
+        }
+        return;
+    }
+
+    // ── Phase 2: Build direction vectors ──────────────────────────────────
+    if (phase == 2) {
+        uint myCost = costs[ci];
+        if (myCost == 0xFFFFFFFFu || myCost == 0) {
+            directions[ci] = vec2(0.0);
+            return;
+        }
+
+        uint bestCost = myCost;
+        int bestDx = 0, bestDz = 0;
+
+        for (int n = 0; n < 8; ++n) {
+            int nx = cx + DX[n];
+            int nz = cz + DZ[n];
+            if (!inBounds(nx, nz)) continue;
+
+            uint nc = costs[cellIdx(nx, nz)];
+            if (nc < bestCost) {
+                bestCost = nc;
+                bestDx = DX[n];
+                bestDz = DZ[n];
+            }
+        }
+
+        vec2 dir = vec2(float(bestDx), float(bestDz));
+        float len = length(dir);
+        directions[ci] = (len > 0.0) ? dir / len : vec2(0.0);
+    }
+}

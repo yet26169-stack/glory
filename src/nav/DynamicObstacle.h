@@ -33,6 +33,17 @@ public:
     uint32_t obstacleCount() const;
     const ObstacleDesc* getObstacle(ObstacleId id) const;
 
+    /// Version counter — increments on any add/remove/expire.
+    /// Flow fields compare against their last-seen version to detect dirt.
+    uint32_t version() const { return m_version; }
+
+    /// Iterate all obstacles (for flow field baking).
+    template<typename Fn>
+    void forEachObstacle(Fn&& fn) const {
+        for (const auto& [id, entry] : m_obstacles)
+            fn(id, entry.desc);
+    }
+
 private:
     struct ObstacleEntry {
         ObstacleDesc desc;
@@ -41,6 +52,7 @@ private:
     };
     std::unordered_map<ObstacleId, ObstacleEntry> m_obstacles;
     ObstacleId m_nextId = 0;
+    uint32_t m_version = 0;
 };
 
 } // namespace glory

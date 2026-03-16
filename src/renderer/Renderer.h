@@ -43,6 +43,8 @@
 #include "scene/Scene.h"
 #include "terrain/IsometricCamera.h"
 #include "nav/DebugRenderer.h"
+#include "nav/PathfindingSystem.h"
+#include "nav/DynamicObstacle.h"
 #include "vfx/VFXRenderer.h"
 #include "vfx/VFXDefinitionLoader.h"
 #include "vfx/VFXFactory.h"
@@ -231,6 +233,10 @@ private:
     // ── HUD / Minimap ────────────────────────────────────────────────────
     HUD     m_hud;
     MapData m_mapData;
+
+    // ── Navigation / Flow Fields ─────────────────────────────────────────
+    PathfindingSystem      m_pathfinding;
+    DynamicObstacleManager m_dynamicObstacles;
 
     // ── GPU profiling / perf overlay ─────────────────────────────────────
     std::unique_ptr<GpuTimer> m_gpuTimer;

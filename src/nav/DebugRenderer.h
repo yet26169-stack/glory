@@ -9,6 +9,7 @@
 namespace glory {
 
 class Device;
+class FlowField;
 
 struct DebugVertex {
   glm::vec3 pos;
@@ -32,6 +33,10 @@ public:
                 const glm::vec4 &color);
   void drawSphere(const glm::vec3 &center, float radius, const glm::vec4 &color,
                   int segments = 8);
+
+  /// Draw flow field direction arrows.  subsample=2 draws every 2nd cell, etc.
+  void drawFlowField(const FlowField &field, const glm::vec4 &color,
+                     int subsample = 2, float arrowLen = 0.6f, float y = 0.1f);
 
   // ── Render (call during command buffer recording) ───────────────────
   void render(VkCommandBuffer cmd, const glm::mat4 &viewProj);

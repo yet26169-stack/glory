@@ -26,6 +26,7 @@ ObstacleId DynamicObstacleManager::addObstacle(const ObstacleDesc& desc) {
     entry.remainingLife = (desc.lifetime > 0.0f) ? desc.lifetime : -1.0f;
 
     m_obstacles[id] = entry;
+    ++m_version;
 
     const char* shapeName = (desc.shape == ObstacleShape::Cylinder) ? "Cylinder" : "Box";
     spdlog::debug("[DynamicObstacleManager] addObstacle id={} shape={} pos=({:.1f},{:.1f},{:.1f}) life={:.1f}",
@@ -43,6 +44,7 @@ void DynamicObstacleManager::removeObstacle(ObstacleId id) {
     }
     // TODO: dtTileCache::removeObstacle
     m_obstacles.erase(it);
+    ++m_version;
     spdlog::debug("[DynamicObstacleManager] removeObstacle id={}", id);
 }
 
@@ -62,6 +64,7 @@ void DynamicObstacleManager::update(float dt) {
         spdlog::debug("[DynamicObstacleManager] obstacle {} expired", id);
         m_obstacles.erase(id);
     }
+    if (!expired.empty()) ++m_version;
 }
 
 uint32_t DynamicObstacleManager::obstacleCount() const {

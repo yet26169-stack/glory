@@ -108,6 +108,7 @@ set(SHADER_SOURCES
     ${CMAKE_SOURCE_DIR}/shaders/ssao.comp
     ${CMAKE_SOURCE_DIR}/shaders/ssao_blur.comp
     ${CMAKE_SOURCE_DIR}/shaders/ssr.comp
+    ${CMAKE_SOURCE_DIR}/shaders/flow_field.comp
 )
 
 foreach(SHADER ${SHADER_SOURCES})
@@ -264,6 +265,7 @@ set(SOURCES
     src/nav/NavMeshBuilder.cpp
     src/nav/PathfindingSystem.cpp
     src/nav/DynamicObstacle.cpp
+    src/nav/FlowField.cpp
     src/hud/HUD.cpp
     src/hud/Minimap.cpp
     src/hud/PerfOverlay.cpp
