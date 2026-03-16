@@ -4,6 +4,7 @@
 #include "vfx/TrailRenderer.h"
 #include "scene/Components.h"
 #include "combat/CombatComponents.h"
+#include "core/FixedPoint.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
@@ -47,13 +48,13 @@ void ProjectileSystem::update(entt::registry& reg, float dt,
             if (dist < 0.5f) {
                 // HIT!
                 if (pc.isAutoAttack) {
-                    // Apply auto-attack damage directly
+                    // Apply auto-attack damage (deterministic fixed-point)
                     if (reg.all_of<StatsComponent>(target)) {
                         auto& stats = reg.get<StatsComponent>(target);
-                        float damage = pc.damage;
-                        float effectiveArmor = stats.total().armor;
-                        float finalDamage = damage * (100.0f / (100.0f + effectiveArmor));
-                        stats.base.currentHP = std::max(0.0f, stats.base.currentHP - finalDamage);
+                        Fixed32 fDamage(pc.damage);
+                        Fixed32 fArmor(stats.total().armor);
+                        Fixed32 fFinal = fDamage * (Fixed32(100) / (Fixed32(100) + fArmor));
+                        stats.base.currentHP = std::max(0.0f, stats.base.currentHP - fFinal.toFloat());
                         
                         // Hit VFX
                         VFXEvent ev{};

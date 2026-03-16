@@ -59,6 +59,12 @@ void SimulationLoop::tick(SimulationContext& ctx) {
     // Lazy init on first tick (all subsystem pointers are valid by this point)
     if (!m_initialized) init(ctx);
 
+    // Override dt with the deterministic fixed timestep
+    ctx.dt = SimulationContext::FIXED_DT_FLOAT;
+
+    // Expose the deterministic PRNG to all systems via the context
+    ctx.rng = &m_rng;
+
     // Sync cone effect state from Renderer into our persistent ConeEffectState
     m_coneState.timer     = ctx.coneEffectTimer;
     m_coneState.duration  = ctx.coneDuration;
@@ -81,6 +87,8 @@ void SimulationLoop::tick(SimulationContext& ctx) {
 
     // Sync cone effect timer back to the context (Renderer reads it)
     ctx.coneEffectTimer = m_coneState.timer;
+
+    ++m_tick;
 }
 
 } // namespace glory

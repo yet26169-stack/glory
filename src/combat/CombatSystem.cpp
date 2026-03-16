@@ -3,6 +3,7 @@
 #include "scene/Components.h"
 #include "ability/AbilityComponents.h"
 #include "ability/AbilityTypes.h"
+#include "core/FixedPoint.h"
 
 #include <spdlog/spdlog.h>
 #include <glm/glm.hpp>
@@ -127,13 +128,15 @@ void CombatSystem::processAttackFire(entt::registry& reg, entt::entity entity,
         applyAutoAttackHit(reg, entity, combat.targetEntity);
     }
 
-    // Set internal attack cooldown based on AttackSpeed
-    combat.attackCooldown = 1.0f / combat.attackSpeed;
+    // Set internal attack cooldown based on AttackSpeed (deterministic)
+    Fixed32 fAttackSpeed(combat.attackSpeed);
+    Fixed32 fCycleTime = Fixed32::one() / fAttackSpeed;
+    combat.attackCooldown = fCycleTime.toFloat();
 
     // Transition to Wind-down
     combat.state = CombatState::ATTACK_WINDDOWN;
-    float cycleTime = 1.0f / combat.attackSpeed;
-    combat.stateTimer = cycleTime * (1.0f - combat.windupPercent);
+    Fixed32 fWindupPercent(combat.windupPercent);
+    combat.stateTimer = (fCycleTime * (Fixed32::one() - fWindupPercent)).toFloat();
 }
 
 void CombatSystem::processAttackWinddown(entt::registry& reg, entt::entity entity,
@@ -245,13 +248,14 @@ void CombatSystem::applyAutoAttackHit(entt::registry& reg, entt::entity attacker
         emitVFX("vfx_attack_blocked", targetPos, dir);
         spdlog::debug("Auto-attack blocked by shield");
     } else {
-        // HIT — apply damage
+        // HIT — apply damage (deterministic fixed-point arithmetic)
         if (reg.all_of<StatsComponent>(target)) {
             auto& stats = reg.get<StatsComponent>(target);
             auto& attackerCombat = reg.get<CombatComponent>(attacker);
-            float damage = attackerCombat.attackDamage;
-            float effectiveArmor = stats.total().armor;
-            float finalDamage = damage * (100.0f / (100.0f + effectiveArmor));
+            Fixed32 fDamage(attackerCombat.attackDamage);
+            Fixed32 fArmor(stats.total().armor);
+            Fixed32 fFinal = fDamage * (Fixed32(100) / (Fixed32(100) + fArmor));
+            float finalDamage = fFinal.toFloat();
             stats.base.currentHP = std::max(0.0f, stats.base.currentHP - finalDamage);
             spdlog::debug("Auto-attack hit for {:.1f} damage (HP: {:.1f})",
                           finalDamage, stats.base.currentHP);
