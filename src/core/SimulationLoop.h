@@ -10,6 +10,7 @@
 namespace glory {
 
 class AbilitySystem;
+class GpuCollisionSystem;
 class ProjectileSystem;
 class CombatSystem;
 class VFXRenderer;
@@ -30,6 +31,7 @@ struct SimulationContext {
     AbilitySystem*        abilities       = nullptr;
     ProjectileSystem*     projectiles     = nullptr;
     CombatSystem*         combat          = nullptr;
+    const GpuCollisionSystem* gpuCollision = nullptr;
 
     // VFX subsystems (non-owning references)
     VFXRenderer*          vfxRenderer     = nullptr;

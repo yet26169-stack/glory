@@ -103,6 +103,8 @@ set(SHADER_SOURCES
     ${CMAKE_SOURCE_DIR}/shaders/depth_only.vert
     ${CMAKE_SOURCE_DIR}/shaders/hiz_generate.comp
     ${CMAKE_SOURCE_DIR}/shaders/occlusion_cull.comp
+    ${CMAKE_SOURCE_DIR}/shaders/spatial_hash.comp
+    ${CMAKE_SOURCE_DIR}/shaders/collision_broadphase.comp
 )
 
 foreach(SHADER ${SHADER_SOURCES})
@@ -212,6 +214,7 @@ set(SOURCES
     src/ability/AbilitySystem.cpp
     src/ability/ProjectileSystem.cpp
     src/combat/CombatSystem.cpp
+    src/combat/GpuCollisionSystem.cpp
     src/audio/AudioEngine.cpp
     src/audio/SoundHandle.cpp
     src/audio/AudioResourceManager.cpp

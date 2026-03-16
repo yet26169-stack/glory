@@ -1,0 +1,59 @@
+#version 460
+
+// GPU Spatial Hashing — builds a fixed-bucket hash grid from entity positions.
+// Each entity is hashed into a 2D cell (XZ plane) and atomically inserted into
+// its bucket. Buckets have a fixed capacity; overflow entities are silently dropped
+// (acceptable at MOBA entity counts).
+
+layout(local_size_x = 64) in;
+
+struct GpuEntity {
+    vec4  posRadius;   // xyz = world position, w = collision radius
+    uint  entityId;    // entt integral ID
+    uint  team;        // 0=player, 1=enemy, 2=neutral
+    uint  flags;       // bit 0: is projectile, bit 1: has stats (damageable)
+    uint  _pad;
+};
+
+layout(set = 0, binding = 0) readonly buffer EntityBuf {
+    GpuEntity entities[];
+};
+
+// Grid: cellCounts[TABLE_SIZE] followed by cellEntities[TABLE_SIZE * MAX_PER_CELL]
+layout(set = 0, binding = 1) buffer GridBuf {
+    uint cellCounts[];   // first TABLE_SIZE uints = counts, rest = entity indices
+};
+
+layout(push_constant) uniform PC {
+    uint  entityCount;
+    float cellSize;
+    float invCellSize;
+    uint  tableSize;     // must equal TABLE_SIZE
+    uint  maxPerCell;    // must equal MAX_PER_CELL
+    uint  maxPairs;      // unused here, shared push constant layout with broadphase
+};
+
+uint hashCell(ivec2 cell) {
+    // Spatial hash using large co-primes for good distribution
+    uint ux = uint(cell.x + 32768);
+    uint uy = uint(cell.y + 32768);
+    return (ux * 73856093u ^ uy * 19349663u) % tableSize;
+}
+
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+    if (idx >= entityCount) return;
+
+    GpuEntity e = entities[idx];
+
+    // 2D grid cell from XZ world position
+    ivec2 cell = ivec2(floor(e.posRadius.x * invCellSize),
+                       floor(e.posRadius.z * invCellSize));
+    uint h = hashCell(cell);
+
+    // Atomically claim a slot in this cell's bucket
+    uint slot = atomicAdd(cellCounts[h], 1u);
+    if (slot < maxPerCell) {
+        cellCounts[tableSize + h * maxPerCell + slot] = idx;
+    }
+}

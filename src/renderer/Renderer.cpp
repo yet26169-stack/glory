@@ -178,6 +178,8 @@ Renderer::Renderer(Window& window) : m_window(window) {
     m_projectileSystem = std::make_unique<ProjectileSystem>();
     m_combatSystem  = std::make_unique<CombatSystem>(*m_combatVfxQueue);
 
+    m_gpuCollision.init(*m_device);
+
     m_bloom = std::make_unique<BloomPass>();
     m_bloom->init(*m_device, m_hdrFB->colorView(), m_hdrFB->sampler(), m_window.getExtent().width, m_window.getExtent().height);
 
@@ -282,6 +284,7 @@ Renderer::~Renderer() {
     m_gpuTimer.reset();
 
     m_combatSystem.reset();
+    m_gpuCollision.destroy();
     m_input.reset();
     m_clickIndicatorRenderer.reset();
     m_groundDecalRenderer.reset();
@@ -368,6 +371,9 @@ void Renderer::simulateStep(float dt) {
     m_gameTime += dt;
     m_currentDt = dt;
 
+    // ── GPU collision: read back previous frame's results ────────────────
+    m_gpuCollision.readResults(m_currentFrame);
+
     // ── Simulation tick (gameplay + VFX updates, decoupled from rendering) ─
     {
         SimulationContext simCtx{
@@ -376,6 +382,7 @@ void Renderer::simulateStep(float dt) {
             .abilities      = m_abilitySystem.get(),
             .projectiles    = m_projectileSystem.get(),
             .combat         = m_combatSystem.get(),
+            .gpuCollision   = &m_gpuCollision,
             .vfxRenderer    = m_vfxRenderer.get(),
             .vfxQueue       = m_vfxQueue.get(),
             .combatVfxQueue = m_combatVfxQueue.get(),
@@ -570,7 +577,7 @@ void Renderer::simulateStep(float dt) {
         // A — auto-attack nearest enemy
         if (m_input->wasAPressed() && combat.state == CombatState::IDLE
             && combat.attackCooldown <= 0.0f) {
-            entt::entity target = m_combatSystem->findNearestEnemy(
+            entt::entity target = m_gpuCollision.findNearestEnemy(
                 reg, m_playerEntity, combat.attackRange);
             if (target != entt::null) {
                 combat.targetEntity = target; // Start chasing/attacking
@@ -1051,16 +1058,27 @@ void Renderer::renderFrame(float alpha) {
     VkCommandBuffer cmd = m_sync->getCommandBuffer(m_currentFrame);
     vkResetCommandBuffer(cmd, 0);
 
-    // ── Async compute: particle simulation on dedicated compute queue ─────
+    // ── Async compute: particle simulation + GPU spatial hash ────────────
     uint64_t computeSignal = 0;
-    if (m_vfxRenderer && m_state != AppState::Launcher) {
+    if (m_state != AppState::Launcher) {
         m_asyncCompute.waitForCompute(m_currentFrame); // wait for prev frame's compute
-        m_vfxRenderer->setCameraPosition(m_isoCam.getPosition());
+
+        // Upload entity positions for GPU spatial hash
+        m_gpuCollision.uploadEntities(m_scene.getRegistry(), m_currentFrame);
 
         VkCommandBuffer computeCmd = m_asyncCompute.begin(m_currentFrame);
         uint32_t computeFamily = m_asyncCompute.getQueueFamilyIndex();
         uint32_t graphicsFamily = m_device->getQueueFamilies().graphicsFamily.value();
-        m_vfxRenderer->dispatchComputeAsync(computeCmd, computeFamily, graphicsFamily);
+
+        // Dispatch GPU spatial hash + broadphase collision
+        m_gpuCollision.dispatch(computeCmd, m_currentFrame, computeFamily, graphicsFamily);
+
+        // Dispatch particle simulation
+        if (m_vfxRenderer) {
+            m_vfxRenderer->setCameraPosition(m_isoCam.getPosition());
+            m_vfxRenderer->dispatchComputeAsync(computeCmd, computeFamily, graphicsFamily);
+        }
+
         computeSignal = m_asyncCompute.submit(m_currentFrame);
     }
 

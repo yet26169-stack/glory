@@ -1,5 +1,6 @@
 #include "ability/ProjectileSystem.h"
 #include "ability/AbilitySystem.h"
+#include "combat/GpuCollisionSystem.h"
 #include "vfx/TrailRenderer.h"
 #include "scene/Components.h"
 #include "combat/CombatComponents.h"
@@ -22,7 +23,8 @@ void ProjectileSystem::registerAbilityMesh(const std::string& abilityID,
 
 void ProjectileSystem::update(entt::registry& reg, float dt,
                                VFXEventQueue& vfxQueue, AbilitySystem& abilitySystem,
-                               TrailRenderer* trailRenderer) {
+                               TrailRenderer* trailRenderer,
+                               const GpuCollisionSystem* gpuCollision) {
     m_landedPositions.clear();
     std::vector<entt::entity> toDestroy;
 
@@ -199,7 +201,8 @@ void ProjectileSystem::update(entt::registry& reg, float dt,
             continue;
         }
 
-        // Collision against enemies
+        // Collision against enemies — use GPU spatial hash results if available,
+        // else fall back to CPU O(N) scan
         Team casterTeam = Team::NEUTRAL;
         auto casterEntt = static_cast<entt::entity>(pc.casterEntity);
         if (reg.valid(casterEntt) && reg.all_of<TeamComponent>(casterEntt))
@@ -210,26 +213,59 @@ void ProjectileSystem::update(entt::registry& reg, float dt,
                                 : PROJECTILE_COLLISION_RADIUS;
 
         bool hitSomething = false;
-        auto targets = reg.view<TransformComponent, TeamComponent>();
-        for (auto [targetEnt, ttc, team] : targets.each()) {
-            if (targetEnt == entity)    continue;
-            if (targetEnt == casterEntt) continue;
-            if (team.team == casterTeam) continue;
-            if (!reg.all_of<StatsComponent>(targetEnt)) continue;
 
-            const float dist = glm::length(tc.position - ttc.position);
-            if (dist <= hitRadius + PROJECTILE_COLLISION_RADIUS) {
-                TargetInfo ti{};
-                ti.type           = TargetingType::TARGETED;
-                ti.targetEntity   = static_cast<EntityID>(entt::to_integral(targetEnt));
-                ti.targetPosition = ttc.position;
+        if (gpuCollision && !gpuCollision->getCollisionResults().empty()) {
+            // GPU path: check cached collision pairs for this projectile
+            for (const auto& pair : gpuCollision->getCollisionResults()) {
+                entt::entity targetEnt = entt::null;
+                if (pair.entityA == entity) targetEnt = pair.entityB;
+                else if (pair.entityB == entity) targetEnt = pair.entityA;
+                else continue;
 
-                abilitySystem.resolveHit(reg, casterEntt, *pc.sourceDef, ti);
-                pc.hitCount++;
-                hitSomething = true;
+                if (!reg.valid(targetEnt)) continue;
+                if (targetEnt == casterEntt) continue;
+                if (!reg.all_of<TeamComponent, StatsComponent, TransformComponent>(targetEnt)) continue;
+                if (reg.get<TeamComponent>(targetEnt).team == casterTeam) continue;
 
-                if (!pc.piercing || pc.hitCount >= pc.maxTargets)
-                    break;
+                // Refine with exact distance check
+                const float dist = glm::length(tc.position - reg.get<TransformComponent>(targetEnt).position);
+                if (dist <= hitRadius + PROJECTILE_COLLISION_RADIUS) {
+                    TargetInfo ti{};
+                    ti.type           = TargetingType::TARGETED;
+                    ti.targetEntity   = static_cast<EntityID>(entt::to_integral(targetEnt));
+                    ti.targetPosition = reg.get<TransformComponent>(targetEnt).position;
+
+                    abilitySystem.resolveHit(reg, casterEntt, *pc.sourceDef, ti);
+                    pc.hitCount++;
+                    hitSomething = true;
+
+                    if (!pc.piercing || pc.hitCount >= pc.maxTargets)
+                        break;
+                }
+            }
+        } else {
+            // CPU fallback: O(N) scan
+            auto targets = reg.view<TransformComponent, TeamComponent>();
+            for (auto [targetEnt, ttc, team] : targets.each()) {
+                if (targetEnt == entity)    continue;
+                if (targetEnt == casterEntt) continue;
+                if (team.team == casterTeam) continue;
+                if (!reg.all_of<StatsComponent>(targetEnt)) continue;
+
+                const float dist = glm::length(tc.position - ttc.position);
+                if (dist <= hitRadius + PROJECTILE_COLLISION_RADIUS) {
+                    TargetInfo ti{};
+                    ti.type           = TargetingType::TARGETED;
+                    ti.targetEntity   = static_cast<EntityID>(entt::to_integral(targetEnt));
+                    ti.targetPosition = ttc.position;
+
+                    abilitySystem.resolveHit(reg, casterEntt, *pc.sourceDef, ti);
+                    pc.hitCount++;
+                    hitSomething = true;
+
+                    if (!pc.piercing || pc.hitCount >= pc.maxTargets)
+                        break;
+                }
             }
         }
 

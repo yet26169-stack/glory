@@ -1,0 +1,96 @@
+#version 460
+
+// GPU Broad-Phase Collision Detection — queries the spatial hash grid built by
+// spatial_hash.comp. Each thread handles one entity, checks its cell plus 8
+// neighbors (3×3 in XZ), tests sphere overlap, and writes collision pairs.
+
+layout(local_size_x = 64) in;
+
+struct GpuEntity {
+    vec4  posRadius;   // xyz = world position, w = collision radius
+    uint  entityId;    // entt integral ID
+    uint  team;        // 0=player, 1=enemy, 2=neutral
+    uint  flags;       // bit 0: is projectile, bit 1: has stats (damageable)
+    uint  _pad;
+};
+
+struct CollisionPair {
+    uint  entityA;     // GPU buffer index of entity A
+    uint  entityB;     // GPU buffer index of entity B
+    float distSq;      // squared XZ distance
+    uint  _pad;
+};
+
+layout(set = 0, binding = 0) readonly buffer EntityBuf {
+    GpuEntity entities[];
+};
+
+layout(set = 0, binding = 1) readonly buffer GridBuf {
+    uint cellCounts[];  // first TABLE_SIZE = counts, rest = entity indices
+};
+
+layout(set = 0, binding = 2) buffer PairBuf {
+    uint          pairCount;
+    CollisionPair pairs[];
+};
+
+layout(push_constant) uniform PC {
+    uint  entityCount;
+    float cellSize;
+    float invCellSize;
+    uint  tableSize;
+    uint  maxPerCell;
+    uint  maxPairs;
+};
+
+uint hashCell(ivec2 cell) {
+    uint ux = uint(cell.x + 32768);
+    uint uy = uint(cell.y + 32768);
+    return (ux * 73856093u ^ uy * 19349663u) % tableSize;
+}
+
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+    if (idx >= entityCount) return;
+
+    GpuEntity self = entities[idx];
+    vec2  selfPos = vec2(self.posRadius.x, self.posRadius.z);
+    float selfR   = self.posRadius.w;
+
+    ivec2 baseCell = ivec2(floor(self.posRadius.x * invCellSize),
+                           floor(self.posRadius.z * invCellSize));
+
+    // Check 3×3 cell neighborhood
+    for (int dy = -1; dy <= 1; dy++) {
+        for (int dx = -1; dx <= 1; dx++) {
+            ivec2 nc = baseCell + ivec2(dx, dy);
+            uint  h  = hashCell(nc);
+            uint  count = min(cellCounts[h], maxPerCell);
+
+            for (uint s = 0; s < count; s++) {
+                uint other = cellCounts[tableSize + h * maxPerCell + s];
+
+                // Only emit pair once: lower index entity owns the pair
+                if (other <= idx) continue;
+                if (other >= entityCount) continue;
+
+                GpuEntity otherE = entities[other];
+                vec2  otherPos = vec2(otherE.posRadius.x, otherE.posRadius.z);
+                float otherR   = otherE.posRadius.w;
+
+                vec2  diff     = selfPos - otherPos;
+                float distSq   = dot(diff, diff);
+                float combined = selfR + otherR;
+
+                if (distSq <= combined * combined) {
+                    uint pairIdx = atomicAdd(pairCount, 1u);
+                    if (pairIdx < maxPairs) {
+                        pairs[pairIdx].entityA = idx;
+                        pairs[pairIdx].entityB = other;
+                        pairs[pairIdx].distSq  = distSq;
+                    }
+                }
+            }
+        }
+    }
+}

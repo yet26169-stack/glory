@@ -55,7 +55,8 @@ void SimulationLoop::tick(SimulationContext& ctx) {
     // ── 4. Projectile system ─────────────────────────────────────────────
     if (ctx.projectiles && ctx.abilities && ctx.vfxQueue) {
         ctx.projectiles->update(ctx.registry, dt,
-                                *ctx.vfxQueue, *ctx.abilities, ctx.trailRenderer);
+                                *ctx.vfxQueue, *ctx.abilities, ctx.trailRenderer,
+                                ctx.gpuCollision);
         if (ctx.explosions) {
             for (const auto& pos : ctx.projectiles->getLandedPositions()) {
                 ctx.explosions->addExplosion(pos);

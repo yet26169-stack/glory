@@ -13,6 +13,7 @@
 namespace glory {
 
 class AbilitySystem;
+class GpuCollisionSystem;
 class TrailRenderer;
 
 // Moves projectile entities each frame, syncs their trail VFX, checks collisions,
@@ -21,7 +22,8 @@ class ProjectileSystem {
 public:
     void update(entt::registry& reg, float dt,
                 VFXEventQueue& vfxQueue, AbilitySystem& abilitySystem,
-                TrailRenderer* trailRenderer = nullptr);
+                TrailRenderer* trailRenderer = nullptr,
+                const GpuCollisionSystem* gpuCollision = nullptr);
 
     // Positions of lob projectiles that landed this frame — read by Renderer each frame.
     const std::vector<glm::vec3>& getLandedPositions() const { return m_landedPositions; }
