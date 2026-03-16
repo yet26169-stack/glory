@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/SystemScheduler.h"
+#include "core/GameSystems.h"
 #include "vfx/VFXEventQueue.h"
 
 #include <entt.hpp>
@@ -21,6 +23,7 @@ class DistortionRenderer;
 class ExplosionRenderer;
 class ConeAbilityRenderer;
 class SpriteEffectRenderer;
+class ThreadPool;
 
 // All state needed by the simulation loop, passed by reference from the Renderer.
 struct SimulationContext {
@@ -52,6 +55,9 @@ struct SimulationContext {
     float  coneRange        = 0.0f;
     glm::vec3 coneApex      = glm::vec3(0.0f);
     glm::vec3 coneDirection = glm::vec3(0.0f, 0.0f, 1.0f);
+
+    // Thread pool for parallel system execution
+    ThreadPool* threadPool = nullptr;
 };
 
 // Runs all gameplay/simulation updates decoupled from the render loop.
@@ -61,10 +67,23 @@ struct SimulationContext {
 //   3. Test simulation logic without a GPU
 class SimulationLoop {
 public:
+    // Build the system scheduler from the subsystem pointers in a context.
+    // Must be called once after all subsystems are initialized.
+    void init(const SimulationContext& ctx);
+
     // Advance the simulation by one frame's worth of delta-time.
-    // Currently runs variable-step (matching render dt).
-    // Future: accumulate dt and tick at FIXED_DT intervals.
-    static void tick(SimulationContext& ctx);
+    // Uses the SystemScheduler for dependency-declared parallel execution.
+    void tick(SimulationContext& ctx);
+
+    SystemScheduler&       scheduler()       { return m_scheduler; }
+    const SystemScheduler& scheduler() const { return m_scheduler; }
+
+    ConeEffectState& coneState() { return m_coneState; }
+
+private:
+    SystemScheduler m_scheduler;
+    ConeEffectState m_coneState;
+    bool m_initialized = false;
 };
 
 } // namespace glory

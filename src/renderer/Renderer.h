@@ -54,6 +54,7 @@
 #include "combat/CombatComponents.h"
 #include "combat/CombatSystem.h"
 #include "combat/GpuCollisionSystem.h"
+#include "core/SimulationLoop.h"
 #include "hud/HUD.h"
 #include "hud/PerfOverlay.h"
 #include "map/MapTypes.h"
@@ -161,6 +162,7 @@ private:
     std::unique_ptr<ProjectileSystem> m_projectileSystem; // moves projectile entities
     std::unique_ptr<CombatSystem>  m_combatSystem;    // auto-attack / shield / trick
     GpuCollisionSystem             m_gpuCollision;    // GPU spatial hash + broadphase
+    SimulationLoop                 m_simLoop;         // parallel ECS system scheduler
 
     // ── Scene ─────────────────────────────────────────────────────────────
     Scene            m_scene;

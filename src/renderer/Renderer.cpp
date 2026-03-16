@@ -449,8 +449,9 @@ void Renderer::simulateStep(float dt) {
             .coneRange       = CONE_RANGE,
             .coneApex        = m_coneApex,
             .coneDirection   = m_coneDirection,
+            .threadPool      = &m_threadPool,
         };
-        SimulationLoop::tick(simCtx);
+        m_simLoop.tick(simCtx);
         m_coneEffectTimer = simCtx.coneEffectTimer;
 
         // ── Fog of War vision update ──────────────────────────────────

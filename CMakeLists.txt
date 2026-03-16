@@ -156,6 +156,8 @@ set(SOURCES
     src/core/Application.cpp
     src/core/FramePacer.cpp
     src/core/SimulationLoop.cpp
+    src/core/SystemScheduler.cpp
+    src/core/GameSystems.cpp
     src/physics/PhysicsSystem.cpp
     src/window/Window.cpp
     src/camera/Camera.cpp

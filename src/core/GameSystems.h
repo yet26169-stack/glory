@@ -1,0 +1,214 @@
+#pragma once
+
+// ISystem adapters that wrap existing gameplay systems for the SystemScheduler.
+// Each adapter captures non-owning pointers to the subsystems it needs,
+// and delegates execute() to the real system's update method.
+
+#include "core/SystemScheduler.h"
+#include "vfx/VFXEventQueue.h"
+#include "physics/PhysicsSystem.h"
+
+#include <glm/glm.hpp>
+#include <typeindex>
+
+namespace glory {
+
+// Forward declarations (avoid pulling in heavy headers)
+class AbilitySystem;
+class ProjectileSystem;
+class CombatSystem;
+class GpuCollisionSystem;
+class VFXRenderer;
+class TrailRenderer;
+class GroundDecalRenderer;
+class MeshEffectRenderer;
+class DistortionRenderer;
+class ExplosionRenderer;
+class ConeAbilityRenderer;
+class SpriteEffectRenderer;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VFXFlushSystem — flushes VFX event queues and updates VFX subsystems
+// Must run before systems that produce VFX events.
+// ═══════════════════════════════════════════════════════════════════════════════
+class VFXFlushSystem : public ISystem {
+public:
+    VFXFlushSystem(VFXRenderer* vfx, VFXEventQueue* q1, VFXEventQueue* q2,
+                   TrailRenderer* trail, GroundDecalRenderer* decals,
+                   MeshEffectRenderer* mesh, DistortionRenderer* distortion)
+        : m_vfx(vfx), m_q1(q1), m_q2(q2), m_trail(trail)
+        , m_decals(decals), m_mesh(mesh), m_distortion(distortion) {}
+
+    void execute(entt::registry& registry, float dt) override;
+    std::string_view name() const override { return "VFXFlush"; }
+
+private:
+    VFXRenderer*         m_vfx;
+    VFXEventQueue*       m_q1;
+    VFXEventQueue*       m_q2;
+    TrailRenderer*       m_trail;
+    GroundDecalRenderer* m_decals;
+    MeshEffectRenderer*  m_mesh;
+    DistortionRenderer*  m_distortion;
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AbilityUpdateSystem — ability state machine + composite sequencer
+// Depends on nothing (per prompt).
+// ═══════════════════════════════════════════════════════════════════════════════
+class AbilityUpdateSystem : public ISystem {
+public:
+    AbilityUpdateSystem(AbilitySystem* abilities, VFXEventQueue* q,
+                        TrailRenderer* trail, GroundDecalRenderer* decals,
+                        MeshEffectRenderer* mesh, ExplosionRenderer* explosions,
+                        ConeAbilityRenderer* cone, SpriteEffectRenderer* sprites,
+                        DistortionRenderer* distortion)
+        : m_abilities(abilities), m_q(q), m_trail(trail), m_decals(decals)
+        , m_mesh(mesh), m_explosions(explosions), m_cone(cone)
+        , m_sprites(sprites), m_distortion(distortion) {}
+
+    void execute(entt::registry& registry, float dt) override;
+    std::vector<std::type_index> dependsOn() const override {
+        return {}; // No formal dependencies
+    }
+    std::string_view name() const override { return "AbilityUpdate"; }
+
+private:
+    AbilitySystem*        m_abilities;
+    VFXEventQueue*        m_q;
+    TrailRenderer*        m_trail;
+    GroundDecalRenderer*  m_decals;
+    MeshEffectRenderer*   m_mesh;
+    ExplosionRenderer*    m_explosions;
+    ConeAbilityRenderer*  m_cone;
+    SpriteEffectRenderer* m_sprites;
+    DistortionRenderer*   m_distortion;
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ProjectileUpdateSystem — moves projectiles, checks collisions, spawns VFX
+// Depends on nothing (per prompt).
+// ═══════════════════════════════════════════════════════════════════════════════
+class ProjectileUpdateSystem : public ISystem {
+public:
+    ProjectileUpdateSystem(ProjectileSystem* proj, AbilitySystem* abilities,
+                           VFXEventQueue* q, TrailRenderer* trail,
+                           ExplosionRenderer* explosions,
+                           const GpuCollisionSystem* gpuCollision)
+        : m_proj(proj), m_abilities(abilities), m_q(q)
+        , m_trail(trail), m_explosions(explosions)
+        , m_gpuCollision(gpuCollision) {}
+
+    void execute(entt::registry& registry, float dt) override;
+    std::vector<std::type_index> dependsOn() const override {
+        return {}; // No formal dependencies
+    }
+    std::string_view name() const override { return "ProjectileUpdate"; }
+
+private:
+    ProjectileSystem*         m_proj;
+    AbilitySystem*            m_abilities;
+    VFXEventQueue*            m_q;
+    TrailRenderer*            m_trail;
+    ExplosionRenderer*        m_explosions;
+    const GpuCollisionSystem* m_gpuCollision;
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EffectsUpdateSystem — explosion and sprite effect ticks
+// Depends on ProjectileUpdateSystem (consumes landed positions).
+// ═══════════════════════════════════════════════════════════════════════════════
+class EffectsUpdateSystem : public ISystem {
+public:
+    EffectsUpdateSystem(ExplosionRenderer* explosions, SpriteEffectRenderer* sprites)
+        : m_explosions(explosions), m_sprites(sprites) {}
+
+    void execute(entt::registry& registry, float dt) override;
+    std::vector<std::type_index> dependsOn() const override {
+        return { std::type_index(typeid(ProjectileUpdateSystem)) };
+    }
+    std::string_view name() const override { return "EffectsUpdate"; }
+
+private:
+    ExplosionRenderer*    m_explosions;
+    SpriteEffectRenderer* m_sprites;
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ConeEffectSystem — W-ability cone visual tick
+// ═══════════════════════════════════════════════════════════════════════════════
+struct ConeEffectState {
+    float  timer     = 0.0f;
+    float  duration  = 0.0f;
+    float  halfAngle = 0.0f;
+    float  range     = 0.0f;
+    glm::vec3 apex{0.0f};
+    glm::vec3 direction{0.0f, 0.0f, 1.0f};
+};
+
+class ConeEffectSystem : public ISystem {
+public:
+    ConeEffectSystem(ConeAbilityRenderer* cone, ConeEffectState* state)
+        : m_cone(cone), m_state(state) {}
+
+    void execute(entt::registry& registry, float dt) override;
+    std::string_view name() const override { return "ConeEffect"; }
+
+private:
+    ConeAbilityRenderer* m_cone;
+    ConeEffectState*     m_state;
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CombatUpdateSystem — auto-attacks, shields, tricks
+// Depends on nothing (per prompt).
+// ═══════════════════════════════════════════════════════════════════════════════
+class CombatUpdateSystem : public ISystem {
+public:
+    explicit CombatUpdateSystem(CombatSystem* combat) : m_combat(combat) {}
+
+    void execute(entt::registry& registry, float dt) override;
+    std::vector<std::type_index> dependsOn() const override {
+        return {}; // No formal dependencies
+    }
+    std::string_view name() const override { return "CombatUpdate"; }
+
+private:
+    CombatSystem* m_combat;
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PhysicsUpdateSystem — integrate, resolve collisions, update sleep
+// Depends on nothing (per prompt). Runs all 3 physics sub-steps in order.
+// ═══════════════════════════════════════════════════════════════════════════════
+class PhysicsUpdateSystem : public ISystem {
+public:
+    PhysicsUpdateSystem() = default;
+
+    void execute(entt::registry& registry, float dt) override;
+    std::vector<std::type_index> dependsOn() const override {
+        return {}; // No formal dependencies
+    }
+    std::string_view name() const override { return "PhysicsUpdate"; }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AnimationUpdateSystem — ticks all AnimationPlayer components
+// Depends on all movement systems (physics, combat, projectile).
+// ═══════════════════════════════════════════════════════════════════════════════
+class AnimationUpdateSystem : public ISystem {
+public:
+    AnimationUpdateSystem() = default;
+
+    void execute(entt::registry& registry, float dt) override;
+    std::vector<std::type_index> dependsOn() const override {
+        return {
+            std::type_index(typeid(PhysicsUpdateSystem)),
+            std::type_index(typeid(CombatUpdateSystem)),
+            std::type_index(typeid(ProjectileUpdateSystem)),
+        };
+    }
+    std::string_view name() const override { return "AnimationUpdate"; }
+};
+
+} // namespace glory

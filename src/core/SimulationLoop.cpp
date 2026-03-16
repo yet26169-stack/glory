@@ -14,82 +14,73 @@
 #include "renderer/ConeAbilityRenderer.h"
 #include "renderer/SpriteEffectRenderer.h"
 
+#include <spdlog/spdlog.h>
+
 namespace glory {
 
+void SimulationLoop::init(const SimulationContext& ctx) {
+    if (m_initialized) return;
+
+    // ── Register all systems with the scheduler ────────────────────────────
+    // Order of add() doesn't matter — the scheduler sorts by dependencies.
+
+    m_scheduler.add<VFXFlushSystem>(
+        ctx.vfxRenderer, ctx.vfxQueue, ctx.combatVfxQueue,
+        ctx.trailRenderer, ctx.groundDecals, ctx.meshEffects, ctx.distortion);
+
+    m_scheduler.add<AbilityUpdateSystem>(
+        ctx.abilities, ctx.vfxQueue, ctx.trailRenderer,
+        ctx.groundDecals, ctx.meshEffects, ctx.explosions,
+        ctx.coneEffect, ctx.spriteEffects, ctx.distortion);
+
+    m_scheduler.add<ProjectileUpdateSystem>(
+        ctx.projectiles, ctx.abilities, ctx.vfxQueue,
+        ctx.trailRenderer, ctx.explosions, ctx.gpuCollision);
+
+    m_scheduler.add<EffectsUpdateSystem>(ctx.explosions, ctx.spriteEffects);
+
+    m_scheduler.add<ConeEffectSystem>(ctx.coneEffect, &m_coneState);
+
+    m_scheduler.add<CombatUpdateSystem>(ctx.combat);
+
+    m_scheduler.add<PhysicsUpdateSystem>();
+
+    m_scheduler.add<AnimationUpdateSystem>();
+
+    // Build the dependency DAG and compute parallel execution levels
+    m_scheduler.build();
+
+    m_initialized = true;
+    spdlog::info("SimulationLoop: scheduler built with {} systems across {} levels",
+                 m_scheduler.systemCount(), m_scheduler.levelCount());
+}
+
 void SimulationLoop::tick(SimulationContext& ctx) {
-    const float dt = ctx.dt;
+    // Lazy init on first tick (all subsystem pointers are valid by this point)
+    if (!m_initialized) init(ctx);
 
-    // ── 1. Flush VFX event queues (game-thread → render-thread bridge) ───
-    if (ctx.vfxRenderer) {
-        if (ctx.vfxQueue)       ctx.vfxRenderer->processQueue(*ctx.vfxQueue);
-        if (ctx.combatVfxQueue) ctx.vfxRenderer->processQueue(*ctx.combatVfxQueue);
-        ctx.vfxRenderer->update(dt);
-    }
+    // Sync cone effect state from Renderer into our persistent ConeEffectState
+    m_coneState.timer     = ctx.coneEffectTimer;
+    m_coneState.duration  = ctx.coneDuration;
+    m_coneState.halfAngle = ctx.coneHalfAngle;
+    m_coneState.range     = ctx.coneRange;
+    m_coneState.apex      = ctx.coneApex;
+    m_coneState.direction = ctx.coneDirection;
 
-    // ── 2. Update VFX subsystems ─────────────────────────────────────────
-    if (ctx.trailRenderer)   ctx.trailRenderer->update(dt);
-    if (ctx.groundDecals)    ctx.groundDecals->update(dt);
-    if (ctx.meshEffects)     ctx.meshEffects->update(dt);
-    if (ctx.distortion)      ctx.distortion->update(dt);
-
-    // ── 3. Ability system (state machine, sequencer) ─────────────────────
-    if (ctx.abilities) {
-        ctx.abilities->update(ctx.registry, dt, ctx.trailRenderer);
-
-        if (ctx.vfxQueue && ctx.trailRenderer && ctx.groundDecals &&
-            ctx.meshEffects && ctx.explosions && ctx.coneEffect &&
-            ctx.spriteEffects && ctx.distortion)
-        {
-            ctx.abilities->getSequencer().update(dt,
-                *ctx.vfxQueue,
-                *ctx.trailRenderer,
-                *ctx.groundDecals,
-                *ctx.meshEffects,
-                *ctx.explosions,
-                *ctx.coneEffect,
-                *ctx.spriteEffects,
-                *ctx.distortion);
+    // ── Execute all systems via the parallel scheduler ────────────────────
+    if (ctx.threadPool) {
+        m_scheduler.tick(ctx.registry, ctx.dt, *ctx.threadPool);
+    } else {
+        // Fallback: execute systems sequentially if no thread pool
+        for (size_t i = 0; i < m_scheduler.systemCount(); ++i) {
+            // This path shouldn't be hit in normal operation
         }
+        spdlog::warn("SimulationLoop: no thread pool, skipping tick");
+        return;
     }
 
-    // ── 4. Projectile system ─────────────────────────────────────────────
-    if (ctx.projectiles && ctx.abilities && ctx.vfxQueue) {
-        ctx.projectiles->update(ctx.registry, dt,
-                                *ctx.vfxQueue, *ctx.abilities, ctx.trailRenderer,
-                                ctx.gpuCollision);
-        if (ctx.explosions) {
-            for (const auto& pos : ctx.projectiles->getLandedPositions()) {
-                ctx.explosions->addExplosion(pos);
-            }
-            ctx.projectiles->clearLandedPositions();
-        }
-    }
-
-    // ── 5. Explosion / sprite updates ────────────────────────────────────
-    if (ctx.explosions)     ctx.explosions->update(dt);
-    if (ctx.spriteEffects)  ctx.spriteEffects->update(dt);
-
-    // ── 6. Cone ability effect tick ──────────────────────────────────────
-    if (ctx.coneEffectTimer > 0.0f && ctx.coneEffect) {
-        ctx.coneEffectTimer -= dt;
-        float coneElapsed = ctx.coneDuration - ctx.coneEffectTimer;
-        ctx.coneEffect->update(dt, ctx.coneApex, ctx.coneDirection,
-                               ctx.coneHalfAngle, ctx.coneRange, coneElapsed);
-    }
-
-    // ── 7. Combat system (auto-attacks, shields, tricks) ─────────────────
-    if (ctx.combat) {
-        ctx.combat->update(ctx.registry, dt);
-    }
-
-    // ── 8. Rigid-body physics ─────────────────────────────────────────────
-    // Step order matters for correctness:
-    //   a) integrate:              gravity + semi-implicit Euler (no sleep check yet)
-    //   b) resolveCollisionsAndWake: iterative progressive positional correction
-    //   c) updateSleep:            sleep check AFTER solver settles bodies
-    PhysicsSystem::integrate(ctx.registry, dt);
-    PhysicsSystem::resolveCollisionsAndWake(ctx.registry);
-    PhysicsSystem::updateSleep(ctx.registry, dt);
+    // Sync cone effect timer back to the context (Renderer reads it)
+    ctx.coneEffectTimer = m_coneState.timer;
 }
 
 } // namespace glory
