@@ -82,6 +82,9 @@ public:
     void renderFrame(float alpha);
     void waitIdle();
 
+    entt::registry&       getRegistry()       { return m_scene.getRegistry(); }
+    const entt::registry& getRegistry() const { return m_scene.getRegistry(); }
+
 private:
     Window& m_window;
 

@@ -144,6 +144,18 @@ else()
     message(STATUS "Glory: Tracy profiler disabled  (pass -DGLORY_TRACY=ON to enable)")
 endif()
 
+# ── ENet networking library ────────────────────────────────────────────────────
+include(FetchContent)
+FetchContent_Declare(
+    enet
+    GIT_REPOSITORY https://github.com/lsalzman/enet.git
+    GIT_TAG        v1.3.18
+    GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(enet)
+target_include_directories(enet PUBLIC ${enet_SOURCE_DIR}/include)
+message(STATUS "Glory: ENet networking library ENABLED (v1.3.18)")
+
 # ── meshoptimizer ─────────────────────────────────────────────────────────────
 file(GLOB MESHOPT_SOURCES ${CMAKE_SOURCE_DIR}/extern/meshoptimizer/src/*.cpp)
 add_library(meshoptimizer STATIC ${MESHOPT_SOURCES})
@@ -268,6 +280,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     glm::glm
     spdlog::spdlog
     meshoptimizer
+    enet
     glory_sanitizers
 )
 
