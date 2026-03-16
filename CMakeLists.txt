@@ -193,6 +193,8 @@ set(SOURCES
     src/renderer/InkingPass.cpp
     src/renderer/OutlineRenderer.cpp
     src/renderer/WaterRenderer.cpp
+    src/renderer/RenderGraph.cpp
+    src/renderer/passes/PassSetup.cpp
     src/fog/FogSystem.cpp
     src/renderer/FogOfWarRenderer.cpp
     src/map/MapLoader.cpp

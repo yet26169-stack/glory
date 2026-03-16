@@ -23,6 +23,7 @@
 #include "renderer/Device.h"
 #include "renderer/Pipeline.h"
 #include "renderer/RenderFormats.h"
+#include "renderer/RenderGraph.h"
 #include "renderer/Swapchain.h"
 #include "renderer/HDRFramebuffer.h"
 #include "renderer/BloomPass.h"
@@ -217,6 +218,16 @@ private:
     PerfOverlay               m_perfOverlay;
     std::vector<GpuTimingResult> m_lastGpuResults;
     float m_lastGpuTotalMs = 0.0f;
+
+    // ── Render graph ─────────────────────────────────────────────────────
+    RenderGraph m_renderGraph;
+
+    // Per-pass recording methods (called from render graph execute lambdas)
+    void recordShadowPass(VkCommandBuffer cmd, const FrameContext& ctx);
+    void recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx);
+    void recordTransparentVFXPass(VkCommandBuffer cmd, const FrameContext& ctx);
+    void recordTonemapPass(VkCommandBuffer cmd, const FrameContext& ctx);
+    FrameContext buildFrameContext(VkCommandBuffer cmd, uint32_t imageIndex);
 
     // ── Helpers ───────────────────────────────────────────────────────────
     void buildScene();

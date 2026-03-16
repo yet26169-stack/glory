@@ -4,6 +4,7 @@
 #include "renderer/Model.h"
 #include "renderer/StaticSkinnedMesh.h"
 #include "renderer/Frustum.h"
+#include "renderer/passes/PassSetup.h"
 #include "core/SimulationLoop.h"
 #include "core/Profiler.h"
 #include "scene/Components.h"
@@ -271,6 +272,35 @@ Renderer::Renderer(Window& window) : m_window(window) {
         Sync::MAX_FRAMES_IN_FLIGHT, /*maxZones=*/32);
 
     m_lastFrameTime = static_cast<float>(glfwGetTime());
+
+    // ── Build the render graph ───────────────────────────────────────────
+    buildDefaultRenderGraph(m_renderGraph);
+
+    // Wire complex passes to Renderer methods
+    if (auto* p = m_renderGraph.findPass("Shadow")) {
+        p->execute = [this](VkCommandBuffer cmd, const FrameContext& ctx) {
+            recordShadowPass(cmd, ctx);
+        };
+    }
+    if (auto* p = m_renderGraph.findPass("GBuffer")) {
+        p->execute = [this](VkCommandBuffer cmd, const FrameContext& ctx) {
+            recordGBufferPass(cmd, ctx);
+        };
+    }
+    if (auto* p = m_renderGraph.findPass("TransparentVFX")) {
+        p->execute = [this](VkCommandBuffer cmd, const FrameContext& ctx) {
+            recordTransparentVFXPass(cmd, ctx);
+        };
+    }
+    if (auto* p = m_renderGraph.findPass("Tonemap")) {
+        p->execute = [this](VkCommandBuffer cmd, const FrameContext& ctx) {
+            recordTonemapPass(cmd, ctx);
+        };
+    }
+
+    // Re-compile after wiring callbacks (order doesn't change, but ensures consistency)
+    m_renderGraph.compile();
+
     spdlog::info("Renderer initialized");
 }
 
@@ -1153,6 +1183,76 @@ void Renderer::renderFrame(float alpha) {
 
     m_currentFrame = (m_currentFrame + 1) % Sync::MAX_FRAMES_IN_FLIGHT;
 }
+// ── buildFrameContext ────────────────────────────────────────────────────────
+FrameContext Renderer::buildFrameContext(VkCommandBuffer cmd, uint32_t imageIndex) {
+    auto ext = m_swapchain->getExtent();
+    float aspect = static_cast<float>(ext.width) / static_cast<float>(ext.height);
+
+    FrameContext ctx{};
+    ctx.frameIndex  = m_currentFrame;
+    ctx.imageIndex  = imageIndex;
+    ctx.cmd         = cmd;
+    ctx.extent      = ext;
+    ctx.aspect      = aspect;
+    ctx.dt          = m_currentDt;
+    ctx.gameTime    = m_gameTime;
+
+    ctx.view      = m_isoCam.getViewMatrix();
+    ctx.proj      = m_isoCam.getProjectionMatrix(aspect);
+    ctx.viewProj  = ctx.proj * ctx.view;
+    ctx.cameraPos = m_isoCam.getPosition();
+    ctx.nearPlane = m_isoCam.getNear();
+    ctx.farPlane  = m_isoCam.getFar();
+    ctx.frustum.update(ctx.viewProj);
+
+    ctx.device             = m_device.get();
+    ctx.descriptors        = m_descriptors.get();
+    ctx.bindless           = m_bindless.get();
+    ctx.pipeline           = m_pipeline.get();
+    ctx.hdrFB              = m_hdrFB.get();
+    ctx.swapchain          = m_swapchain.get();
+    ctx.shadowPass         = &m_shadowPass;
+    ctx.bloom              = m_bloom.get();
+    ctx.toneMap             = m_toneMap.get();
+    ctx.inkingPass         = m_inkingPass.get();
+    ctx.fogOfWar           = m_fogOfWar.get();
+    ctx.outlineRenderer    = m_outlineRenderer.get();
+    ctx.waterRenderer      = m_waterRenderer.get();
+    ctx.distortionRenderer = m_distortionRenderer.get();
+    ctx.shieldBubble       = m_shieldBubble.get();
+    ctx.coneEffect         = m_coneEffect.get();
+    ctx.explosionRenderer  = m_explosionRenderer.get();
+    ctx.spriteEffects      = m_spriteEffectRenderer.get();
+    ctx.clickIndicator     = m_clickIndicatorRenderer.get();
+    ctx.groundDecals       = m_groundDecalRenderer.get();
+    ctx.megaBuffer         = m_megaBuffer.get();
+    ctx.hizPass            = &m_hizPass;
+    ctx.vfxRenderer        = m_vfxRenderer.get();
+    ctx.trailRenderer      = m_trailRenderer.get();
+    ctx.meshEffects        = m_meshEffectRenderer.get();
+    ctx.debugRenderer      = &m_debugRenderer;
+    ctx.gpuTimer           = m_gpuTimer.get();
+    ctx.scene              = &m_scene;
+    ctx.threadPool         = &m_threadPool;
+    ctx.cmdPools           = &m_cmdPools;
+    ctx.asyncCompute       = &m_asyncCompute;
+
+    ctx.skinnedPipeline       = m_skinnedPipeline;
+    ctx.skinnedPipelineLayout = m_skinnedPipelineLayout;
+    ctx.gridPipeline          = m_gridPipeline;
+    ctx.gridPipelineLayout    = m_gridPipelineLayout;
+    ctx.instanceBuffer        = m_instanceBuffers[m_currentFrame].getBuffer();
+    ctx.instanceMapped        = static_cast<InstanceData*>(m_instanceMapped[m_currentFrame]);
+    ctx.sceneMapped           = m_sceneMapped[m_currentFrame];
+    ctx.renderAlpha           = m_renderAlpha;
+    ctx.wireframe             = m_wireframe;
+    ctx.showGrid              = m_showGrid;
+    ctx.fogEnabled            = m_fogEnabled;
+    ctx.isLauncher            = (m_state == AppState::Launcher);
+
+    return ctx;
+}
+
 // ── recordCommandBuffer ──────────────────────────────────────────────────────
 void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, float /*dt*/) {
     VkCommandBufferBeginInfo bi{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
@@ -1163,31 +1263,14 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
     // ── Reset GPU timer queries for this frame ──────────────────────────────
     if (m_gpuTimer) m_gpuTimer->resetFrame(cmd, m_currentFrame);
 
-    // ── FoW compute pass ────────────────────────────────────────────────────
-    if (m_fogOfWar) {
-        if (m_gpuTimer) m_gpuTimer->beginZone(cmd, m_currentFrame, "FoW");
-        m_fogOfWar->dispatch(cmd);
-        if (m_gpuTimer) m_gpuTimer->endZone(cmd, m_currentFrame, "FoW");
-    }
-
-    // ── VFX: acquire particle buffers from async compute queue ──────────
-    if (m_vfxRenderer && m_state != AppState::Launcher) {
-        if (m_gpuTimer) m_gpuTimer->beginZone(cmd, m_currentFrame, "VFX Acquire");
-        uint32_t computeFamily = m_asyncCompute.getQueueFamilyIndex();
-        uint32_t graphicsFamily = m_device->getQueueFamilies().graphicsFamily.value();
-        m_vfxRenderer->acquireFromCompute(cmd, computeFamily, graphicsFamily);
-        if (m_gpuTimer) m_gpuTimer->endZone(cmd, m_currentFrame, "VFX Acquire");
-    }
-
+    // ── Update per-frame UBOs ───────────────────────────────────────────────
     auto ext = m_swapchain->getExtent();
     float aspect = static_cast<float>(ext.width) / static_cast<float>(ext.height);
 
-    // ── Update per-frame UBO ─────────────────────────────────────────────
     {
         glm::mat4 viewMat = m_isoCam.getViewMatrix();
         glm::mat4 projMat = m_isoCam.getProjectionMatrix(aspect);
 
-        // Compute cascade shadow matrices from current camera
         glm::vec3 lightDir = glm::normalize(glm::vec3(100.0f, 60.0f, 100.0f));
         m_shadowPass.updateCascades(viewMat, projMat, lightDir, 0.1f, 150.0f);
         const auto& cascades = m_shadowPass.getCascades();
@@ -1210,7 +1293,6 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
         light.ambientStrength = 0.5f;
         light.lights[0].position = glm::vec3(100.0f, 60.0f, 100.0f);
         light.lights[0].color    = glm::vec3(1.0f, 0.95f, 0.85f);
-        // Fog toggle: set density to 0 to disable (exp(0)=1 → no fog mixing)
         light.fogDensity = m_fogEnabled ? 0.03f : 0.0f;
         light.fogColor   = glm::vec3(0.6f, 0.65f, 0.75f);
         light.fogStart   = 5.0f;
@@ -1219,81 +1301,94 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
         m_descriptors->updateLightBuffer(m_currentFrame, light);
     }
 
-    // ── Shadow pass: render depth from light's perspective ───────────────
-    if (m_state != AppState::Launcher) {
-        VkDescriptorSet ds = m_descriptors->getSet(m_currentFrame);
+    // ── Conditional pass enable/disable ─────────────────────────────────────
+    bool isLauncher = (m_state == AppState::Launcher);
+    m_renderGraph.setPassEnabled("FogOfWar",      m_fogEnabled && !isLauncher);
+    m_renderGraph.setPassEnabled("VFXAcquire",    !isLauncher);
+    m_renderGraph.setPassEnabled("Shadow",        !isLauncher);
+    m_renderGraph.setPassEnabled("TransparentVFX",!isLauncher);
 
-        // Pre-collect static entities for random-access indexing
-        struct ShadowEntity { uint32_t meshIndex; glm::mat4 model; };
-        std::vector<ShadowEntity> shadowEntities;
-        {
-            auto staticView = m_scene.getRegistry()
-                .view<TransformComponent, MeshComponent, MaterialComponent>(
-                    entt::exclude<GPUSkinnedMeshComponent>);
-            for (auto&& [e, t, mc, mat] : staticView.each()) {
-                if (shadowEntities.size() >= MAX_INSTANCES) break;
-                shadowEntities.push_back({mc.meshIndex, t.getInterpolatedModelMatrix(m_renderAlpha)});
-            }
+    // ── Build per-frame context and execute the render graph ────────────────
+    FrameContext ctx = buildFrameContext(cmd, imageIndex);
+    m_renderGraph.execute(cmd, ctx);
+
+    VK_CHECK(vkEndCommandBuffer(cmd), "End command buffer");
+}
+
+// ── recordShadowPass ─────────────────────────────────────────────────────────
+void Renderer::recordShadowPass(VkCommandBuffer cmd, const FrameContext& ctx) {
+    VkDescriptorSet ds = m_descriptors->getSet(m_currentFrame);
+
+    // Pre-collect static entities for random-access indexing
+    struct ShadowEntity { uint32_t meshIndex; glm::mat4 model; };
+    std::vector<ShadowEntity> shadowEntities;
+    {
+        auto staticView = m_scene.getRegistry()
+            .view<TransformComponent, MeshComponent, MaterialComponent>(
+                entt::exclude<GPUSkinnedMeshComponent>);
+        for (auto&& [e, t, mc, mat] : staticView.each()) {
+            if (shadowEntities.size() >= MAX_INSTANCES) break;
+            shadowEntities.push_back({mc.meshIndex, t.getInterpolatedModelMatrix(m_renderAlpha)});
         }
+    }
 
-        // Pre-fill instance buffer model matrices for shadow
-        auto* instances = static_cast<InstanceData*>(m_instanceMapped[m_currentFrame]);
-        for (uint32_t i = 0; i < shadowEntities.size(); ++i) {
-            instances[i].model = shadowEntities[i].model;
-        }
+    // Pre-fill instance buffer model matrices for shadow
+    auto* instances = static_cast<InstanceData*>(m_instanceMapped[m_currentFrame]);
+    for (uint32_t i = 0; i < shadowEntities.size(); ++i) {
+        instances[i].model = shadowEntities[i].model;
+    }
 
-        {
-            GLORY_ZONE_N("ShadowPass");
-            if (m_gpuTimer) m_gpuTimer->beginZone(cmd, m_currentFrame, "Shadow");
+    if (m_gpuTimer) m_gpuTimer->beginZone(cmd, m_currentFrame, "Shadow");
 
-            if (shadowEntities.size() >= PARALLEL_THRESHOLD) {
-                auto shadowFormats = RenderFormats::depthOnly(ShadowPass::DEPTH_FORMAT);
-                VkBuffer instBuf = m_instanceBuffers[m_currentFrame].getBuffer();
+    if (shadowEntities.size() >= PARALLEL_THRESHOLD) {
+        auto shadowFormats = RenderFormats::depthOnly(ShadowPass::DEPTH_FORMAT);
+        VkBuffer instBuf = m_instanceBuffers[m_currentFrame].getBuffer();
 
-                auto parallelStaticFn = [&](uint32_t /*cascade*/, const glm::mat4& lvp,
-                                            VkViewport vp, VkRect2D sc) -> std::vector<VkCommandBuffer> {
-                    auto result = ParallelRecorder::record(
-                        m_threadPool, m_cmdPools, m_currentFrame, shadowFormats,
-                        static_cast<uint32_t>(shadowEntities.size()),
-                        [&](VkCommandBuffer scmd, uint32_t start, uint32_t end) {
-                            vkCmdSetViewport(scmd, 0, 1, &vp);
-                            vkCmdSetScissor(scmd, 0, 1, &sc);
-                            vkCmdBindPipeline(scmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                              m_shadowPass.getStaticPipeline());
-                            vkCmdPushConstants(scmd, m_shadowPass.getPipelineLayout(),
-                                               VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &lvp);
-                            for (uint32_t i = start; i < end; ++i) {
-                                VkDeviceSize instOffset = i * sizeof(InstanceData);
-                                vkCmdBindVertexBuffers(scmd, 1, 1, &instBuf, &instOffset);
-                                m_scene.getMesh(shadowEntities[i].meshIndex).draw(scmd);
-                            }
-                        });
-                    return result.secondaryBuffers;
-                };
-
-                m_shadowPass.recordCommandsParallel(cmd, parallelStaticFn, nullptr);
-            } else {
-                // Fall back to single-threaded recording
-                auto drawStaticShadows = [&](VkCommandBuffer scmd, uint32_t /*cascade*/) {
-                    VkBuffer instBuf = m_instanceBuffers[m_currentFrame].getBuffer();
-                    for (uint32_t i = 0; i < static_cast<uint32_t>(shadowEntities.size()); ++i) {
+        auto parallelStaticFn = [&](uint32_t /*cascade*/, const glm::mat4& lvp,
+                                    VkViewport vp, VkRect2D sc) -> std::vector<VkCommandBuffer> {
+            auto result = ParallelRecorder::record(
+                m_threadPool, m_cmdPools, m_currentFrame, shadowFormats,
+                static_cast<uint32_t>(shadowEntities.size()),
+                [&](VkCommandBuffer scmd, uint32_t start, uint32_t end) {
+                    vkCmdSetViewport(scmd, 0, 1, &vp);
+                    vkCmdSetScissor(scmd, 0, 1, &sc);
+                    vkCmdBindPipeline(scmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                      m_shadowPass.getStaticPipeline());
+                    vkCmdPushConstants(scmd, m_shadowPass.getPipelineLayout(),
+                                       VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &lvp);
+                    for (uint32_t i = start; i < end; ++i) {
                         VkDeviceSize instOffset = i * sizeof(InstanceData);
                         vkCmdBindVertexBuffers(scmd, 1, 1, &instBuf, &instOffset);
                         m_scene.getMesh(shadowEntities[i].meshIndex).draw(scmd);
                     }
-                };
-                m_shadowPass.recordCommands(cmd, drawStaticShadows, nullptr);
-            }
+                });
+            return result.secondaryBuffers;
+        };
 
-            if (m_gpuTimer) m_gpuTimer->endZone(cmd, m_currentFrame, "Shadow");
-        }
+        m_shadowPass.recordCommandsParallel(cmd, parallelStaticFn, nullptr);
+    } else {
+        auto drawStaticShadows = [&](VkCommandBuffer scmd, uint32_t /*cascade*/) {
+            VkBuffer instBuf = m_instanceBuffers[m_currentFrame].getBuffer();
+            for (uint32_t i = 0; i < static_cast<uint32_t>(shadowEntities.size()); ++i) {
+                VkDeviceSize instOffset = i * sizeof(InstanceData);
+                vkCmdBindVertexBuffers(scmd, 1, 1, &instBuf, &instOffset);
+                m_scene.getMesh(shadowEntities[i].meshIndex).draw(scmd);
+            }
+        };
+        m_shadowPass.recordCommands(cmd, drawStaticShadows, nullptr);
     }
 
-    // ── Begin HDR render pass (dynamic rendering) ──────────────────────────
-    // Transition HDR attachments to attachment-optimal layouts
+    if (m_gpuTimer) m_gpuTimer->endZone(cmd, m_currentFrame, "Shadow");
+}
+
+// ── recordGBufferPass ────────────────────────────────────────────────────────
+void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
+    auto ext = ctx.extent;
+    float aspect = ctx.aspect;
+
+    // ── Transition HDR attachments to attachment-optimal layouts ─────────────
     {
         VkImageMemoryBarrier2 barriers[3]{};
-        // Color attachment
         barriers[0] = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
         barriers[0].srcStageMask  = VK_PIPELINE_STAGE_2_NONE;
         barriers[0].srcAccessMask = VK_ACCESS_2_NONE;
@@ -1303,7 +1398,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
         barriers[0].newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         barriers[0].image = m_hdrFB->colorImage();
         barriers[0].subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-        // Depth attachment
+
         barriers[1] = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
         barriers[1].srcStageMask  = VK_PIPELINE_STAGE_2_NONE;
         barriers[1].srcAccessMask = VK_ACCESS_2_NONE;
@@ -1313,7 +1408,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
         barriers[1].newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
         barriers[1].image = m_hdrFB->depthImage();
         barriers[1].subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 0, 1};
-        // CharDepth attachment
+
         barriers[2] = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
         barriers[2].srcStageMask  = VK_PIPELINE_STAGE_2_NONE;
         barriers[2].srcAccessMask = VK_ACCESS_2_NONE;
@@ -1364,7 +1459,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
     VkViewport vp{ 0, 0, static_cast<float>(ext.width), static_cast<float>(ext.height), 0, 1 };
     VkRect2D   sc{ {0, 0}, ext };
 
-    // ── Phase 1: CPU data fill (sequential, before rendering) ──────────────
+    // ── Phase 1: CPU data fill (sequential, before rendering) ───────────────
     struct SkinnedDrawInfo {
         entt::entity entity;
         VkBuffer     instBuf;
@@ -1381,7 +1476,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
         auto* sceneData = static_cast<GpuObjectData*>(m_sceneMapped[m_currentFrame]);
         VkDescriptorSet ds = m_descriptors->getSet(m_currentFrame);
 
-        // ── Static entities ──────────────────────────────────────────────────
+        // ── Static entities ─────────────────────────────────────────────────
         auto staticView = m_scene.getRegistry()
             .view<TransformComponent, MeshComponent, MaterialComponent>(
                 entt::exclude<GPUSkinnedMeshComponent>);
@@ -1430,7 +1525,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
                 m_sceneBuffers[m_currentFrame].getBuffer(), usedSize);
         }
 
-        // ── Skinned entities ─────────────────────────────────────────────────
+        // ── Skinned entities ────────────────────────────────────────────────
         auto skinnedView = m_scene.getRegistry()
             .view<TransformComponent, MaterialComponent, GPUSkinnedMeshComponent>();
         for (auto&& [e, t, mat, ssm] : skinnedView.each()) {
@@ -1471,10 +1566,10 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
             staticResult = ParallelRecorder::record(
                 m_threadPool, m_cmdPools, m_currentFrame, hdrFormats, objectCount,
                 [&](VkCommandBuffer scmd, uint32_t start, uint32_t end) {
-                    VkViewport vp{ 0, 0, static_cast<float>(ext.width), static_cast<float>(ext.height), 0, 1 };
-                    VkRect2D sc{ {0,0}, ext };
-                    vkCmdSetViewport(scmd, 0, 1, &vp);
-                    vkCmdSetScissor(scmd, 0, 1, &sc);
+                    VkViewport lvp{ 0, 0, static_cast<float>(ext.width), static_cast<float>(ext.height), 0, 1 };
+                    VkRect2D lsc{ {0,0}, ext };
+                    vkCmdSetViewport(scmd, 0, 1, &lvp);
+                    vkCmdSetScissor(scmd, 0, 1, &lsc);
                     VkPipeline mainPipeline = m_wireframe ? m_pipeline->getWireframePipeline()
                                                           : m_pipeline->getGraphicsPipeline();
                     vkCmdBindPipeline(scmd, VK_PIPELINE_BIND_POINT_GRAPHICS, mainPipeline);
@@ -1497,10 +1592,10 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
                 m_threadPool, m_cmdPools, m_currentFrame, hdrFormats,
                 static_cast<uint32_t>(skinnedDraws.size()),
                 [&](VkCommandBuffer scmd, uint32_t start, uint32_t end) {
-                    VkViewport vp{ 0, 0, static_cast<float>(ext.width), static_cast<float>(ext.height), 0, 1 };
-                    VkRect2D sc{ {0,0}, ext };
-                    vkCmdSetViewport(scmd, 0, 1, &vp);
-                    vkCmdSetScissor(scmd, 0, 1, &sc);
+                    VkViewport lvp{ 0, 0, static_cast<float>(ext.width), static_cast<float>(ext.height), 0, 1 };
+                    VkRect2D lsc{ {0,0}, ext };
+                    vkCmdSetViewport(scmd, 0, 1, &lvp);
+                    vkCmdSetScissor(scmd, 0, 1, &lsc);
                     vkCmdBindPipeline(scmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_skinnedPipeline);
                     VkDescriptorSet sets[2] = { ds, m_bindless->getSet() };
                     vkCmdBindDescriptorSets(scmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -1521,7 +1616,6 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
         bool hasSecondaries = !staticResult.secondaryBuffers.empty() ||
                               !skinnedResult.secondaryBuffers.empty();
 
-        // Set SECONDARY_COMMAND_BUFFERS flag only when we have secondaries
         if (hasSecondaries)
             hdrRenderInfo.flags = VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT;
 
@@ -1585,14 +1679,12 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
 
             vkCmdBeginRendering(cmd, &loadRenderInfo);
 
-            VkViewport vp{ 0, 0, static_cast<float>(ext.width), static_cast<float>(ext.height), 0, 1 };
-            VkRect2D   sc{ {0, 0}, ext };
             vkCmdSetViewport(cmd, 0, 1, &vp);
             vkCmdSetScissor(cmd, 0, 1, &sc);
 
             VkDescriptorSet sets[2] = { ds, m_bindless->getSet() };
 
-            // ── Team-colored outlines (LoL Stage 8) ──────────────────────────
+            // ── Team-colored outlines (LoL Stage 8) ─────────────────────────
             if (m_outlineRenderer && !skinnedDraws.empty()) {
                 auto& reg = m_scene.getRegistry();
 
@@ -1636,11 +1728,11 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
                                         m_skinnedPipelineLayout, 0, 2, sets, 0, nullptr);
             }
 
-            // ── Debug grid ───────────────────────────────────────────────────
+            // ── Debug grid ──────────────────────────────────────────────────
             if (m_showGrid && m_gridPipeline != VK_NULL_HANDLE) {
                 vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_gridPipeline);
                 struct GridPC { glm::mat4 viewProj; float gridY; } gridPC;
-                gridPC.viewProj = m_isoCam.getProjectionMatrix(aspect) * m_isoCam.getViewMatrix();
+                gridPC.viewProj = ctx.viewProj;
                 gridPC.gridY    = 0.0f;
                 vkCmdPushConstants(cmd, m_gridPipelineLayout,
                                    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -1650,29 +1742,26 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
 
             // ── Ground decals (depth test ON, depth write OFF, alpha blend) ──
             if (m_groundDecalRenderer) {
-                float aspect = static_cast<float>(ext.width) / static_cast<float>(ext.height);
-                glm::mat4 vp = m_isoCam.getProjectionMatrix(aspect) * m_isoCam.getViewMatrix();
                 float appTime = static_cast<float>(glfwGetTime());
-                m_groundDecalRenderer->render(cmd, vp, appTime);
+                m_groundDecalRenderer->render(cmd, ctx.viewProj, appTime);
             }
 
-            // ── Click indicator ──────────────────────────────────────────────
+            // ── Click indicator ─────────────────────────────────────────────
             if (m_clickAnim && m_clickIndicatorRenderer) {
                 float t_norm = m_clickAnim->lifetime / m_clickAnim->maxLife;
-                glm::mat4 vp = m_isoCam.getProjectionMatrix(aspect) * m_isoCam.getViewMatrix();
-                m_clickIndicatorRenderer->render(cmd, vp, m_clickAnim->position, t_norm, 1.5f);
+                m_clickIndicatorRenderer->render(cmd, ctx.viewProj, m_clickAnim->position, t_norm, 1.5f);
             }
 
-            // ── Debug Renderer (Marquee Box) ─────────────────────────────────
-            glm::mat4 viewProj = m_isoCam.getProjectionMatrix(aspect) * m_isoCam.getViewMatrix();
-            m_debugRenderer.render(cmd, viewProj);
+            // ── Debug Renderer (Marquee Box) ────────────────────────────────
+            m_debugRenderer.render(cmd, ctx.viewProj);
 
             // ── Water surface (alpha-blend, depth-test ON, depth-write OFF) ──
             if (m_waterRenderer) {
                 float appTime = static_cast<float>(glfwGetTime());
                 glm::mat4 waterModel = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -0.25f, 0.0f))
                                      * glm::scale(glm::mat4(1.0f), glm::vec3(200.0f, 1.0f, 200.0f));
-                m_waterRenderer->render(cmd, ds, m_bindless->getSet(), appTime, waterModel);
+                m_waterRenderer->render(cmd, m_descriptors->getSet(m_currentFrame),
+                                        m_bindless->getSet(), appTime, waterModel);
                 vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_skinnedPipeline);
                 vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                         m_skinnedPipelineLayout, 0, 2, sets, 0, nullptr);
@@ -1688,10 +1777,9 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
 
     if (m_gpuTimer) m_gpuTimer->endZone(cmd, m_currentFrame, "Geometry");
 
-    // ── Transition HDR attachments after main pass ──────────────────────────
+    // ── Transition HDR attachments to read-only layouts ─────────────────────
     {
         VkImageMemoryBarrier2 barriers[3]{};
-        // Color → SHADER_READ_ONLY for bloom sampling / copyColor
         barriers[0] = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
         barriers[0].srcStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
         barriers[0].srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
@@ -1701,7 +1789,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
         barriers[0].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         barriers[0].image = m_hdrFB->colorImage();
         barriers[0].subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-        // Depth → DEPTH_STENCIL_READ_ONLY for load pass read-only depth test
+
         barriers[1] = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
         barriers[1].srcStageMask  = VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
         barriers[1].srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
@@ -1711,7 +1799,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
         barriers[1].newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
         barriers[1].image = m_hdrFB->depthImage();
         barriers[1].subresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 0, 1};
-        // CharDepth → SHADER_READ_ONLY for inking pass sampling
+
         barriers[2] = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
         barriers[2].srcStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
         barriers[2].srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
@@ -1727,177 +1815,180 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
         depInfo.pImageMemoryBarriers    = barriers;
         vkCmdPipelineBarrier2(cmd, &depInfo);
     }
+}
 
-    // ── Transparent / VFX pass (LOAD_OP_LOAD, dynamic rendering) ──────────
-    if (m_state != AppState::Launcher) {
-        // Copy scene color for distortion effects before rendering transparents over it
-        if (m_distortionRenderer) {
-            m_hdrFB->copyColor(cmd);
-        }
+// ── recordTransparentVFXPass ─────────────────────────────────────────────────
+void Renderer::recordTransparentVFXPass(VkCommandBuffer cmd, const FrameContext& ctx) {
+    auto ext = ctx.extent;
+    float aspect = ctx.aspect;
 
-        // Transition color back to attachment for load pass writing
-        {
-            VkImageMemoryBarrier2 colorToAttach{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
-            colorToAttach.srcStageMask  = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-            colorToAttach.srcAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_TRANSFER_READ_BIT;
-            colorToAttach.dstStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-            colorToAttach.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT;
-            colorToAttach.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            colorToAttach.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-            colorToAttach.image = m_hdrFB->colorImage();
-            colorToAttach.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    // Copy scene color for distortion effects before rendering transparents over it
+    if (m_distortionRenderer) {
+        m_hdrFB->copyColor(cmd);
+    }
 
-            VkDependencyInfo depInfo{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
-            depInfo.imageMemoryBarrierCount = 1;
-            depInfo.pImageMemoryBarriers    = &colorToAttach;
-            vkCmdPipelineBarrier2(cmd, &depInfo);
-        }
+    // Transition color back to attachment for load pass writing
+    {
+        VkImageMemoryBarrier2 colorToAttach{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
+        colorToAttach.srcStageMask  = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+        colorToAttach.srcAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_TRANSFER_READ_BIT;
+        colorToAttach.dstStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+        colorToAttach.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT;
+        colorToAttach.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        colorToAttach.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        colorToAttach.image = m_hdrFB->colorImage();
+        colorToAttach.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
-        // Load pass: color LOAD (preserve geometry), charDepth read-only (inking reads it),
-        // depth read-only (depth test, no write)
-        VkRenderingAttachmentInfo loadColorAttach{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-        loadColorAttach.imageView   = m_hdrFB->colorView();
-        loadColorAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        loadColorAttach.loadOp      = VK_ATTACHMENT_LOAD_OP_LOAD;
-        loadColorAttach.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
+        VkDependencyInfo depInfo{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        depInfo.imageMemoryBarrierCount = 1;
+        depInfo.pImageMemoryBarriers    = &colorToAttach;
+        vkCmdPipelineBarrier2(cmd, &depInfo);
+    }
 
-        // charDepth: write-masked to 0 but must be declared for pipeline compatibility
-        VkRenderingAttachmentInfo loadCharDepthAttach{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-        loadCharDepthAttach.imageView   = m_hdrFB->characterDepthView();
-        loadCharDepthAttach.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        loadCharDepthAttach.loadOp      = VK_ATTACHMENT_LOAD_OP_LOAD;
-        loadCharDepthAttach.storeOp     = VK_ATTACHMENT_STORE_OP_NONE;
+    // Load pass: color LOAD (preserve geometry), charDepth read-only (inking reads it),
+    // depth read-only (depth test, no write)
+    VkRenderingAttachmentInfo loadColorAttach{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+    loadColorAttach.imageView   = m_hdrFB->colorView();
+    loadColorAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    loadColorAttach.loadOp      = VK_ATTACHMENT_LOAD_OP_LOAD;
+    loadColorAttach.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
 
-        VkRenderingAttachmentInfo loadColorAttachments[2] = {loadColorAttach, loadCharDepthAttach};
+    VkRenderingAttachmentInfo loadCharDepthAttach{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+    loadCharDepthAttach.imageView   = m_hdrFB->characterDepthView();
+    loadCharDepthAttach.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    loadCharDepthAttach.loadOp      = VK_ATTACHMENT_LOAD_OP_LOAD;
+    loadCharDepthAttach.storeOp     = VK_ATTACHMENT_STORE_OP_NONE;
 
-        VkRenderingAttachmentInfo loadDepthAttach{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-        loadDepthAttach.imageView   = m_hdrFB->depthAttachmentView();
-        loadDepthAttach.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-        loadDepthAttach.loadOp      = VK_ATTACHMENT_LOAD_OP_LOAD;
-        loadDepthAttach.storeOp     = VK_ATTACHMENT_STORE_OP_NONE;
+    VkRenderingAttachmentInfo loadColorAttachments[2] = {loadColorAttach, loadCharDepthAttach};
 
-        VkRenderingInfo loadRenderInfo{VK_STRUCTURE_TYPE_RENDERING_INFO};
-        loadRenderInfo.renderArea           = { {0, 0}, ext };
-        loadRenderInfo.layerCount           = 1;
-        loadRenderInfo.colorAttachmentCount = 2;
-        loadRenderInfo.pColorAttachments    = loadColorAttachments;
-        loadRenderInfo.pDepthAttachment     = &loadDepthAttach;
-        loadRenderInfo.pStencilAttachment   = &loadDepthAttach;
+    VkRenderingAttachmentInfo loadDepthAttach{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+    loadDepthAttach.imageView   = m_hdrFB->depthAttachmentView();
+    loadDepthAttach.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+    loadDepthAttach.loadOp      = VK_ATTACHMENT_LOAD_OP_LOAD;
+    loadDepthAttach.storeOp     = VK_ATTACHMENT_STORE_OP_NONE;
 
-        vkCmdBeginRendering(cmd, &loadRenderInfo);
-        if (m_gpuTimer) m_gpuTimer->beginZone(cmd, m_currentFrame, "VFX/Trans");
+    VkRenderingInfo loadRenderInfo{VK_STRUCTURE_TYPE_RENDERING_INFO};
+    loadRenderInfo.renderArea           = { {0, 0}, ext };
+    loadRenderInfo.layerCount           = 1;
+    loadRenderInfo.colorAttachmentCount = 2;
+    loadRenderInfo.pColorAttachments    = loadColorAttachments;
+    loadRenderInfo.pDepthAttachment     = &loadDepthAttach;
+    loadRenderInfo.pStencilAttachment   = &loadDepthAttach;
 
-        vkCmdSetViewport(cmd, 0, 1, &vp);
-        vkCmdSetScissor(cmd, 0, 1, &sc);
+    vkCmdBeginRendering(cmd, &loadRenderInfo);
+    if (m_gpuTimer) m_gpuTimer->beginZone(cmd, m_currentFrame, "VFX/Trans");
 
-        // ── Character outline (Sobel inking pass) ──────────────────────────────
-        if (m_inkingPass) {
-            m_inkingPass->render(cmd, 0.02f, 1.5f, glm::vec4(0.05f, 0.03f, 0.02f, 1.0f));
-        }
+    VkViewport vp{ 0, 0, static_cast<float>(ext.width), static_cast<float>(ext.height), 0, 1 };
+    VkRect2D   sc{ {0, 0}, ext };
+    vkCmdSetViewport(cmd, 0, 1, &vp);
+    vkCmdSetScissor(cmd, 0, 1, &sc);
 
-        glm::mat4 viewProj = m_isoCam.getProjectionMatrix(aspect) * m_isoCam.getViewMatrix();
+    // ── Character outline (Sobel inking pass) ───────────────────────────────
+    if (m_inkingPass) {
+        m_inkingPass->render(cmd, 0.02f, 1.5f, glm::vec4(0.05f, 0.03f, 0.02f, 1.0f));
+    }
 
-        // ── VFX particle render pass ──────────────────────────────────────────
-        if (m_vfxRenderer) {
-            const glm::mat4& view = m_isoCam.getViewMatrix();
-            glm::vec3 camRight{view[0][0], view[1][0], view[2][0]};
-            glm::vec3 camUp   {view[0][1], view[1][1], view[2][1]};
-            glm::vec2 screenSize(static_cast<float>(ext.width), static_cast<float>(ext.height));
-            m_vfxRenderer->render(cmd, viewProj, camRight, camUp, 
-                                  screenSize, m_isoCam.getNear(), m_isoCam.getFar());
-        }
+    glm::mat4 viewProj = ctx.viewProj;
 
-        // ── Trail ribbon render pass ──────────────────────────────────────────
-        if (m_trailRenderer) {
-            const glm::mat4& view = m_isoCam.getViewMatrix();
-            glm::vec3 camRight{view[0][0], view[1][0], view[2][0]};
-            glm::vec3 camUp   {view[0][1], view[1][1], view[2][1]};
-            m_trailRenderer->render(cmd, viewProj, camRight, camUp);
-        }
+    // ── VFX particle render pass ────────────────────────────────────────────
+    if (m_vfxRenderer) {
+        const glm::mat4& view = m_isoCam.getViewMatrix();
+        glm::vec3 camRight{view[0][0], view[1][0], view[2][0]};
+        glm::vec3 camUp   {view[0][1], view[1][1], view[2][1]};
+        glm::vec2 screenSize(static_cast<float>(ext.width), static_cast<float>(ext.height));
+        m_vfxRenderer->render(cmd, viewProj, camRight, camUp,
+                              screenSize, m_isoCam.getNear(), m_isoCam.getFar());
+    }
 
-        // ── Glass shield bubble ───────────────────────────────────────────────
-        if (m_shieldBubble) {
-            auto& reg = m_scene.getRegistry();
-            if (reg.all_of<CombatComponent, TransformComponent>(m_playerEntity)) {
-                const auto& combat = reg.get<CombatComponent>(m_playerEntity);
-                if (combat.state == CombatState::SHIELDING) {
-                    const auto& t = reg.get<TransformComponent>(m_playerEntity);
-                    float elapsed  = combat.shieldDuration - combat.stateTimer;
-                    float fadeIn   = std::min(elapsed / 0.25f, 1.0f);
-                    float fadeOut  = std::min(combat.stateTimer / 0.25f, 1.0f);
-                    float alpha    = fadeIn * fadeOut;
-                    glm::vec3 center    = t.position + glm::vec3(0.0f, 2.5f, 0.0f);
-                    glm::vec3 cameraPos = m_isoCam.getPosition();
-                    float appTime = static_cast<float>(glfwGetTime());
-                    m_shieldBubble->render(cmd, viewProj, center, cameraPos,
-                                           3.2f, appTime, alpha);
-                }
+    // ── Trail ribbon render pass ────────────────────────────────────────────
+    if (m_trailRenderer) {
+        const glm::mat4& view = m_isoCam.getViewMatrix();
+        glm::vec3 camRight{view[0][0], view[1][0], view[2][0]};
+        glm::vec3 camUp   {view[0][1], view[1][1], view[2][1]};
+        m_trailRenderer->render(cmd, viewProj, camRight, camUp);
+    }
+
+    // ── Glass shield bubble ─────────────────────────────────────────────────
+    if (m_shieldBubble) {
+        auto& reg = m_scene.getRegistry();
+        if (reg.all_of<CombatComponent, TransformComponent>(m_playerEntity)) {
+            const auto& combat = reg.get<CombatComponent>(m_playerEntity);
+            if (combat.state == CombatState::SHIELDING) {
+                const auto& t = reg.get<TransformComponent>(m_playerEntity);
+                float elapsed  = combat.shieldDuration - combat.stateTimer;
+                float fadeIn   = std::min(elapsed / 0.25f, 1.0f);
+                float fadeOut  = std::min(combat.stateTimer / 0.25f, 1.0f);
+                float alpha    = fadeIn * fadeOut;
+                glm::vec3 center    = t.position + glm::vec3(0.0f, 2.5f, 0.0f);
+                glm::vec3 cameraPos = m_isoCam.getPosition();
+                float appTime = static_cast<float>(glfwGetTime());
+                m_shieldBubble->render(cmd, viewProj, center, cameraPos,
+                                       3.2f, appTime, alpha);
             }
-        }
-
-        // ── E-ability cone effect (Molten Shield) ─────────────────────────
-        if (m_coneEffectTimer > 0.0f && m_coneEffect) {
-            float elapsed    = CONE_DURATION - m_coneEffectTimer;
-            glm::vec3 camPos = m_isoCam.getPosition();
-            float     t      = static_cast<float>(glfwGetTime());
-            m_coneEffect->render(cmd, viewProj, m_coneApex, m_coneDirection,
-                                 CONE_HALF_ANGLE, CONE_RANGE,
-                                 camPos, t, elapsed, 1.0f);
-        }
-
-        // ── R-ability explosion effects (Incendiary Bomb) ─────────────────
-        if (m_explosionRenderer) {
-            glm::vec3 camPos = m_isoCam.getPosition();
-            float appTime    = static_cast<float>(glfwGetTime());
-            m_explosionRenderer->render(cmd, viewProj, camPos, appTime);
-        }
-
-        if (m_meshEffectRenderer) {
-            float appTime = static_cast<float>(glfwGetTime());
-            m_meshEffectRenderer->render(cmd, viewProj, appTime);
-        }
-
-        // ── Sprite-atlas VFX effects (W cone, E explosion) ────────────────────
-        if (m_spriteEffectRenderer) {
-            glm::vec3 camPos = m_isoCam.getPosition();
-            m_spriteEffectRenderer->render(cmd, viewProj, camPos);
-        }
-
-        // ── Distortion pass (rendered on top of transparents) ──────────────────
-        if (m_distortionRenderer) {
-            float appTime = static_cast<float>(glfwGetTime());
-            m_distortionRenderer->render(cmd, viewProj, appTime, ext.width, ext.height);
-        }
-
-        if (m_gpuTimer) m_gpuTimer->endZone(cmd, m_currentFrame, "VFX/Trans");
-        vkCmdEndRendering(cmd);
-
-        // Transition HDR color to SHADER_READ_ONLY for tonemap sampling
-        {
-            VkImageMemoryBarrier2 colorBarrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
-            colorBarrier.srcStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-            colorBarrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-            colorBarrier.dstStageMask  = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-            colorBarrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
-            colorBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-            colorBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            colorBarrier.image = m_hdrFB->colorImage();
-            colorBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-
-            VkDependencyInfo depInfo{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
-            depInfo.imageMemoryBarrierCount = 1;
-            depInfo.pImageMemoryBarriers    = &colorBarrier;
-            vkCmdPipelineBarrier2(cmd, &depInfo);
         }
     }
 
-    // ═══════════ PHASE 3: BLOOM (outside render pass) ═══════════
-    if (m_gpuTimer) m_gpuTimer->beginZone(cmd, m_currentFrame, "Bloom");
-    m_bloom->dispatch(cmd);
-    if (m_gpuTimer) m_gpuTimer->endZone(cmd, m_currentFrame, "Bloom");
+    // ── E-ability cone effect (Molten Shield) ───────────────────────────────
+    if (m_coneEffectTimer > 0.0f && m_coneEffect) {
+        float elapsed    = CONE_DURATION - m_coneEffectTimer;
+        glm::vec3 camPos = m_isoCam.getPosition();
+        float     t      = static_cast<float>(glfwGetTime());
+        m_coneEffect->render(cmd, viewProj, m_coneApex, m_coneDirection,
+                             CONE_HALF_ANGLE, CONE_RANGE,
+                             camPos, t, elapsed, 1.0f);
+    }
 
-    // ═══════════ PHASE 4: TONE-MAP TO SWAPCHAIN (dynamic rendering) ═══════════
-    // Transition swapchain image to COLOR_ATTACHMENT_OPTIMAL
+    // ── R-ability explosion effects (Incendiary Bomb) ───────────────────────
+    if (m_explosionRenderer) {
+        glm::vec3 camPos = m_isoCam.getPosition();
+        float appTime    = static_cast<float>(glfwGetTime());
+        m_explosionRenderer->render(cmd, viewProj, camPos, appTime);
+    }
+
+    if (m_meshEffectRenderer) {
+        float appTime = static_cast<float>(glfwGetTime());
+        m_meshEffectRenderer->render(cmd, viewProj, appTime);
+    }
+
+    // ── Sprite-atlas VFX effects (W cone, E explosion) ──────────────────────
+    if (m_spriteEffectRenderer) {
+        glm::vec3 camPos = m_isoCam.getPosition();
+        m_spriteEffectRenderer->render(cmd, viewProj, camPos);
+    }
+
+    // ── Distortion pass (rendered on top of transparents) ───────────────────
+    if (m_distortionRenderer) {
+        float appTime = static_cast<float>(glfwGetTime());
+        m_distortionRenderer->render(cmd, viewProj, appTime, ext.width, ext.height);
+    }
+
+    if (m_gpuTimer) m_gpuTimer->endZone(cmd, m_currentFrame, "VFX/Trans");
+    vkCmdEndRendering(cmd);
+
+    // Transition HDR color to SHADER_READ_ONLY for bloom/tonemap sampling
+    {
+        VkImageMemoryBarrier2 colorBarrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
+        colorBarrier.srcStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+        colorBarrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+        colorBarrier.dstStageMask  = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+        colorBarrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+        colorBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        colorBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        colorBarrier.image = m_hdrFB->colorImage();
+        colorBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+        VkDependencyInfo depInfo{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        depInfo.imageMemoryBarrierCount = 1;
+        depInfo.pImageMemoryBarriers    = &colorBarrier;
+        vkCmdPipelineBarrier2(cmd, &depInfo);
+    }
+}
+
+// ── recordTonemapPass ────────────────────────────────────────────────────────
+void Renderer::recordTonemapPass(VkCommandBuffer cmd, const FrameContext& ctx) {
+    auto ext = ctx.extent;
+
+    // ── Transition swapchain image to COLOR_ATTACHMENT_OPTIMAL ───────────────
     {
         VkImageMemoryBarrier2 swapBarrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
         swapBarrier.srcStageMask  = VK_PIPELINE_STAGE_2_NONE;
@@ -1906,7 +1997,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
         swapBarrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
         swapBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         swapBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        swapBarrier.image = m_swapchain->getImages()[imageIndex];
+        swapBarrier.image = m_swapchain->getImages()[ctx.imageIndex];
         swapBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
         VkDependencyInfo depInfo{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
@@ -1916,7 +2007,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
     }
 
     VkRenderingAttachmentInfo swapColorAttach{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-    swapColorAttach.imageView   = m_swapchain->getImageViews()[imageIndex];
+    swapColorAttach.imageView   = m_swapchain->getImageViews()[ctx.imageIndex];
     swapColorAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     swapColorAttach.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
     swapColorAttach.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
@@ -1935,7 +2026,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
 
     if (m_gpuTimer) m_gpuTimer->endZone(cmd, m_currentFrame, "Tonemap");
 
-    // ── ImGui render draw data (last thing inside render pass) ────────────
+    // ── ImGui render draw data (last thing inside render pass) ──────────────
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
 
     vkCmdEndRendering(cmd);
@@ -1949,7 +2040,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
         presentBarrier.dstAccessMask = VK_ACCESS_2_NONE;
         presentBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         presentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-        presentBarrier.image = m_swapchain->getImages()[imageIndex];
+        presentBarrier.image = m_swapchain->getImages()[ctx.imageIndex];
         presentBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
         VkDependencyInfo depInfo{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
@@ -1957,9 +2048,8 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
         depInfo.pImageMemoryBarriers    = &presentBarrier;
         vkCmdPipelineBarrier2(cmd, &depInfo);
     }
-
-    VK_CHECK(vkEndCommandBuffer(cmd), "End command buffer");
 }
+
 
 // ── buildScene ───────────────────────────────────────────────────────────────
 void Renderer::buildScene() {
