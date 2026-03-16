@@ -193,6 +193,17 @@ Renderer::Renderer(Window& window) : m_window(window) {
     m_toneMap = std::make_unique<ToneMapPass>();
     m_toneMap->init(*m_device, swapFmts, m_hdrFB->colorView(), m_bloom->bloomResultView(), m_hdrFB->sampler());
 
+    // ── Post-processing: SSAO / SSR ──────────────────────────────────────
+    {
+        auto ext = m_window.getExtent();
+        m_ssaoPass.init(*m_device, ext.width, ext.height,
+                        m_hdrFB->depthView(), m_hdrFB->sampler());
+        m_ssrPass.init(*m_device, ext.width, ext.height,
+                       m_hdrFB->depthView(), m_hdrFB->sampler(),
+                       m_hdrFB->colorView(), m_hdrFB->sampler(),
+                       m_hizPass.getPyramidView(), m_hizPass.getSampler());
+    }
+
     m_isoCam.setBounds(glm::vec3(0, 0, 0), glm::vec3(200, 0, 200));
     m_isoCam.setTarget(glm::vec3(100, 0, 100));
 
@@ -342,6 +353,8 @@ Renderer::~Renderer() {
 
     if (m_toneMap) m_toneMap->destroy();
     m_toneMap.reset();
+    m_ssaoPass.destroy();
+    m_ssrPass.destroy();
     if (m_bloom) m_bloom->destroy();
     m_bloom.reset();
     if (m_hdrFB) m_hdrFB->destroy();
@@ -1236,6 +1249,8 @@ FrameContext Renderer::buildFrameContext(VkCommandBuffer cmd, uint32_t imageInde
     ctx.threadPool         = &m_threadPool;
     ctx.cmdPools           = &m_cmdPools;
     ctx.asyncCompute       = &m_asyncCompute;
+    ctx.ssaoPass           = &m_ssaoPass;
+    ctx.ssrPass            = &m_ssrPass;
 
     ctx.skinnedPipeline       = m_skinnedPipeline;
     ctx.skinnedPipelineLayout = m_skinnedPipelineLayout;
@@ -1307,6 +1322,8 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
     m_renderGraph.setPassEnabled("VFXAcquire",    !isLauncher);
     m_renderGraph.setPassEnabled("Shadow",        !isLauncher);
     m_renderGraph.setPassEnabled("TransparentVFX",!isLauncher);
+    m_renderGraph.setPassEnabled("SSAO",          m_ssaoPass.isEnabled() && !isLauncher);
+    m_renderGraph.setPassEnabled("SSR",           m_ssrPass.isEnabled() && !isLauncher);
 
     // ── Build per-frame context and execute the render graph ────────────────
     FrameContext ctx = buildFrameContext(cmd, imageIndex);
@@ -2657,6 +2674,12 @@ void Renderer::recreateSwapchain() {
     m_distortionRenderer->updateDescriptorSet(m_hdrFB->colorCopyView());
     if (m_inkingPass) m_inkingPass->updateInput(m_hdrFB->characterDepthView());
     m_toneMap->updateDescriptorSets(m_hdrFB->colorView(), m_bloom->bloomResultView());
+    m_ssaoPass.recreate(extent.width, extent.height,
+                        m_hdrFB->depthView(), m_hdrFB->sampler());
+    m_ssrPass.recreate(extent.width, extent.height,
+                       m_hdrFB->depthView(), m_hdrFB->sampler(),
+                       m_hdrFB->colorView(), m_hdrFB->sampler(),
+                       m_hizPass.getPyramidView(), m_hizPass.getSampler());
     m_sync->recreateRenderFinishedSemaphores(m_swapchain->getImageCount());
     spdlog::info("Swapchain recreated ({}×{})", extent.width, extent.height);
 }

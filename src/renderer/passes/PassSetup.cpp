@@ -32,6 +32,8 @@
 #include "renderer/ThreadedCommandPool.h"
 #include "renderer/AsyncComputeManager.h"
 #include "renderer/ParallelRecorder.h"
+#include "renderer/SSAOPass.h"
+#include "renderer/SSRPass.h"
 
 #include <GLFW/glfw3.h>
 
@@ -209,6 +211,63 @@ RenderPassNode createTransparentVFXPass() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// SSAO compute pass
+// ═══════════════════════════════════════════════════════════════════════════════
+RenderPassNode createSSAORenderPass() {
+    RenderPassNode node;
+    node.name = "SSAO";
+    node.reads(res::HdrDepth,
+               VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+               VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+               VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
+    node.writes(res::AOTexture,
+                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+                VK_IMAGE_LAYOUT_GENERAL);
+    node.execute = [](VkCommandBuffer cmd, const FrameContext& ctx) {
+        if (!ctx.ssaoPass || ctx.isLauncher) return;
+        if (ctx.gpuTimer) ctx.gpuTimer->beginZone(cmd, ctx.frameIndex, "SSAO");
+        glm::mat4 invProj = glm::inverse(ctx.proj);
+        ctx.ssaoPass->dispatch(cmd, invProj);
+        if (ctx.gpuTimer) ctx.gpuTimer->endZone(cmd, ctx.frameIndex, "SSAO");
+    };
+    return node;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SSR compute pass
+// ═══════════════════════════════════════════════════════════════════════════════
+RenderPassNode createSSRRenderPass() {
+    RenderPassNode node;
+    node.name = "SSR";
+    node.reads(res::HdrDepth,
+               VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+               VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+               VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
+    node.reads(res::HdrColor,
+               VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+               VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    node.reads(res::HiZPyramid,
+               VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+               VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    node.writes(res::SSRTexture,
+                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+                VK_IMAGE_LAYOUT_GENERAL);
+    node.enabled = false; // off by default, HIGH_QUALITY+ only
+    node.execute = [](VkCommandBuffer cmd, const FrameContext& ctx) {
+        if (!ctx.ssrPass || ctx.isLauncher) return;
+        if (ctx.gpuTimer) ctx.gpuTimer->beginZone(cmd, ctx.frameIndex, "SSR");
+        glm::mat4 invProj = glm::inverse(ctx.proj);
+        ctx.ssrPass->dispatch(cmd, invProj, ctx.proj, ctx.view);
+        if (ctx.gpuTimer) ctx.gpuTimer->endZone(cmd, ctx.frameIndex, "SSR");
+    };
+    return node;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Bloom compute pass
 // ═══════════════════════════════════════════════════════════════════════════════
 RenderPassNode createBloomRenderPass() {
@@ -269,6 +328,8 @@ void buildDefaultRenderGraph(RenderGraph& graph) {
     graph.addPass(createHiZRenderPass());
     graph.addPass(createOcclusionCullPass());
     graph.addPass(createTransparentVFXPass());
+    graph.addPass(createSSAORenderPass());
+    graph.addPass(createSSRRenderPass());
     graph.addPass(createBloomRenderPass());
     graph.addPass(createTonemapRenderPass());
 

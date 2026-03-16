@@ -105,6 +105,9 @@ set(SHADER_SOURCES
     ${CMAKE_SOURCE_DIR}/shaders/occlusion_cull.comp
     ${CMAKE_SOURCE_DIR}/shaders/spatial_hash.comp
     ${CMAKE_SOURCE_DIR}/shaders/collision_broadphase.comp
+    ${CMAKE_SOURCE_DIR}/shaders/ssao.comp
+    ${CMAKE_SOURCE_DIR}/shaders/ssao_blur.comp
+    ${CMAKE_SOURCE_DIR}/shaders/ssr.comp
 )
 
 foreach(SHADER ${SHADER_SOURCES})
@@ -188,6 +191,8 @@ set(SOURCES
     src/renderer/AsyncComputeManager.cpp
     src/renderer/BloomPass.cpp
     src/renderer/ToneMapPass.cpp
+    src/renderer/SSAOPass.cpp
+    src/renderer/SSRPass.cpp
     src/renderer/GroundDecalRenderer.cpp
     src/renderer/DistortionRenderer.cpp
     src/renderer/InkingPass.cpp

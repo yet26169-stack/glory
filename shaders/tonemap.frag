@@ -8,6 +8,7 @@ layout(push_constant) uniform ToneMapPC {
     float bloomStrength;
     uint  enableVignette;
     uint  enableColorGrade;
+    float chromaticAberration; // UV offset strength (default 0.003)
 } pc;
 
 layout(location = 0) in vec2 uv;
@@ -24,7 +25,18 @@ vec3 ACESFilm(vec3 x) {
 }
 
 void main() {
-    vec3 hdr = texture(hdrColor, uv).rgb;
+    // ── Chromatic Aberration ─────────────────────────────────────────────────
+    vec3 hdr;
+    if (pc.chromaticAberration > 0.0) {
+        vec2 center = uv - 0.5;
+        float dist  = length(center);
+        vec2 dir    = center * (pc.chromaticAberration * dist);
+        hdr.r = texture(hdrColor, uv + dir).r;
+        hdr.g = texture(hdrColor, uv).g;
+        hdr.b = texture(hdrColor, uv - dir).b;
+    } else {
+        hdr = texture(hdrColor, uv).rgb;
+    }
     vec3 bloom = texture(bloomColor, uv).rgb;
 
     vec3 combined = hdr + bloom * pc.bloomStrength;

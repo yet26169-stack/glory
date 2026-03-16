@@ -34,6 +34,8 @@
 #include "renderer/HiZPass.h"
 #include "renderer/MegaBuffer.h"
 #include "renderer/AsyncComputeManager.h"
+#include "renderer/SSAOPass.h"
+#include "renderer/SSRPass.h"
 #include "renderer/GpuTimer.h"
 #include "renderer/ParallelRecorder.h"
 #include "renderer/ThreadedCommandPool.h"
@@ -67,6 +69,8 @@ class Window;
 
 class Renderer {
 public:
+    enum class RenderQuality { MOBA_PERFORMANCE, HIGH_QUALITY, ULTRA };
+
     explicit Renderer(Window& window);
     ~Renderer();
 
@@ -218,6 +222,11 @@ private:
     PerfOverlay               m_perfOverlay;
     std::vector<GpuTimingResult> m_lastGpuResults;
     float m_lastGpuTotalMs = 0.0f;
+
+    // ── Post-processing: SSAO / SSR ─────────────────────────────────────
+    SSAOPass m_ssaoPass;
+    SSRPass  m_ssrPass;
+    RenderQuality m_renderQuality = RenderQuality::MOBA_PERFORMANCE;
 
     // ── Render graph ─────────────────────────────────────────────────────
     RenderGraph m_renderGraph;

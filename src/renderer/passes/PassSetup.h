@@ -18,6 +18,8 @@ RenderPassNode createOcclusionCullPass();    // placeholder — GPU occlusion cu
 RenderPassNode createVFXAcquirePass();
 RenderPassNode createTransparentVFXPass();
 RenderPassNode createBloomRenderPass();
+RenderPassNode createSSAORenderPass();
+RenderPassNode createSSRRenderPass();
 RenderPassNode createTonemapRenderPass();
 
 // Utility: create the full default pipeline of passes and add them to a graph

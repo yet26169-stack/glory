@@ -38,6 +38,8 @@ namespace res {
     inline constexpr ResourceId BloomMips      = makeResourceId("BloomMips");
     inline constexpr ResourceId SwapchainImage = makeResourceId("SwapchainImage");
     inline constexpr ResourceId SceneCopyColor = makeResourceId("SceneCopyColor");
+    inline constexpr ResourceId AOTexture      = makeResourceId("AOTexture");
+    inline constexpr ResourceId SSRTexture     = makeResourceId("SSRTexture");
 }
 
 // ── C++20 concept: any pass type must be executable with a command buffer + context
