@@ -96,8 +96,8 @@ private:
     // FoW state — set via setFogOfWar()
     VkImageView m_fowView    = VK_NULL_HANDLE;
     VkSampler   m_fowSampler = VK_NULL_HANDLE;
-    glm::vec2   m_fowMapMin  = {-100.0f, -100.0f};
-    glm::vec2   m_fowMapMax  = { 100.0f,  100.0f};
+    glm::vec2   m_fowMapMin  = {0.0f, 0.0f};
+    glm::vec2   m_fowMapMax  = {200.0f, 200.0f};
 
     uint32_t m_nextHandle = 1;
 

@@ -22,7 +22,7 @@ class FogSystem {
 public:
     static constexpr uint32_t MAP_SIZE   = 128;
     static constexpr float    WORLD_SIZE = 200.0f;  // total world extent
-    static constexpr float    WORLD_MIN  = -100.0f; // world-space origin of grid
+    static constexpr float    WORLD_MIN  =   0.0f;  // world-space origin of grid
 
     FogSystem();
 

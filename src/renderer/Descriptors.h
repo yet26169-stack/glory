@@ -50,8 +50,8 @@ struct LightUBO {
     alignas(4)  float     shadowWarmth      = 0.3f;       // warm/cool shadow tinting weight
     alignas(4)  float     shadowBiasScale   = 1.5f;       // normal-offset bias multiplier (tune to taste)
     alignas(16) glm::vec3 shadowTint{0.15f, 0.12f, 0.25f}; // cool purple shadow tint (LoL style)
-    alignas(8) glm::vec2 fowMapMin{-100.0f, -100.0f};    // world-space FoW min bounds
-    alignas(8) glm::vec2 fowMapMax{ 100.0f,  100.0f};    // world-space FoW max bounds
+    alignas(8) glm::vec2 fowMapMin{0.0f, 0.0f};      // world-space FoW min bounds
+    alignas(8) glm::vec2 fowMapMax{200.0f, 200.0f};  // world-space FoW max bounds
 };
 
 // ── std140 layout verification ────────────────────────────────────────────────

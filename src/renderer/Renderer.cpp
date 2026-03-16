@@ -2238,7 +2238,7 @@ void Renderer::buildScene() {
             // Decals sample FoW so ability indicators fade in unexplored areas
             m_groundDecalRenderer->setFogOfWar(
                 m_fogOfWar->getVisibilityView(), m_fogOfWar->getSampler(),
-                glm::vec2(-100.0f, -100.0f), glm::vec2(100.0f, 100.0f));
+                glm::vec2(0.0f, 0.0f), glm::vec2(200.0f, 200.0f));
         }
     }
 
