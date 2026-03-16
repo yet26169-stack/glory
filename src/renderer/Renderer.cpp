@@ -10,6 +10,7 @@
 #include "scene/Components.h"
 #include "combat/CombatComponents.h"
 #include "ability/AbilityComponents.h"
+#include "scripting/LuaBindings.h"
 #include "map/MapLoader.h"
 #include "window/Window.h"
 
@@ -180,6 +181,13 @@ Renderer::Renderer(Window& window) : m_window(window) {
     m_abilitySystem = std::make_unique<AbilitySystem>(*m_vfxQueue);
     m_abilitySystem->loadDirectory(std::string(ASSET_DIR) + "abilities/");
     m_abilitySystem->getSequencer().loadDirectory(std::string(ASSET_DIR) + "vfx/composites/");
+
+    // ── Lua scripting VM ─────────────────────────────────────────────────
+    m_scriptEngine.init();
+    registerAllBindings(m_scriptEngine, m_scene.getRegistry(),
+                        m_abilitySystem.get(), m_vfxQueue.get(), &m_gameTime);
+    m_abilitySystem->setScriptEngine(&m_scriptEngine);
+
     m_projectileSystem = std::make_unique<ProjectileSystem>();
     m_combatSystem  = std::make_unique<CombatSystem>(*m_combatVfxQueue);
 
@@ -420,6 +428,9 @@ void Renderer::simulateStep(float dt) {
 
     // ── VFX definition hot-reload (checks filesystem timestamps) ─────────
     m_vfxFactory.tickHotReload();
+
+    // ── Lua script hot-reload ────────────────────────────────────────────
+    m_scriptEngine.reloadModified();
 
     // ── GPU collision: read back previous frame's results ────────────────
     m_gpuCollision.readResults(m_currentFrame);

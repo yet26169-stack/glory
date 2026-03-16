@@ -4,54 +4,56 @@
 #include <vector>
 #include <unordered_map>
 #include <filesystem>
-#include <any>
 #include <cstdint>
+#include <memory>
+
+// Forward-declare sol types to keep enet/Vulkan headers out
+namespace sol { class state; }
 
 namespace glory {
 
-/// Unique identifier for a loaded script.
 using ScriptId = uint32_t;
 
-/// Stub script engine – provides the full API surface for sol2+Lua integration
-/// without pulling in any Lua dependency.  Every public method logs its intent
-/// via spdlog so integration work can be verified before Lua is wired up.
 class ScriptEngine {
 public:
-    ScriptEngine() = default;
+    ScriptEngine();
     ~ScriptEngine();
 
-    /// Initialise the (future) Lua VM and register core libraries.
+    /// Initialise the Lua VM and register core libraries (no io/os/debug).
     bool init();
 
     /// Tear down the VM and release all scripts.
     void shutdown();
 
-    /// Load a Lua script from disk.  Returns a ScriptId handle (0 on failure).
+    /// Load a Lua script from disk. Returns a ScriptId handle (0 on failure).
     ScriptId loadScript(const std::string& path);
 
     /// Scan loaded scripts for on-disk changes and reload any that were modified.
     void reloadModified();
 
-    /// Call a named function inside a loaded script.
-    /// @param scriptId  Handle returned by loadScript().
-    /// @param functionName  Lua function to invoke.
-    /// @param args  Arbitrary arguments forwarded to the function (unused in stub).
-    void callFunction(ScriptId scriptId,
-                      const std::string& functionName,
-                      const std::vector<std::any>& args = {});
+    /// Call a named global Lua function with no arguments.
+    void callFunction(const std::string& functionName);
 
-    /// True after a successful init() and before shutdown().
+    /// Call a named global Lua function with entity IDs and position.
+    void callFunction(const std::string& functionName,
+                      uint32_t casterEntity, uint32_t targetEntity,
+                      float px, float py, float pz);
+
+    /// Direct access to the sol::state for binding registration.
+    sol::state& lua();
+
     bool isInitialised() const { return m_initialised; }
 
 private:
     struct ScriptEntry {
-        std::string                        path;
-        std::filesystem::file_time_type    lastWriteTime;
+        std::string                     path;
+        std::filesystem::file_time_type lastWriteTime;
     };
 
-    bool                                          m_initialised{false};
-    ScriptId                                      m_nextId{1};
-    std::unordered_map<ScriptId, ScriptEntry>     m_scripts;
+    bool                                      m_initialised{false};
+    ScriptId                                  m_nextId{1};
+    std::unordered_map<ScriptId, ScriptEntry> m_scripts;
+    std::unique_ptr<sol::state>               m_lua;
 };
 
 } // namespace glory

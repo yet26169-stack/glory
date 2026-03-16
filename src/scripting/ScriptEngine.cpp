@@ -1,4 +1,6 @@
 #include "ScriptEngine.h"
+
+#include <sol/sol.hpp>
 #include <spdlog/spdlog.h>
 #include <filesystem>
 
@@ -6,55 +8,66 @@ namespace fs = std::filesystem;
 
 namespace glory {
 
+ScriptEngine::ScriptEngine() = default;
+
 ScriptEngine::~ScriptEngine() {
-    if (m_initialised) {
-        shutdown();
-    }
+    if (m_initialised) shutdown();
 }
 
 bool ScriptEngine::init() {
     if (m_initialised) {
-        spdlog::warn("ScriptEngine::init() called but already initialised");
+        spdlog::warn("[ScriptEngine] init() called but already initialised");
         return false;
     }
 
-    // TODO: create sol::state, open standard Lua libraries
-    spdlog::info("ScriptEngine::init() — stub: Lua VM would be created here");
+    m_lua = std::make_unique<sol::state>();
+
+    // Sandboxed: open only safe libraries (no io, os, debug)
+    m_lua->open_libraries(sol::lib::base, sol::lib::math,
+                          sol::lib::string, sol::lib::table,
+                          sol::lib::coroutine);
+
+    // Override dangerous globals
+    (*m_lua)["dofile"]    = sol::lua_nil;
+    (*m_lua)["loadfile"]  = sol::lua_nil;
+    (*m_lua)["require"]   = sol::lua_nil;
+
     m_initialised = true;
+    spdlog::info("[ScriptEngine] Lua 5.4 VM initialised (sandboxed)");
     return true;
 }
 
 void ScriptEngine::shutdown() {
-    if (!m_initialised) {
-        spdlog::warn("ScriptEngine::shutdown() called but not initialised");
-        return;
-    }
+    if (!m_initialised) return;
 
-    spdlog::info("ScriptEngine::shutdown() — releasing {} script(s)", m_scripts.size());
+    spdlog::info("[ScriptEngine] shutdown — releasing {} script(s)", m_scripts.size());
     m_scripts.clear();
+    m_lua.reset();
     m_nextId = 1;
     m_initialised = false;
 }
 
 ScriptId ScriptEngine::loadScript(const std::string& path) {
     if (!m_initialised) {
-        spdlog::error("ScriptEngine::loadScript() called before init()");
+        spdlog::error("[ScriptEngine] loadScript() called before init()");
         return 0;
     }
 
     if (!fs::exists(path)) {
-        spdlog::warn("ScriptEngine::loadScript() — file not found: {}", path);
+        spdlog::warn("[ScriptEngine] loadScript — file not found: {}", path);
+        return 0;
+    }
+
+    try {
+        m_lua->safe_script_file(path);
+    } catch (const sol::error& e) {
+        spdlog::error("[ScriptEngine] loadScript '{}' failed: {}", path, e.what());
         return 0;
     }
 
     ScriptId id = m_nextId++;
-    ScriptEntry entry;
-    entry.path          = path;
-    entry.lastWriteTime = fs::last_write_time(path);
-    m_scripts[id]       = std::move(entry);
-
-    // TODO: execute sol::state::script_file(path)
-    spdlog::info("ScriptEngine::loadScript() — stub: loaded '{}' as id {}", path, id);
+    m_scripts[id] = ScriptEntry{path, fs::last_write_time(path)};
+    spdlog::info("[ScriptEngine] loaded '{}' as id {}", path, id);
     return id;
 }
 
@@ -67,30 +80,46 @@ void ScriptEngine::reloadModified() {
         auto currentTime = fs::last_write_time(entry.path);
         if (currentTime != entry.lastWriteTime) {
             entry.lastWriteTime = currentTime;
-            // TODO: re-execute sol::state::script_file(entry.path)
-            spdlog::info("ScriptEngine::reloadModified() — stub: reloaded '{}' (id {})",
-                         entry.path, id);
+            try {
+                m_lua->safe_script_file(entry.path);
+                spdlog::info("[ScriptEngine] hot-reloaded '{}' (id {})", entry.path, id);
+            } catch (const sol::error& e) {
+                spdlog::error("[ScriptEngine] hot-reload '{}' failed: {}", entry.path, e.what());
+            }
         }
     }
 }
 
-void ScriptEngine::callFunction(ScriptId scriptId,
-                                const std::string& functionName,
-                                const std::vector<std::any>& args) {
-    if (!m_initialised) {
-        spdlog::error("ScriptEngine::callFunction() called before init()");
-        return;
-    }
+void ScriptEngine::callFunction(const std::string& functionName) {
+    if (!m_initialised) return;
 
-    auto it = m_scripts.find(scriptId);
-    if (it == m_scripts.end()) {
-        spdlog::warn("ScriptEngine::callFunction() — unknown script id {}", scriptId);
-        return;
-    }
+    sol::protected_function fn = (*m_lua)[functionName];
+    if (!fn.valid()) return;
 
-    // TODO: look up sol::function and invoke with args
-    spdlog::debug("ScriptEngine::callFunction() — stub: would call {}() in '{}' with {} arg(s)",
-                  functionName, it->second.path, args.size());
+    auto result = fn();
+    if (!result.valid()) {
+        sol::error err = result;
+        spdlog::error("[ScriptEngine] {}() error: {}", functionName, err.what());
+    }
+}
+
+void ScriptEngine::callFunction(const std::string& functionName,
+                                uint32_t casterEntity, uint32_t targetEntity,
+                                float px, float py, float pz) {
+    if (!m_initialised) return;
+
+    sol::protected_function fn = (*m_lua)[functionName];
+    if (!fn.valid()) return;
+
+    auto result = fn(casterEntity, targetEntity, px, py, pz);
+    if (!result.valid()) {
+        sol::error err = result;
+        spdlog::error("[ScriptEngine] {}() error: {}", functionName, err.what());
+    }
+}
+
+sol::state& ScriptEngine::lua() {
+    return *m_lua;
 }
 
 } // namespace glory

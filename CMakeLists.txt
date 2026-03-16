@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Glory VERSION 0.1.0 LANGUAGES CXX)
+project(Glory VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -156,6 +156,38 @@ FetchContent_MakeAvailable(enet)
 target_include_directories(enet PUBLIC ${enet_SOURCE_DIR}/include)
 message(STATUS "Glory: ENet networking library ENABLED (v1.3.18)")
 
+# ── Lua 5.4 ───────────────────────────────────────────────────────────────────
+# Build Lua 5.4 from source as a static library
+FetchContent_Declare(
+    lua
+    GIT_REPOSITORY https://github.com/lua/lua.git
+    GIT_TAG        v5.4.7
+    GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(lua)
+
+file(GLOB LUA_CORE_SOURCES ${lua_SOURCE_DIR}/*.c)
+# Remove lua.c (standalone interpreter) and luac.c (compiler) from library sources
+list(FILTER LUA_CORE_SOURCES EXCLUDE REGEX "lua\\.c$")
+list(FILTER LUA_CORE_SOURCES EXCLUDE REGEX "luac\\.c$")
+add_library(lua_static STATIC ${LUA_CORE_SOURCES})
+target_include_directories(lua_static PUBLIC ${lua_SOURCE_DIR})
+set_target_properties(lua_static PROPERTIES LINKER_LANGUAGE C)
+if(APPLE OR UNIX)
+    target_compile_definitions(lua_static PRIVATE LUA_USE_POSIX)
+endif()
+message(STATUS "Glory: Lua 5.4 ENABLED (built from source)")
+
+# ── sol2 (header-only Lua binding library) ─────────────────────────────────────
+FetchContent_Declare(
+    sol2
+    GIT_REPOSITORY https://github.com/ThePhD/sol2.git
+    GIT_TAG        develop
+    GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(sol2)
+message(STATUS "Glory: sol2 v3.3.1 ENABLED")
+
 # ── meshoptimizer ─────────────────────────────────────────────────────────────
 file(GLOB MESHOPT_SOURCES ${CMAKE_SOURCE_DIR}/extern/meshoptimizer/src/*.cpp)
 add_library(meshoptimizer STATIC ${MESHOPT_SOURCES})
@@ -281,6 +313,8 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     spdlog::spdlog
     meshoptimizer
     enet
+    lua_static
+    sol2
     glory_sanitizers
 )
 
@@ -303,6 +337,9 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
     ASSET_DIR="${CMAKE_BINARY_DIR}/assets/"
     MAP_DATA_DIR="${CMAKE_SOURCE_DIR}/assets/maps/"
     MODEL_DIR="${CMAKE_SOURCE_DIR}/"
+    SOL_ALL_SAFETIES_ON=1
+    SOL_USE_CXX_OPTIONAL=1
+    SOL_STD_VARIANT=1
 )
 
 # ── Asset copy ────────────────────────────────────────────────────────────────

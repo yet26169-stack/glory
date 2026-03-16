@@ -2,6 +2,7 @@
 
 #include "ability/AbilityTypes.h"
 #include "ability/AbilityComponents.h"
+#include "scripting/AbilityScriptHooks.h"
 #include "vfx/VFXEventQueue.h"
 #include "vfx/CompositeVFXSequencer.h"
 
@@ -15,6 +16,7 @@
 namespace glory {
 
 class TrailRenderer;
+class ScriptEngine;
 
 // ── AbilitySystem ──────────────────────────────────────────────────────────
 // Processes ability requests, drives the per-slot state machine, resolves
@@ -71,11 +73,16 @@ public:
 
     CompositeVFXSequencer& getSequencer() { return m_compositeSequencer; }
 
+    /// Attach a ScriptEngine for Lua ability hooks. Call before loading defs.
+    void setScriptEngine(ScriptEngine* engine) { m_scriptEngine = engine; }
+
 private:
     VFXEventQueue& m_vfxQueue;
     CompositeVFXSequencer m_compositeSequencer;
+    ScriptEngine* m_scriptEngine = nullptr;
 
     std::unordered_map<std::string, AbilityDefinition> m_defs;
+    std::unordered_map<std::string, AbilityScriptHooks> m_scriptHooks;
     std::queue<AbilityRequest> m_requests;
 
     // ── State machine ──────────────────────────────────────────────────────

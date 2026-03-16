@@ -1,28 +1,27 @@
 #pragma once
 
+#include <entt.hpp>
+#include "vfx/VFXEventQueue.h"
+
 namespace glory {
 
 class ScriptEngine;
+class AbilitySystem;
 
-/// Register every Lua binding category with the given engine.
+/// Register all Lua binding categories with the given engine.
+/// Must be called after ScriptEngine::init() and before loading scripts.
 ///
-/// When sol2 is integrated each helper will expose the following:
+/// Binding categories:
+///   entity — get/set position, rotation; destroy/spawn
+///   world  — spatial queries (findEntitiesInRadius, nearestEnemy), getGameTime
+///   ability — cooldowns, levels, dealDamage, heal, applyBuff, spawnProjectile
+///   vfx    — emit particle effects, screenShake
+///   stats  — getAD, getAP, getHealth, isAlive
 ///
-/// **Entity bindings** – get/set position, rotation, scale; access to
-///   entt::entity handle; destroy / spawn helpers.
-///
-/// **World bindings** – query entities by component, spatial queries
-///   (nearest enemy, allies in radius), game-time access.
-///
-/// **Ability bindings** – read AbilityDefinition fields, cooldown helpers,
-///   damage / heal / apply-buff / remove-buff calls, projectile spawning.
-///
-/// **VFX bindings** – emit particle bursts, spawn trails, trigger composite
-///   sequences, screen-shake, sound cues.
-///
-/// **Combat / Stats bindings** – read StatsComponent (AD, AP, armour, MR),
-///   apply damage with type, check alive / stunned / silenced.
-///
-void registerAllBindings(ScriptEngine& engine);
+void registerAllBindings(ScriptEngine& engine,
+                         entt::registry& registry,
+                         AbilitySystem* abilitySystem,
+                         VFXEventQueue* vfxQueue,
+                         float* gameTime);
 
 } // namespace glory

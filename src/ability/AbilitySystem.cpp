@@ -1,5 +1,6 @@
 #include "ability/AbilitySystem.h"
 #include "scene/Components.h"  // TransformComponent
+#include "scripting/ScriptEngine.h"
 #include "vfx/TrailRenderer.h"
 
 #include <spdlog/spdlog.h>
@@ -43,6 +44,19 @@ void AbilitySystem::loadDirectory(const std::string& dirPath) {
 // ── registerDefinition ────────────────────────────────────────────────────────
 void AbilitySystem::registerDefinition(AbilityDefinition def) {
     const std::string id = def.id;
+
+    // Load Lua script if specified
+    if (!def.scriptFile.empty() && m_scriptEngine) {
+        AbilityScriptHooks hooks;
+        hooks.scriptFile = def.scriptFile;
+        hooks.scriptId = m_scriptEngine->loadScript(def.scriptFile);
+        if (hooks.scriptId != 0) {
+            m_scriptHooks[id] = std::move(hooks);
+            spdlog::info("[AbilitySystem] loaded script '{}' for ability '{}'",
+                         def.scriptFile, id);
+        }
+    }
+
     m_defs[id] = std::move(def);
 }
 
@@ -281,6 +295,18 @@ void AbilitySystem::executeAbility(entt::registry& reg, entt::entity caster,
     if (reg.all_of<TransformComponent>(caster))
         casterPos = reg.get<TransformComponent>(caster).position;
 
+    // Lua onCast hook
+    if (m_scriptEngine && !def.scriptFile.empty()) {
+        auto hookIt = m_scriptHooks.find(def.id);
+        if (hookIt != m_scriptHooks.end()) {
+            m_scriptEngine->callFunction(
+                AbilityScriptHooks::ON_CAST,
+                static_cast<uint32_t>(entt::to_integral(caster)),
+                static_cast<uint32_t>(target.targetEntity),
+                target.targetPosition.x, target.targetPosition.y, target.targetPosition.z);
+        }
+    }
+
     if (def.targeting == TargetingType::SKILLSHOT && !def.projectileVFX.empty()) {
         spawnProjectile(reg, caster, def, target, trailRenderer);
     } else if (def.targeting == TargetingType::POINT && def.projectile.isLob) {
@@ -512,6 +538,18 @@ void AbilitySystem::resolveHit(entt::registry& reg, entt::entity caster,
                                 const TargetInfo& target) {
     resolveInstantEffects(reg, caster, def, target);
 
+    // Lua onHit hook
+    if (m_scriptEngine && !def.scriptFile.empty()) {
+        auto hookIt = m_scriptHooks.find(def.id);
+        if (hookIt != m_scriptHooks.end()) {
+            m_scriptEngine->callFunction(
+                AbilityScriptHooks::ON_HIT,
+                static_cast<uint32_t>(entt::to_integral(caster)),
+                static_cast<uint32_t>(target.targetEntity),
+                target.targetPosition.x, target.targetPosition.y, target.targetPosition.z);
+        }
+    }
+
     if (!def.compositeImpactVFX.empty()) {
         glm::vec3 casterPos{0.f};
         if (reg.all_of<TransformComponent>(caster))
@@ -625,6 +663,8 @@ AbilityDefinition AbilitySystem::parseJSON(const nlohmann::json& j,
     if (j.contains("tags"))
         for (const auto& t : j["tags"])
             def.tags.insert(t.get<std::string>());
+
+    def.scriptFile = j.value("scriptFile", "");
 
     return def;
 }

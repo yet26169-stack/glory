@@ -55,6 +55,7 @@
 #include "combat/CombatSystem.h"
 #include "combat/GpuCollisionSystem.h"
 #include "core/SimulationLoop.h"
+#include "scripting/ScriptEngine.h"
 #include "hud/HUD.h"
 #include "hud/PerfOverlay.h"
 #include "map/MapTypes.h"
@@ -166,6 +167,7 @@ private:
     std::unique_ptr<CombatSystem>  m_combatSystem;    // auto-attack / shield / trick
     GpuCollisionSystem             m_gpuCollision;    // GPU spatial hash + broadphase
     SimulationLoop                 m_simLoop;         // parallel ECS system scheduler
+    ScriptEngine                   m_scriptEngine;    // Lua 5.4 scripting VM
 
     // ── Scene ─────────────────────────────────────────────────────────────
     Scene            m_scene;

@@ -176,6 +176,8 @@ struct AbilityDefinition {
     std::string impactSFX;
 
     std::unordered_set<std::string> tags;  // "damage", "cc", "mobility", "ultimate"
+
+    std::string scriptFile;  // path to Lua script (empty = no scripting)
 };
 
 // ── Damage calculation ─────────────────────────────────────────────────────
