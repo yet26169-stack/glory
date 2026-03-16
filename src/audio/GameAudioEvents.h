@@ -48,6 +48,8 @@ private:
     // event key -> SoundId (loaded from JSON)
     std::unordered_map<std::string, SoundId> m_eventSounds;
 
+    SoundHandle m_ambientHandle;  // tracked so we can stop it
+
     void playEvent3D(const std::string& key, const glm::vec3& position,
                      float volume = 1.0f);
     void playEvent2D(const std::string& key, float volume = 1.0f);

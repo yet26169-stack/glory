@@ -1,4 +1,5 @@
 #include "ability/AbilitySystem.h"
+#include "audio/GameAudioEvents.h"
 #include "scene/Components.h"  // TransformComponent
 #include "scripting/ScriptEngine.h"
 #include "vfx/TrailRenderer.h"
@@ -307,6 +308,9 @@ void AbilitySystem::executeAbility(entt::registry& reg, entt::entity caster,
         }
     }
 
+    // Audio: ability cast sound
+    if (m_audio) m_audio->onAbilityCast(def.id, casterPos);
+
     if (def.targeting == TargetingType::SKILLSHOT && !def.projectileVFX.empty()) {
         spawnProjectile(reg, caster, def, target, trailRenderer);
     } else if (def.targeting == TargetingType::POINT && def.projectile.isLob) {
@@ -537,6 +541,9 @@ void AbilitySystem::resolveHit(entt::registry& reg, entt::entity caster,
                                 const AbilityDefinition& def,
                                 const TargetInfo& target) {
     resolveInstantEffects(reg, caster, def, target);
+
+    // Audio: ability hit sound
+    if (m_audio) m_audio->onAbilityHit(def.id, target.targetPosition);
 
     // Lua onHit hook
     if (m_scriptEngine && !def.scriptFile.empty()) {

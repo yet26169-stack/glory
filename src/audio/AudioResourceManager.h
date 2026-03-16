@@ -5,13 +5,15 @@
 
 #include <string>
 #include <unordered_map>
-#include <vector>
-#include <memory>
+#include <array>
+#include <cstdint>
 
 namespace glory {
 
 class AudioResourceManager {
 public:
+    static constexpr uint32_t MAX_VOICES = 32;
+
     explicit AudioResourceManager(AudioEngine& engine);
     ~AudioResourceManager();
 
@@ -34,11 +36,17 @@ public:
 
     SoundId findSound(const std::string& name) const;
 
+    /// Called each frame to recycle finished voice slots.
+    void tick();
+
+    /// Release a voice slot (called by SoundHandle destructor — does NOT stop the sound).
+    void releaseVoice(uint32_t slot);
+
 private:
     AudioEngine& m_engine;
 
     struct SoundEntry {
-        SoundId    id;
+        SoundId     id;
         std::string path;
         std::string name;
         SoundGroup  group;
@@ -47,6 +55,22 @@ private:
     std::unordered_map<SoundId, SoundEntry>   m_sounds;
     std::unordered_map<std::string, SoundId>  m_nameToId;
     SoundId m_nextId = 1;
+
+    struct VoiceSlot {
+        void*  sound       = nullptr;  // ma_sound* (heap-allocated)
+        bool   active      = false;    // currently in use
+        bool   owned       = false;    // a SoundHandle still references this slot
+        float  startTime   = 0.0f;
+        uint8_t priority   = 0;        // higher = harder to evict
+    };
+
+    std::array<VoiceSlot, MAX_VOICES> m_voices{};
+    float m_clock = 0.0f;
+
+    uint32_t acquireVoice(uint8_t priority);
+    void     freeVoiceSlot(uint32_t slot);
+    SoundHandle initVoice(uint32_t slot, SoundId id, SoundGroup group,
+                          bool spatial, const glm::vec3& pos, float volume, bool loop);
 };
 
 } // namespace glory

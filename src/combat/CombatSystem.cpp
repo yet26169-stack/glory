@@ -1,4 +1,5 @@
 #include "combat/CombatSystem.h"
+#include "audio/GameAudioEvents.h"
 #include "scene/Components.h"
 #include "ability/AbilityComponents.h"
 #include "ability/AbilityTypes.h"
@@ -235,6 +236,9 @@ void CombatSystem::applyAutoAttackHit(entt::registry& reg, entt::entity attacker
     glm::vec3 midpoint = (attackerPos + targetPos) * 0.5f;
     emitVFX("vfx_melee_slash", midpoint, dir);
     emitVFX("vfx_melee_hit", midpoint, dir);
+
+    // Audio: auto-attack sound at impact position
+    if (m_audio) m_audio->onAutoAttack(midpoint, false);
 
     if (targetCombat.state == CombatState::SHIELDING) {
         // BLOCKED

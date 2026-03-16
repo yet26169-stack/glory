@@ -76,10 +76,14 @@ public:
     /// Attach a ScriptEngine for Lua ability hooks. Call before loading defs.
     void setScriptEngine(ScriptEngine* engine) { m_scriptEngine = engine; }
 
+    /// Attach GameAudioEvents for ability sounds.
+    void setAudioEvents(class GameAudioEvents* audio) { m_audio = audio; }
+
 private:
     VFXEventQueue& m_vfxQueue;
     CompositeVFXSequencer m_compositeSequencer;
     ScriptEngine* m_scriptEngine = nullptr;
+    GameAudioEvents* m_audio = nullptr;
 
     std::unordered_map<std::string, AbilityDefinition> m_defs;
     std::unordered_map<std::string, AbilityScriptHooks> m_scriptHooks;

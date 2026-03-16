@@ -56,6 +56,9 @@
 #include "combat/GpuCollisionSystem.h"
 #include "core/SimulationLoop.h"
 #include "scripting/ScriptEngine.h"
+#include "audio/AudioEngine.h"
+#include "audio/AudioResourceManager.h"
+#include "audio/GameAudioEvents.h"
 #include "hud/HUD.h"
 #include "hud/PerfOverlay.h"
 #include "map/MapTypes.h"
@@ -168,6 +171,11 @@ private:
     GpuCollisionSystem             m_gpuCollision;    // GPU spatial hash + broadphase
     SimulationLoop                 m_simLoop;         // parallel ECS system scheduler
     ScriptEngine                   m_scriptEngine;    // Lua 5.4 scripting VM
+
+    // ── Audio ─────────────────────────────────────────────────────────────
+    AudioEngine                                m_audioEngine;
+    std::unique_ptr<AudioResourceManager>      m_audioResources;
+    std::unique_ptr<GameAudioEvents>           m_audioEvents;
 
     // ── Scene ─────────────────────────────────────────────────────────────
     Scene            m_scene;

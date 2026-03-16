@@ -188,6 +188,16 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(sol2)
 message(STATUS "Glory: sol2 v3.3.1 ENABLED")
 
+# ── miniaudio (single-header audio library) ────────────────────────────────────
+FetchContent_Declare(
+    miniaudio
+    GIT_REPOSITORY https://github.com/mackron/miniaudio.git
+    GIT_TAG        0.11.21
+    GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(miniaudio)
+message(STATUS "Glory: miniaudio ENABLED (0.11.21)")
+
 # ── meshoptimizer ─────────────────────────────────────────────────────────────
 file(GLOB MESHOPT_SOURCES ${CMAKE_SOURCE_DIR}/extern/meshoptimizer/src/*.cpp)
 add_library(meshoptimizer STATIC ${MESHOPT_SOURCES})
@@ -274,6 +284,7 @@ set(SOURCES
     src/audio/SoundHandle.cpp
     src/audio/AudioResourceManager.cpp
     src/audio/GameAudioEvents.cpp
+    src/audio/miniaudio_impl.cpp
     src/assets/CookedLoader.cpp
     src/assets/AssetRegistry.cpp
     src/scripting/ScriptEngine.cpp
@@ -304,6 +315,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/extern/imgui
     ${CMAKE_SOURCE_DIR}/extern/tinygltf
     ${CMAKE_SOURCE_DIR}/extern
+    ${miniaudio_SOURCE_DIR}
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
@@ -321,6 +333,15 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 # Platform-specific libs for FramePacer
 if(WIN32)
     target_link_libraries(${PROJECT_NAME} PRIVATE winmm)
+endif()
+
+# Platform-specific libs for miniaudio
+if(APPLE)
+    find_library(COREAUDIO_LIB CoreAudio)
+    find_library(AUDIOTOOLBOX_LIB AudioToolbox)
+    find_library(COREFOUNDATION_LIB CoreFoundation)
+    target_link_libraries(${PROJECT_NAME} PRIVATE
+        ${COREAUDIO_LIB} ${AUDIOTOOLBOX_LIB} ${COREFOUNDATION_LIB})
 endif()
 
 # Tracy client (only when GLORY_TRACY=ON)

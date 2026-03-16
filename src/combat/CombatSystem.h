@@ -10,9 +10,13 @@
 
 namespace glory {
 
+class GameAudioEvents;
+
 class CombatSystem {
 public:
     explicit CombatSystem(VFXEventQueue& vfxQueue);
+
+    void setAudioEvents(GameAudioEvents* audio) { m_audio = audio; }
 
     // ── Input requests (called from Renderer in response to player keys) ──
     void requestAutoAttack(entt::entity attacker, entt::entity target);
@@ -27,7 +31,8 @@ public:
     entt::entity findNearestEnemy(entt::registry& reg, entt::entity attacker, float range);
 
 private:
-    VFXEventQueue& m_vfxQueue;
+    VFXEventQueue&   m_vfxQueue;
+    GameAudioEvents* m_audio = nullptr;
 
     void processAttackWindup(entt::registry& reg, entt::entity entity, CombatComponent& combat, float dt);
     void processAttackFire(entt::registry& reg, entt::entity entity, CombatComponent& combat, float dt);

@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 #include <string>
 #include <cstdint>
+#include <memory>
 
 namespace glory {
 
@@ -13,6 +14,8 @@ enum class SoundGroup : uint8_t {
     UI    = 3,
     Count = 4
 };
+
+struct AudioEngineImpl;
 
 class AudioEngine {
 public:
@@ -36,18 +39,18 @@ public:
 
     bool isInitialized() const { return m_initialized; }
 
+    /// Opaque pointer to the underlying ma_engine (for internal use by SoundHandle/ResourceManager).
+    void* getEnginePtr() const;
+
+    /// Opaque pointer to a ma_sound_group for the given SoundGroup.
+    void* getGroupPtr(SoundGroup group) const;
+
 private:
     bool  m_initialized  = false;
     float m_masterVolume = 1.0f;
     float m_groupVolumes[static_cast<size_t>(SoundGroup::Count)] = {1.0f, 0.7f, 1.0f, 1.0f};
 
-    glm::vec3 m_listenerPos     {0.0f};
-    glm::vec3 m_listenerForward {0.0f, 0.0f, -1.0f};
-    glm::vec3 m_listenerUp      {0.0f, 1.0f, 0.0f};
-
-    // miniaudio handles will go here once integrated
-    // ma_engine      m_engine;
-    // ma_sound_group m_groups[4];
+    std::unique_ptr<AudioEngineImpl> m_impl;
 };
 
 } // namespace glory

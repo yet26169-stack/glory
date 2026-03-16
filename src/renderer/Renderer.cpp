@@ -191,6 +191,15 @@ Renderer::Renderer(Window& window) : m_window(window) {
     m_projectileSystem = std::make_unique<ProjectileSystem>();
     m_combatSystem  = std::make_unique<CombatSystem>(*m_combatVfxQueue);
 
+    // ── Audio engine ─────────────────────────────────────────────────────
+    m_audioEngine.init();
+    m_audioResources = std::make_unique<AudioResourceManager>(m_audioEngine);
+    m_audioResources->loadDirectory(std::string(ASSET_DIR) + "audio/", SoundGroup::SFX);
+    m_audioEvents = std::make_unique<GameAudioEvents>(*m_audioResources);
+    m_audioEvents->loadConfig(std::string(ASSET_DIR) + "config/audio_events.json");
+    m_combatSystem->setAudioEvents(m_audioEvents.get());
+    m_abilitySystem->setAudioEvents(m_audioEvents.get());
+
     m_gpuCollision.init(*m_device);
 
     m_bloom = std::make_unique<BloomPass>();
@@ -425,6 +434,14 @@ void Renderer::simulateStep(float dt) {
 
     m_gameTime += dt;
     m_currentDt = dt;
+
+    // ── Audio listener follows camera ────────────────────────────────────
+    {
+        glm::vec3 camPos = m_isoCam.getPosition();
+        glm::vec3 camFwd = glm::normalize(m_isoCam.getTarget() - camPos);
+        m_audioEngine.setListenerPosition(camPos, camFwd, glm::vec3(0.0f, 1.0f, 0.0f));
+    }
+    if (m_audioResources) m_audioResources->tick();
 
     // ── VFX definition hot-reload (checks filesystem timestamps) ─────────
     m_vfxFactory.tickHotReload();

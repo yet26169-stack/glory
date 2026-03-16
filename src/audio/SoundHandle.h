@@ -8,6 +8,13 @@ namespace glory {
 using SoundId = uint32_t;
 static constexpr SoundId INVALID_SOUND = 0;
 
+class AudioResourceManager;
+
+/// Lightweight RAII wrapper around a playing sound voice.
+/// Move-only.  When destroyed the underlying voice slot is released
+/// back to AudioResourceManager but the sound is NOT stopped — this
+/// enables fire-and-forget usage (play, drop handle, sound plays out).
+/// Call stop() explicitly if you need to silence it early.
 class SoundHandle {
 public:
     SoundHandle() = default;
@@ -29,17 +36,16 @@ public:
     void setLooping(bool loop);
 
     bool    isPlaying() const;
-    bool    isValid()   const { return m_id != INVALID_SOUND; }
+    bool    isValid()   const { return m_sound != nullptr; }
     SoundId getId()     const { return m_id; }
 
 private:
     friend class AudioResourceManager;
-    SoundId   m_id       = INVALID_SOUND;
-    bool      m_playing  = false;
-    bool      m_looping  = false;
-    float     m_volume   = 1.0f;
-    float     m_pitch    = 1.0f;
-    glm::vec3 m_position {0.0f};
+
+    SoundId  m_id    = INVALID_SOUND;
+    void*    m_sound = nullptr;  // ma_sound* (heap-allocated, owned by ResourceManager voice pool)
+    AudioResourceManager* m_manager = nullptr;
+    uint32_t m_voiceSlot = UINT32_MAX;
 };
 
 } // namespace glory

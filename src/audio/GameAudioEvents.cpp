@@ -140,12 +140,12 @@ void GameAudioEvents::onChatMessage() {
 void GameAudioEvents::startAmbientLoop() {
     auto it = m_eventSounds.find("ambient_loop");
     if (it == m_eventSounds.end()) return;
-    m_resources.playMusic(it->second, 0.4f);
+    m_ambientHandle = m_resources.playMusic(it->second, 0.4f);
 }
 
 void GameAudioEvents::stopAmbientLoop() {
-    // TODO: track the ambient handle and stop it
-    spdlog::debug("GameAudioEvents::stopAmbientLoop (stub)");
+    m_ambientHandle.stop();
+    m_ambientHandle = {};
 }
 
 } // namespace glory
