@@ -46,6 +46,8 @@ struct AssetHeader {
     uint64_t animDataSize       = 0;
     uint64_t materialDataOffset = 0;
     uint64_t materialDataSize   = 0;
+    uint64_t lodDescOffset      = 0;   // array of LodLevel
+    uint64_t lodDescSize        = 0;
 };
 
 // Vertex layout matching GPU format exactly — no conversion at load time
@@ -65,6 +67,14 @@ struct CookedSkinVertex {
     float    boneWeights[4];
 };
 
+// LOD level — shares vertex buffer with base mesh, different indices
+struct LodLevel {
+    uint32_t indexOffset;  // offset in global index array
+    uint32_t indexCount;
+    float    error;        // meshopt simplification error metric
+    uint32_t _pad0 = 0;
+};
+
 struct MeshDescriptor {
     uint32_t vertexOffset;   // offset in vertex array
     uint32_t vertexCount;
@@ -72,6 +82,8 @@ struct MeshDescriptor {
     uint32_t indexCount;
     uint32_t materialIndex;
     uint32_t isSkinned;      // 0 = static, 1 = skinned
+    uint32_t lodCount;       // number of LOD levels (0 = base only)
+    uint32_t _pad0 = 0;
     float    aabbMin[3];
     float    aabbMax[3];
 };

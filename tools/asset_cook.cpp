@@ -1,19 +1,21 @@
 // Standalone asset cook tool: converts GLB files to binary .glory format
 // Usage: asset_cook <input.glb> [-o output.glory]
 //
-// The .glory format stores pre-processed vertex/index data that can be
-// memory-mapped directly into GPU buffers with zero conversion overhead.
+// The .glory format stores pre-processed, meshoptimizer-optimized vertex/index
+// data with LOD meshes that can be memory-mapped directly into GPU buffers.
 
 #define TINYGLTF_NO_STB_IMAGE_WRITE
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #include <tiny_gltf.h>
+#include <meshoptimizer.h>
 
 #include "assets/AssetFormat.h"
 
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <cmath>
 #include <fstream>
 #include <limits>
@@ -36,7 +38,6 @@ static size_t accessorStride(const tinygltf::Model& model, int accessorIdx) {
     const auto& acc = model.accessors[accessorIdx];
     const auto& bv  = model.bufferViews[acc.bufferView];
     if (bv.byteStride > 0) return bv.byteStride;
-    // Fallback: tightly packed
     switch (acc.type) {
         case TINYGLTF_TYPE_SCALAR: return sizeof(float);
         case TINYGLTF_TYPE_VEC2:   return sizeof(float) * 2;
@@ -47,7 +48,9 @@ static size_t accessorStride(const tinygltf::Model& model, int accessorIdx) {
 }
 
 static void printUsage(const char* prog) {
-    std::fprintf(stderr, "Usage: %s <input.glb> [-o output.glory]\n", prog);
+    std::fprintf(stderr,
+        "Usage: %s <input.glb> [-o output.glory]\n"
+        "       %s <input_dir> <output_dir>  (batch mode)\n", prog, prog);
 }
 
 // ── Per-mesh cooking state ──────────────────────────────────────────────────
@@ -62,46 +65,88 @@ struct RawMesh {
     float aabbMax[3] = { std::numeric_limits<float>::lowest(),
                          std::numeric_limits<float>::lowest(),
                          std::numeric_limits<float>::lowest() };
+
+    // LOD levels (base mesh is LOD 0, stored in indices above)
+    struct LodData {
+        std::vector<uint32_t> indices;
+        float                 error = 0.0f;
+    };
+    std::vector<LodData> lods;  // LOD 1, 2, 3 (50%, 25%, 12.5%)
 };
 
-// ── Main ────────────────────────────────────────────────────────────────────
+// ── Meshoptimizer passes ────────────────────────────────────────────────────
 
-int main(int argc, char* argv[]) {
-    if (argc < 2) {
-        printUsage(argv[0]);
-        return 1;
+static void optimizeMesh(RawMesh& mesh) {
+    if (mesh.indices.empty() || mesh.vertices.empty()) return;
+
+    size_t indexCount  = mesh.indices.size();
+    size_t vertexCount = mesh.vertices.size();
+
+    // 1. Vertex cache optimization (GPU pre/post-transform cache)
+    meshopt_optimizeVertexCache(mesh.indices.data(), mesh.indices.data(),
+                                indexCount, vertexCount);
+
+    // 2. Overdraw optimization (reorder triangles to reduce overdraw)
+    meshopt_optimizeOverdraw(mesh.indices.data(), mesh.indices.data(),
+                             indexCount,
+                             &mesh.vertices[0].position[0],
+                             vertexCount, sizeof(glory::CookedVertex),
+                             1.05f);  // threshold
+
+    // 3. Vertex fetch optimization (reorder vertices for sequential access)
+    std::vector<uint32_t> remap(vertexCount);
+    size_t uniqueVertices = meshopt_optimizeVertexFetchRemap(
+        remap.data(), mesh.indices.data(), indexCount, vertexCount);
+
+    meshopt_remapIndexBuffer(mesh.indices.data(), mesh.indices.data(),
+                             indexCount, remap.data());
+
+    std::vector<glory::CookedVertex> newVerts(uniqueVertices);
+    meshopt_remapVertexBuffer(newVerts.data(), mesh.vertices.data(),
+                              vertexCount, sizeof(glory::CookedVertex),
+                              remap.data());
+    mesh.vertices = std::move(newVerts);
+}
+
+static void generateLODs(RawMesh& mesh) {
+    if (mesh.indices.size() < 12) return;  // too few triangles
+
+    size_t vertexCount = mesh.vertices.size();
+    float scale = meshopt_simplifyScale(&mesh.vertices[0].position[0],
+                                         vertexCount, sizeof(glory::CookedVertex));
+
+    const float ratios[] = { 0.50f, 0.25f, 0.125f };
+
+    for (float ratio : ratios) {
+        size_t targetIndexCount = static_cast<size_t>(
+            static_cast<float>(mesh.indices.size()) * ratio);
+        // Round down to multiple of 3
+        targetIndexCount = (targetIndexCount / 3) * 3;
+        if (targetIndexCount < 3) targetIndexCount = 3;
+
+        float resultError = 0.0f;
+        std::vector<uint32_t> lodIndices(mesh.indices.size());
+        size_t lodIndexCount = meshopt_simplify(
+            lodIndices.data(), mesh.indices.data(), mesh.indices.size(),
+            &mesh.vertices[0].position[0], vertexCount,
+            sizeof(glory::CookedVertex),
+            targetIndexCount, 0.02f, 0, &resultError);
+
+        if (lodIndexCount == 0) break;  // simplification failed
+
+        lodIndices.resize(lodIndexCount);
+
+        // Optimize the LOD indices for GPU cache
+        meshopt_optimizeVertexCache(lodIndices.data(), lodIndices.data(),
+                                     lodIndexCount, vertexCount);
+
+        mesh.lods.push_back({std::move(lodIndices), resultError * scale});
     }
+}
 
-    std::string inputPath;
-    std::string outputPath;
+// ── Single-file cook ────────────────────────────────────────────────────────
 
-    for (int i = 1; i < argc; ++i) {
-        std::string arg = argv[i];
-        if (arg == "-o" && i + 1 < argc) {
-            outputPath = argv[++i];
-        } else if (arg[0] == '-') {
-            std::fprintf(stderr, "Unknown option: %s\n", arg.c_str());
-            printUsage(argv[0]);
-            return 1;
-        } else {
-            inputPath = arg;
-        }
-    }
-
-    if (inputPath.empty()) {
-        std::fprintf(stderr, "Error: no input file specified\n");
-        printUsage(argv[0]);
-        return 1;
-    }
-
-    // Default output: replace extension with .glory
-    if (outputPath.empty()) {
-        outputPath = inputPath;
-        auto dot = outputPath.rfind('.');
-        if (dot != std::string::npos) outputPath = outputPath.substr(0, dot);
-        outputPath += ".glory";
-    }
-
+static int cookFile(const std::string& inputPath, const std::string& outputPath) {
     // ── Load GLB ────────────────────────────────────────────────────────────
     tinygltf::Model gltfModel;
     tinygltf::TinyGLTF loader;
@@ -142,9 +187,7 @@ int main(int argc, char* argv[]) {
             for (size_t vi = 0; vi < vertCount; ++vi) {
                 auto& v = raw.vertices[vi];
                 std::memcpy(v.position, posBytes + vi * posStride, sizeof(float) * 3);
-                // Default color: white
                 v.color[0] = 1.0f; v.color[1] = 1.0f; v.color[2] = 1.0f;
-                // Update AABB
                 for (int a = 0; a < 3; ++a) {
                     raw.aabbMin[a] = std::fmin(raw.aabbMin[a], v.position[a]);
                     raw.aabbMax[a] = std::fmax(raw.aabbMax[a], v.position[a]);
@@ -215,11 +258,18 @@ int main(int argc, char* argv[]) {
                         continue;
                 }
             } else {
-                // Non-indexed: generate sequential indices
                 raw.indices.resize(vertCount);
                 for (uint32_t ii = 0; ii < static_cast<uint32_t>(vertCount); ++ii)
                     raw.indices[ii] = ii;
             }
+
+            // ── Meshoptimizer passes ────────────────────────────────────────
+            optimizeMesh(raw);
+            generateLODs(raw);
+
+            std::fprintf(stdout, "  Mesh %zu: %zu verts, %zu tris, %zu LODs\n",
+                         rawMeshes.size(), raw.vertices.size(),
+                         raw.indices.size() / 3, raw.lods.size());
 
             rawMeshes.push_back(std::move(raw));
         }
@@ -247,7 +297,6 @@ int main(int argc, char* argv[]) {
         std::memset(md.diffuseTexturePath, 0, sizeof(md.diffuseTexturePath));
         std::memset(md.normalTexturePath, 0, sizeof(md.normalTexturePath));
 
-        // Diffuse texture reference
         if (pbr.baseColorTexture.index >= 0) {
             int texIdx = pbr.baseColorTexture.index;
             if (texIdx < static_cast<int>(gltfModel.textures.size())) {
@@ -262,7 +311,6 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        // Normal map reference
         if (mat.normalTexture.index >= 0) {
             int texIdx = mat.normalTexture.index;
             if (texIdx < static_cast<int>(gltfModel.textures.size())) {
@@ -280,7 +328,6 @@ int main(int argc, char* argv[]) {
         materials.push_back(md);
     }
 
-    // Ensure at least one default material
     if (materials.empty()) {
         glory::MaterialDescriptor def{};
         def.baseColor[0] = 1.0f; def.baseColor[1] = 1.0f;
@@ -293,18 +340,20 @@ int main(int argc, char* argv[]) {
     }
 
     // ── Build packed buffers ────────────────────────────────────────────────
-    std::vector<glory::CookedVertex> allVertices;
-    std::vector<uint32_t>            allIndices;
+    std::vector<glory::CookedVertex>   allVertices;
+    std::vector<uint32_t>              allIndices;
     std::vector<glory::MeshDescriptor> meshDescs;
+    std::vector<glory::LodLevel>       allLods;
 
     for (const auto& raw : rawMeshes) {
         glory::MeshDescriptor desc{};
-        desc.vertexOffset = static_cast<uint32_t>(allVertices.size());
-        desc.vertexCount  = static_cast<uint32_t>(raw.vertices.size());
-        desc.indexOffset  = static_cast<uint32_t>(allIndices.size());
-        desc.indexCount   = static_cast<uint32_t>(raw.indices.size());
+        desc.vertexOffset  = static_cast<uint32_t>(allVertices.size());
+        desc.vertexCount   = static_cast<uint32_t>(raw.vertices.size());
+        desc.indexOffset   = static_cast<uint32_t>(allIndices.size());
+        desc.indexCount    = static_cast<uint32_t>(raw.indices.size());
         desc.materialIndex = raw.materialIndex;
-        desc.isSkinned    = 0;
+        desc.isSkinned     = 0;
+        desc.lodCount      = static_cast<uint32_t>(raw.lods.size());
         std::memcpy(desc.aabbMin, raw.aabbMin, sizeof(float) * 3);
         std::memcpy(desc.aabbMax, raw.aabbMax, sizeof(float) * 3);
 
@@ -312,6 +361,19 @@ int main(int argc, char* argv[]) {
                            raw.vertices.begin(), raw.vertices.end());
         allIndices.insert(allIndices.end(),
                           raw.indices.begin(), raw.indices.end());
+
+        // Append LOD index data and descriptors
+        for (const auto& lod : raw.lods) {
+            glory::LodLevel ll{};
+            ll.indexOffset = static_cast<uint32_t>(allIndices.size());
+            ll.indexCount  = static_cast<uint32_t>(lod.indices.size());
+            ll.error       = lod.error;
+            allLods.push_back(ll);
+
+            allIndices.insert(allIndices.end(),
+                              lod.indices.begin(), lod.indices.end());
+        }
+
         meshDescs.push_back(desc);
     }
 
@@ -333,6 +395,10 @@ int main(int argc, char* argv[]) {
     header.meshDescOffset = cursor;
     header.meshDescSize   = meshDescs.size() * sizeof(glory::MeshDescriptor);
     cursor += header.meshDescSize;
+
+    header.lodDescOffset = cursor;
+    header.lodDescSize   = allLods.size() * sizeof(glory::LodLevel);
+    cursor += header.lodDescSize;
 
     header.materialDataOffset = cursor;
     header.materialDataSize   = materials.size() * sizeof(glory::MaterialDescriptor);
@@ -357,12 +423,15 @@ int main(int argc, char* argv[]) {
               static_cast<std::streamsize>(header.indexDataSize));
     out.write(reinterpret_cast<const char*>(meshDescs.data()),
               static_cast<std::streamsize>(header.meshDescSize));
+    if (!allLods.empty()) {
+        out.write(reinterpret_cast<const char*>(allLods.data()),
+                  static_cast<std::streamsize>(header.lodDescSize));
+    }
     out.write(reinterpret_cast<const char*>(materials.data()),
               static_cast<std::streamsize>(header.materialDataSize));
     out.close();
 
     // ── Stats ───────────────────────────────────────────────────────────────
-    // Get input file size
     std::ifstream inFile(inputPath, std::ios::binary | std::ios::ate);
     auto inputSize = inFile.tellg();
     inFile.close();
@@ -371,13 +440,17 @@ int main(int argc, char* argv[]) {
     auto outputSize = outCheck.tellg();
     outCheck.close();
 
+    size_t totalLods = 0;
+    for (const auto& m : rawMeshes) totalLods += m.lods.size();
+
     std::printf("\n=== Asset Cook Complete ===\n");
     std::printf("  Input:      %s\n", inputPath.c_str());
     std::printf("  Output:     %s\n", outputPath.c_str());
     std::printf("  Meshes:     %zu\n", meshDescs.size());
+    std::printf("  LOD levels: %zu\n", totalLods);
     std::printf("  Materials:  %zu\n", materials.size());
-    std::printf("  Vertices:   %zu\n", allVertices.size());
-    std::printf("  Indices:    %zu\n", allIndices.size());
+    std::printf("  Vertices:   %zu (optimized)\n", allVertices.size());
+    std::printf("  Indices:    %zu (base + LOD)\n", allIndices.size());
     std::printf("  Input size: %.2f KB\n", static_cast<double>(inputSize) / 1024.0);
     std::printf("  Output size:%.2f KB\n", static_cast<double>(outputSize) / 1024.0);
     if (inputSize > 0) {
@@ -386,4 +459,63 @@ int main(int argc, char* argv[]) {
     }
 
     return 0;
+}
+
+// ── Main ────────────────────────────────────────────────────────────────────
+
+int main(int argc, char* argv[]) {
+    if (argc < 2) {
+        printUsage(argv[0]);
+        return 1;
+    }
+
+    namespace fs = std::filesystem;
+
+    std::string arg1 = argv[1];
+
+    // Batch mode: asset_cook <input_dir> <output_dir>
+    if (fs::is_directory(arg1)) {
+        if (argc < 3) {
+            std::fprintf(stderr, "Error: batch mode requires output directory\n");
+            printUsage(argv[0]);
+            return 1;
+        }
+        std::string outDir = argv[2];
+        fs::create_directories(outDir);
+
+        int cooked = 0, failed = 0;
+        for (const auto& entry : fs::recursive_directory_iterator(arg1)) {
+            if (!entry.is_regular_file()) continue;
+            if (entry.path().extension() != ".glb") continue;
+
+            std::string outPath = (fs::path(outDir) /
+                entry.path().stem()).string() + ".glory";
+            std::printf("\n── Cooking: %s ──\n", entry.path().c_str());
+            if (cookFile(entry.path().string(), outPath) == 0) ++cooked;
+            else ++failed;
+        }
+
+        std::printf("\n=== Batch Complete: %d cooked, %d failed ===\n", cooked, failed);
+        return (failed > 0) ? 1 : 0;
+    }
+
+    // Single-file mode: asset_cook <input.glb> [-o output.glory]
+    std::string inputPath = arg1;
+    std::string outputPath;
+
+    for (int i = 2; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "-o" && i + 1 < argc) {
+            outputPath = argv[++i];
+        }
+    }
+
+    if (outputPath.empty()) {
+        outputPath = inputPath;
+        auto dot = outputPath.rfind('.');
+        if (dot != std::string::npos) outputPath = outputPath.substr(0, dot);
+        outputPath += ".glory";
+    }
+
+    return cookFile(inputPath, outputPath);
 }

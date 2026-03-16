@@ -54,6 +54,29 @@ std::optional<std::string> AssetRegistry::resolve(const std::string& assetName) 
     return std::nullopt;
 }
 
+std::optional<CookedAssetData> AssetRegistry::loadAsset(const std::string& assetName) const {
+    auto it = m_entries.find(assetName);
+    if (it == m_entries.end()) {
+        spdlog::warn("AssetRegistry: unknown asset '{}'", assetName);
+        return std::nullopt;
+    }
+
+    // Try cooked .glory first
+    if (!it->second.cookedPath.empty()) {
+        auto data = CookedLoader::load(it->second.cookedPath);
+        if (data) return data;
+        spdlog::warn("AssetRegistry: cooked load failed for '{}', falling back to raw",
+                     assetName);
+    }
+
+    // Fallback: raw .glb path is returned for the caller to handle via GLBLoader
+    if (!it->second.rawPath.empty()) {
+        spdlog::info("AssetRegistry: '{}' has no cooked version, use raw path: {}",
+                     assetName, it->second.rawPath);
+    }
+    return std::nullopt;
+}
+
 bool AssetRegistry::hasCookedVersion(const std::string& assetName) const {
     auto it = m_entries.find(assetName);
     return it != m_entries.end() && !it->second.cookedPath.empty();

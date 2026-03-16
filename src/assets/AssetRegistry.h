@@ -1,4 +1,5 @@
 #pragma once
+#include "assets/CookedLoader.h"
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -15,6 +16,9 @@ public:
 
     // Resolve asset name to file path (.glory preferred, .glb fallback)
     std::optional<std::string> resolve(const std::string& assetName) const;
+
+    // Load a cooked asset by name (resolves path, loads .glory or returns nullopt)
+    std::optional<CookedAssetData> loadAsset(const std::string& assetName) const;
 
     // Scan directories and build registry
     void scan();

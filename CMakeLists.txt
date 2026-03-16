@@ -339,3 +339,15 @@ target_include_directories(asset_cook PRIVATE
 )
 target_link_libraries(asset_cook PRIVATE meshoptimizer)
 target_compile_definitions(asset_cook PRIVATE GLM_FORCE_RADIANS GLM_FORCE_DEPTH_ZERO_TO_ONE)
+
+# ── Cook assets target ───────────────────────────────────────────────────────
+set(COOKED_ASSET_DIR ${CMAKE_BINARY_DIR}/assets_cooked)
+add_custom_target(cook_assets
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${COOKED_ASSET_DIR}
+    COMMAND asset_cook ${CMAKE_SOURCE_DIR}/assets ${COOKED_ASSET_DIR}
+    DEPENDS asset_cook
+    COMMENT "Cooking assets..."
+)
+target_compile_definitions(${PROJECT_NAME} PRIVATE
+    COOKED_ASSET_DIR="${COOKED_ASSET_DIR}/"
+)
