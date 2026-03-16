@@ -41,6 +41,8 @@
 #include "terrain/IsometricCamera.h"
 #include "nav/DebugRenderer.h"
 #include "vfx/VFXRenderer.h"
+#include "vfx/VFXDefinitionLoader.h"
+#include "vfx/VFXFactory.h"
 #include "vfx/TrailRenderer.h"
 #include "vfx/MeshEffectRenderer.h"
 #include "vfx/VFXEventQueue.h"
@@ -143,6 +145,8 @@ private:
     std::unique_ptr<VFXEventQueue> m_vfxQueue;        // SPSC bridge game→render (AbilitySystem)
     std::unique_ptr<VFXEventQueue> m_combatVfxQueue;  // SPSC bridge CombatSystem→render
     std::unique_ptr<VFXRenderer>   m_vfxRenderer;     // GPU particle pipeline
+    VFXDefinitionLoader            m_vfxDefLoader;    // JSON definition registry + hot-reload
+    VFXFactory                     m_vfxFactory;      // spawn VFX by definition name
     std::unique_ptr<TrailRenderer> m_trailRenderer;   // connected ribbon trails
     std::unique_ptr<MeshEffectRenderer> m_meshEffectRenderer; // geometric mesh VFX
     AsyncComputeManager            m_asyncCompute;    // async compute queue for particles

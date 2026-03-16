@@ -1,0 +1,37 @@
+{
+    "id": "death",
+    "maxParticles": 64,
+    "emitRate": 0.0,
+    "burstCount": 48,
+    "looping": false,
+    "duration": 2.0,
+    "lifetimeMin": 0.6,
+    "lifetimeMax": 1.8,
+    "initialSpeedMin": 1.0,
+    "initialSpeedMax": 4.0,
+    "sizeMin": 0.05,
+    "sizeMax": 0.15,
+    "sizeEnd": 0.02,
+    "spreadAngle": 180.0,
+    "gravity": -1.0,
+    "drag": 0.5,
+    "blendMode": "alpha",
+    "textureAtlas": "textures/particles/smoke_wisp.png",
+    "emitShape": "sphere",
+    "renderMode": "billboard",
+    "forces": [
+        { "type": "gravity",    "strength": -0.5,  "direction": [0, -1, 0] },
+        { "type": "turbulence", "strength": 2.0,    "direction": [0, 0, 0] }
+    ],
+    "colorOverLifetime": [
+        { "time": 0.0, "color": [0.3, 0.1, 0.4, 0.9] },
+        { "time": 0.3, "color": [0.5, 0.2, 0.6, 0.7] },
+        { "time": 0.7, "color": [0.2, 0.15, 0.3, 0.4] },
+        { "time": 1.0, "color": [0.1, 0.08, 0.15, 0.0] }
+    ],
+    "sizeOverLife": [
+        { "time": 0.0, "size": 0.3 },
+        { "time": 0.4, "size": 1.0 },
+        { "time": 1.0, "size": 1.5 }
+    ]
+}

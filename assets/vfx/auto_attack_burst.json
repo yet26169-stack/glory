@@ -1,0 +1,36 @@
+{
+    "id": "auto_attack_burst",
+    "maxParticles": 32,
+    "emitRate": 0.0,
+    "burstCount": 24,
+    "looping": false,
+    "duration": 0.4,
+    "lifetimeMin": 0.15,
+    "lifetimeMax": 0.35,
+    "initialSpeedMin": 3.0,
+    "initialSpeedMax": 6.0,
+    "sizeMin": 0.04,
+    "sizeMax": 0.08,
+    "sizeEnd": 0.0,
+    "spreadAngle": 45.0,
+    "gravity": -2.0,
+    "drag": 0.3,
+    "blendMode": "additive",
+    "textureAtlas": "textures/particles/soft_glow.png",
+    "emitShape": "sphere",
+    "renderMode": "billboard",
+    "forces": [
+        { "type": "gravity",  "strength": -2.0, "direction": [0, -1, 0] },
+        { "type": "radial",   "strength": 4.0,  "direction": [0, 0, 0] }
+    ],
+    "colorOverLifetime": [
+        { "time": 0.0, "color": [1.0, 0.9, 0.5, 1.0] },
+        { "time": 0.5, "color": [1.0, 0.6, 0.2, 0.8] },
+        { "time": 1.0, "color": [0.8, 0.3, 0.1, 0.0] }
+    ],
+    "sizeOverLife": [
+        { "time": 0.0, "size": 1.0 },
+        { "time": 0.3, "size": 1.5 },
+        { "time": 1.0, "size": 0.0 }
+    ]
+}

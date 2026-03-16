@@ -208,6 +208,8 @@ set(SOURCES
     src/animation/CPUSkinning.cpp
     src/vfx/ParticleSystem.cpp
     src/vfx/VFXRenderer.cpp
+    src/vfx/VFXDefinitionLoader.cpp
+    src/vfx/VFXFactory.cpp
     src/vfx/TrailRenderer.cpp
     src/vfx/MeshEffectRenderer.cpp
     src/vfx/CompositeVFXSequencer.cpp

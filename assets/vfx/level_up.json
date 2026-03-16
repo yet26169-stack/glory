@@ -1,0 +1,38 @@
+{
+    "id": "level_up",
+    "maxParticles": 128,
+    "emitRate": 80.0,
+    "burstCount": 0,
+    "looping": false,
+    "duration": 1.8,
+    "lifetimeMin": 0.8,
+    "lifetimeMax": 1.5,
+    "initialSpeedMin": 2.0,
+    "initialSpeedMax": 5.0,
+    "sizeMin": 0.06,
+    "sizeMax": 0.12,
+    "sizeEnd": 0.0,
+    "spreadAngle": 360.0,
+    "gravity": 1.5,
+    "drag": 0.1,
+    "blendMode": "additive",
+    "textureAtlas": "textures/particles/sparkle.png",
+    "emitShape": "cone",
+    "renderMode": "billboard",
+    "forces": [
+        { "type": "gravity", "strength": 2.0, "direction": [0, 1, 0] },
+        { "type": "vortex",  "strength": 3.0, "direction": [0, 1, 0] }
+    ],
+    "colorOverLifetime": [
+        { "time": 0.0, "color": [1.0, 0.95, 0.6, 1.0] },
+        { "time": 0.3, "color": [0.9, 0.8, 0.3, 1.0] },
+        { "time": 0.7, "color": [0.6, 0.85, 1.0, 0.7] },
+        { "time": 1.0, "color": [0.4, 0.7, 1.0, 0.0] }
+    ],
+    "sizeOverLife": [
+        { "time": 0.0, "size": 0.5 },
+        { "time": 0.2, "size": 1.2 },
+        { "time": 0.8, "size": 0.8 },
+        { "time": 1.0, "size": 0.0 }
+    ]
+}

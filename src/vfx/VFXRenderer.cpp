@@ -689,6 +689,10 @@ void VFXRenderer::registerEmitter(EmitterDef def) {
     m_emitterDefs[id] = std::move(def);
 }
 
+void VFXRenderer::spawnDirect(VFXEvent& ev) {
+    handleSpawn(ev);
+}
+
 // ── loadEmitterDirectory ──────────────────────────────────────────────────────
 void VFXRenderer::loadEmitterDirectory(const std::string& dirPath) {
     namespace fs = std::filesystem;
@@ -749,6 +753,28 @@ void VFXRenderer::loadEmitterDirectory(const std::string& dirPath) {
                                 c[2].get<float>(), c[3].get<float>()};
                     def.colorOverLifetime.push_back(ck);
                 }
+            }
+
+            // Force parameters
+            def.forceType     = j.value("forceType", 0u);
+            def.forceStrength = j.value("forceStrength", 1.0f);
+            if (j.contains("attractorPos")) {
+                auto& a = j["attractorPos"];
+                def.attractorPos = {a[0].get<float>(), a[1].get<float>(), a[2].get<float>()};
+            }
+            if (j.contains("forces") && j["forces"].is_array()) {
+                // Multi-force: build bitmask from forces array
+                uint32_t mask = 0;
+                for (const auto& fj : j["forces"]) {
+                    std::string ft = fj.value("type", "gravity");
+                    if      (ft == "gravity")    mask |= 1u;
+                    else if (ft == "radial")     mask |= 2u;
+                    else if (ft == "vortex")     mask |= 4u;
+                    else if (ft == "turbulence") mask |= 8u;
+                }
+                def.forceParams_bitmask = mask;
+            } else {
+                def.forceParams_bitmask = 1u << def.forceType;
             }
 
             const std::string emitterID = def.id;

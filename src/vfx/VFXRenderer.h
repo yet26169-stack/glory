@@ -85,6 +85,10 @@ public:
     // Load all *.json files in a directory as EmitterDefs.
     void loadEmitterDirectory(const std::string& path);
 
+    // Direct spawn (bypasses event queue — for VFXFactory use).
+    // Fills ev.handle with the assigned handle.
+    void spawnDirect(VFXEvent& ev);
+
 private:
     const Device& m_device;
 

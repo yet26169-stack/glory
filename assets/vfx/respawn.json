@@ -1,0 +1,39 @@
+{
+    "id": "respawn",
+    "maxParticles": 80,
+    "emitRate": 0.0,
+    "burstCount": 60,
+    "looping": false,
+    "duration": 1.5,
+    "lifetimeMin": 0.4,
+    "lifetimeMax": 1.2,
+    "initialSpeedMin": 4.0,
+    "initialSpeedMax": 8.0,
+    "sizeMin": 0.05,
+    "sizeMax": 0.12,
+    "sizeEnd": 0.0,
+    "spreadAngle": 360.0,
+    "gravity": -0.5,
+    "drag": 0.15,
+    "blendMode": "additive",
+    "textureAtlas": "textures/particles/soft_glow.png",
+    "emitShape": "sphere",
+    "renderMode": "billboard",
+    "forces": [
+        { "type": "gravity",    "strength": -0.5, "direction": [0, -1, 0] },
+        { "type": "radial",     "strength": 6.0,  "direction": [0, 0, 0] },
+        { "type": "turbulence", "strength": 1.0,  "direction": [0, 0, 0] }
+    ],
+    "colorOverLifetime": [
+        { "time": 0.0, "color": [1.0, 1.0, 1.0, 1.0] },
+        { "time": 0.2, "color": [0.8, 0.9, 1.0, 1.0] },
+        { "time": 0.6, "color": [0.4, 0.7, 1.0, 0.6] },
+        { "time": 1.0, "color": [0.2, 0.4, 0.8, 0.0] }
+    ],
+    "sizeOverLife": [
+        { "time": 0.0, "size": 0.8 },
+        { "time": 0.15, "size": 1.5 },
+        { "time": 0.5, "size": 0.6 },
+        { "time": 1.0, "size": 0.0 }
+    ]
+}

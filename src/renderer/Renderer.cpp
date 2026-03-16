@@ -124,6 +124,10 @@ Renderer::Renderer(Window& window) : m_window(window) {
     m_vfxRenderer->setDepthBuffer(m_hdrFB->depthView(), m_hdrFB->sampler());
     m_vfxRenderer->loadEmitterDirectory(std::string(ASSET_DIR) + "vfx/");
 
+    // Data-driven VFX definition registry (new-style JSON with multi-force, shapes)
+    m_vfxDefLoader.loadDirectory(std::string(ASSET_DIR) + "vfx/");
+    m_vfxFactory.init(&m_vfxDefLoader, m_vfxRenderer.get());
+
     // Async compute for particle simulation
     m_asyncCompute.init(*m_device);
 
@@ -370,6 +374,9 @@ void Renderer::simulateStep(float dt) {
 
     m_gameTime += dt;
     m_currentDt = dt;
+
+    // ── VFX definition hot-reload (checks filesystem timestamps) ─────────
+    m_vfxFactory.tickHotReload();
 
     // ── GPU collision: read back previous frame's results ────────────────
     m_gpuCollision.readResults(m_currentFrame);
