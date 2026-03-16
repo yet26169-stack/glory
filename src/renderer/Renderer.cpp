@@ -544,8 +544,8 @@ void Renderer::simulateStep(float dt) {
         spdlog::info("Camera {}", m_isoCam.isAttached() ? "attached" : "detached");
     }
 
-    // Tab toggles debug UI overlay
-    if (m_input->wasTabPressed()) m_showDebugUI = !m_showDebugUI;
+    // Tab toggles scoreboard (hold pattern); F5 for debug UI
+    if (m_input->wasTabPressed()) m_hud.scoreboard().toggle();
     // F3 toggles perf overlay
     if (m_input->wasF3Pressed()) m_perfOverlay.toggle();
 
@@ -1140,6 +1140,23 @@ void Renderer::renderFrame(float alpha) {
     // ── Perf overlay (F3) ─────────────────────────────────────────────────
     m_perfOverlay.draw(m_lastGpuResults, m_lastGpuTotalMs,
                        static_cast<float>(realDt * 1000.0f));
+
+    // ── In-game HUD overlays (health bars, ability bar, floating text, etc.)
+    if (m_state != AppState::Launcher) {
+        auto ext2 = m_swapchain->getExtent();
+        float a2  = static_cast<float>(ext2.width) / static_cast<float>(ext2.height);
+        glm::mat4 vp = m_isoCam.getProjectionMatrix(a2) * m_isoCam.getViewMatrix();
+        int hw, hh;
+        glfwGetWindowSize(m_window.getHandle(), &hw, &hh);
+        uint8_t playerTeam = 0;
+        if (m_playerEntity != entt::null &&
+            m_scene.getRegistry().all_of<TeamComponent>(m_playerEntity))
+            playerTeam = static_cast<uint8_t>(
+                m_scene.getRegistry().get<TeamComponent>(m_playerEntity).team);
+        m_hud.renderOverlays(m_scene.getRegistry(), m_playerEntity, vp,
+                             static_cast<float>(hw), static_cast<float>(hh),
+                             realDt, playerTeam);
+    }
 
     ImGui::Render(); // always call Render() even if no windows built
 

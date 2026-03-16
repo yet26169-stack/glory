@@ -276,6 +276,11 @@ set(SOURCES
     src/hud/HUD.cpp
     src/hud/Minimap.cpp
     src/hud/PerfOverlay.cpp
+    src/hud/FloatingText.cpp
+    src/hud/HealthBar.cpp
+    src/hud/AbilityBar.cpp
+    src/hud/Scoreboard.cpp
+    src/hud/KillFeed.cpp
     src/animation/AnimationPlayer.cpp
     src/animation/CPUSkinning.cpp
     src/vfx/ParticleSystem.cpp
