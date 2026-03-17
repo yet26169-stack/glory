@@ -1047,7 +1047,9 @@ void Renderer::simulateStep(float dt) {
             }
         }
         anim.player.refreshSkeleton(&skel.skeleton);
-        anim.player.update(dt);
+        // NOTE: anim.player.update(dt) is NOT called here — it is already
+        // called once per tick by AnimationUpdateSystem in the SimulationLoop.
+        // Calling it again would double the animation playback speed.
     }
 }
 
@@ -2293,7 +2295,8 @@ void Renderer::buildScene() {
             // Quad is 1×1; scale it so it covers the lane width in both axes.
             // Stride = scale factor, so tiles step exactly their own width along the lane.
             auto placeLaneTiles = [&](const std::vector<glm::vec3>& waypoints,
-                                      float laneWidth, const std::string& laneName)
+                                      float laneWidth, const std::string& laneName,
+                                      float laneY)
             {
                 int tileCount = 0;
                 // Each tile is scaled to laneWidth × laneWidth world units.
@@ -2313,7 +2316,7 @@ void Renderer::buildScene() {
                     float walked = 0.0f;
                     while (walked < segLen) {
                         glm::vec3 pos = a + dir * (walked + stride * 0.5f);
-                        pos.y = 0.02f;  // slight offset to avoid Z-fighting with grid/decals
+                        pos.y = laneY;
 
                         auto tile = m_scene.createEntity(
                             laneName + "_tile_" + std::to_string(tileCount));
@@ -2336,23 +2339,25 @@ void Renderer::buildScene() {
                 spdlog::info("Placed {} tiles for {}", tileCount, laneName);
             };
 
-            // Top Lane: up the left edge then across the top
+            // Lanes converge at bases {22,22} and {178,178} — stagger Y per
+            // lane so overlapping tiles don't Z-fight.  Mid lane on top (widest,
+            // most visible), Top/Bot underneath at distinct heights.
             placeLaneTiles({
                 {22,0,22}, {22,0,60}, {22,0,100}, {22,0,140}, {22,0,178},
                 {60,0,178}, {100,0,178}, {140,0,178}, {178,0,178}
-            }, 12.0f, "TopLane");
+            }, 12.0f, "TopLane", 0.02f);
 
             // Mid Lane: diagonal base to base
             placeLaneTiles({
                 {22,0,22}, {40,0,40}, {60,0,60}, {80,0,80}, {100,0,100},
                 {120,0,120}, {140,0,140}, {160,0,160}, {178,0,178}
-            }, 14.0f, "MidLane");
+            }, 14.0f, "MidLane", 0.06f);
 
             // Bot Lane: across the bottom then up the right edge
             placeLaneTiles({
                 {22,0,22}, {60,0,22}, {100,0,22}, {140,0,22}, {178,0,22},
                 {178,0,60}, {178,0,100}, {178,0,140}, {178,0,178}
-            }, 12.0f, "BotLane");
+            }, 12.0f, "BotLane", 0.04f);
         }
     }
 
