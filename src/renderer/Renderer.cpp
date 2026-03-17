@@ -584,472 +584,34 @@ void Renderer::simulateStep(float dt) {
         }
     }
 
-    // Right-click: move player to world position OR target enemy for auto-attack
-    if (m_input->wasRightClicked() && !m_hud.isMinimapHovered() && m_playerEntity != entt::null) {
-        glm::vec2 clickPos = m_input->getLastClickPos();
-        glm::vec3 worldPos = screenToWorld(clickPos.x, clickPos.y);
+    // ── Gameplay update ──────────────────────────────────────────────────
+    {
+        GameplayInput gi;
+        gi.mousePos       = m_input->getMousePos();
+        gi.lastClickPos   = m_input->getLastClickPos();
+        gi.rightClicked   = m_input->wasRightClicked();
+        gi.leftMouseDown  = m_input->isLeftMouseDown();
+        gi.shiftHeld      = glfwGetKey(m_window.getHandle(), GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS;
+        gi.minimapHovered = m_hud.isMinimapHovered();
+        gi.qPressed       = m_input->wasQPressed();
+        gi.wPressed       = m_input->wasWPressed();
+        gi.ePressed       = m_input->wasEPressed();
+        gi.rPressed       = m_input->wasRPressed();
+        gi.aPressed       = m_input->wasAPressed();
+        gi.sPressed       = m_input->wasSPressed();
+        gi.dPressed       = m_input->wasDPressed();
+        gi.xKeyDown       = glfwGetKey(m_window.getHandle(), GLFW_KEY_X) == GLFW_PRESS;
+        gi.view           = m_isoCam.getViewMatrix();
+        gi.proj           = m_isoCam.getProjectionMatrix(aspect);
+        gi.screenW        = static_cast<float>(winW);
+        gi.screenH        = static_cast<float>(winH);
+        gi.hoveredEntity  = m_hoveredEntity;
 
-        auto& reg = m_scene.getRegistry();
-        auto& c = reg.get<CharacterComponent>(m_playerEntity);
-        auto& combat = reg.get<CombatComponent>(m_playerEntity);
+        GameplayOutput go;
+        m_gameplaySystem.update(dt, gi, go);
 
-        // Try to pick an enemy entity under cursor
-        entt::entity target = pickEntityUnderCursor();
-        if (target != entt::null && m_combatSystem) {
-            // Target enemy for auto-attack (will chase if out of range)
-            combat.targetEntity = target;
-
-            // Animation canceling: interrupt windup if a new target is clicked
-            if (combat.state == CombatState::ATTACK_WINDUP || combat.state == CombatState::ATTACK_WINDDOWN) {
-                combat.state = CombatState::IDLE;
-            }
-        } else {
-            // No enemy under cursor — move to position and clear target
-            combat.targetEntity = entt::null;
-            c.targetPosition = worldPos;
-            c.hasTarget = true;
-            m_clickAnim = ClickAnim{ worldPos, 0.0f, 0.25f };
-
-            // Animation canceling: interrupt windup if move command issued
-            if (combat.state == CombatState::ATTACK_WINDUP || combat.state == CombatState::ATTACK_WINDDOWN) {
-                combat.state = CombatState::IDLE;
-            }
-        }
-    }
-
-    // ── Ability keys: Q / W / E / R ───────────────────────────────────────
-    // Build a target from the current cursor world position (ground-targeted).
-    // The AbilitySystem validates the targeting type; ground pos is always valid.
-    if (m_abilitySystem && m_playerEntity != entt::null) {
-        glm::vec2 mpos     = m_input->getMousePos();
-        glm::vec3 worldPos = screenToWorld(mpos.x, mpos.y);
-        TargetInfo groundTarget;
-        groundTarget.type           = TargetingType::POINT;
-        groundTarget.targetPosition = worldPos;
-
-        // Compute the fire direction from the player toward the mouse cursor.
-        // Skillshot abilities (Q) read target.direction for their velocity;
-        // without this, every projectile would fly in the default (0,0,1) direction.
-        if (m_scene.getRegistry().all_of<TransformComponent>(m_playerEntity)) {
-            const auto& pt  = m_scene.getRegistry().get<TransformComponent>(m_playerEntity);
-            glm::vec3 toMouse = worldPos - pt.position;
-            toMouse.y = 0.0f;   // project onto ground plane
-            groundTarget.direction = glm::length(toMouse) > 0.001f
-                                     ? glm::normalize(toMouse)
-                                     : glm::vec3(0.f, 0.f, 1.f);
-        }
-
-        auto tryAbility = [&](bool pressed, AbilitySlot slot) {
-            if (!pressed) return;
-            m_abilitySystem->enqueueRequest(m_playerEntity, slot, groundTarget);
-        };
-        tryAbility(m_input->wasQPressed(), AbilitySlot::Q);
-        tryAbility(m_input->wasWPressed(), AbilitySlot::W);
-
-        // E: nature_shield — self-buff (SELF targeting; no cone visual)
-        if (m_input->wasEPressed()) {
-            m_abilitySystem->enqueueRequest(m_playerEntity, AbilitySlot::E, groundTarget);
-        }
-
-        tryAbility(m_input->wasRPressed(), AbilitySlot::R);
-
-        // D — purple trick skillshot (uses SUMMONER slot in AbilityBook)
-        tryAbility(m_input->wasDPressed(), AbilitySlot::SUMMONER);
-    }
-
-    // ── Combat keys: A (auto-attack), S (shield), D (trick) ──────────────
-    if (m_combatSystem && m_playerEntity != entt::null &&
-        m_scene.getRegistry().all_of<CombatComponent>(m_playerEntity)) {
-        auto& reg = m_scene.getRegistry();
-        auto& combat = reg.get<CombatComponent>(m_playerEntity);
-
-        // A — auto-attack nearest enemy
-        if (m_input->wasAPressed() && combat.state == CombatState::IDLE
-            && combat.attackCooldown <= 0.0f) {
-            entt::entity target = m_gpuCollision.findNearestEnemy(
-                reg, m_playerEntity, combat.attackRange);
-            if (target != entt::null) {
-                combat.targetEntity = target; // Start chasing/attacking
-            }
-        }
-
-        // S — shield (duration 3.5s)
-        if (m_input->wasSPressed() && combat.state == CombatState::IDLE
-            && combat.shieldCooldown <= 0.0f) {
-            m_combatSystem->requestShield(m_playerEntity, reg);
-        }
-    }
-
-    // ── Unit System: Spawning (X) ──────────────────────────────────────────
-    m_spawnTimer -= dt;
-    if (glfwGetKey(m_window.getHandle(), GLFW_KEY_X) == GLFW_PRESS && m_spawnTimer <= 0.0f) {
-        glm::vec2 mpos = m_input->getMousePos();
-        glm::vec3 worldPos = screenToWorld(mpos.x, mpos.y);
-
-        auto minion = m_scene.createEntity("MeleeMinion");
-        auto& t = m_scene.getRegistry().get<TransformComponent>(minion);
-        t.position = worldPos;
-        t.scale    = glm::vec3(0.05f); // Match player scale
-        t.rotation = glm::vec3(0.0f);
-
-        m_scene.getRegistry().emplace<SelectableComponent>(minion, SelectableComponent{ false, 1.0f });
-        m_scene.getRegistry().emplace<UnitComponent>(minion, UnitComponent{ UnitComponent::State::IDLE, worldPos, 5.0f });
-        m_scene.getRegistry().emplace<CharacterComponent>(minion, CharacterComponent{ worldPos, 5.0f });
-        m_scene.getRegistry().emplace<GPUSkinnedMeshComponent>(minion, GPUSkinnedMeshComponent{ m_minionMeshIndex });
-
-        // Setup simple Material
-        m_scene.getRegistry().emplace<MaterialComponent>(minion,
-            MaterialComponent{ m_minionTexIndex, m_flatNormIndex, 0.0f, 0.0f, 0.5f, 0.2f });
-        // Setup Animation (Melee minion)
-        SkeletonComponent skelComp;
-        skelComp.skeleton         = m_minionSkeleton;
-        skelComp.skinVertices     = m_minionSkinVertices;
-        skelComp.bindPoseVertices = m_minionBindPoseVertices;
-
-        AnimationComponent animComp;
-        animComp.player.setSkeleton(&skelComp.skeleton);
-        animComp.clips = m_minionClips;
-        if (!animComp.clips.empty()) {
-            animComp.activeClipIndex = 0;
-            animComp.player.setClip(&animComp.clips[0]);
-        }
-
-        m_scene.getRegistry().emplace<SkeletonComponent>(minion, std::move(skelComp));
-        m_scene.getRegistry().emplace<AnimationComponent>(minion, std::move(animComp));
-
-        m_spawnTimer = 0.5f; // Debounce
-        spdlog::info("Spawned minion at ({}, {}, {})", worldPos.x, worldPos.y, worldPos.z);
-    }
-
-    // ── Unit System: Selection (Marquee) ───────────────────────────────────
-    if (m_input->isLeftMouseDown()) {
-        if (!m_selection.isDragging) {
-            m_selection.isDragging = true;
-            m_selection.dragStart = m_input->getMousePos();
-        }
-        m_selection.dragEnd = m_input->getMousePos();
-
-        // Draw Marquee Box using DebugRenderer on the ground plane
-        glm::vec3 tl = screenToWorld(m_selection.dragStart.x, m_selection.dragStart.y);
-        glm::vec3 tr = screenToWorld(m_selection.dragEnd.x, m_selection.dragStart.y);
-        glm::vec3 br = screenToWorld(m_selection.dragEnd.x, m_selection.dragEnd.y);
-        glm::vec3 bl = screenToWorld(m_selection.dragStart.x, m_selection.dragEnd.y);
-
-        // Offset slightly above ground to prevent z-fighting
-        tl.y = tr.y = br.y = bl.y = 0.05f;
-
-        glm::vec4 color(0.2f, 1.0f, 0.4f, 1.0f);
-        m_debugRenderer.drawLine(tl, tr, color);
-        m_debugRenderer.drawLine(tr, br, color);
-        m_debugRenderer.drawLine(br, bl, color);
-        m_debugRenderer.drawLine(bl, tl, color);
-
-    } else {
-        if (m_selection.isDragging) {
-            m_selection.isDragging = false;
-            glm::vec2 start = m_selection.dragStart;
-            glm::vec2 end   = m_selection.dragEnd;
-
-            float dist = glm::distance(start, end);
-            bool isClick = dist < 5.0f;
-
-            auto view = m_scene.getRegistry().view<TransformComponent, SelectableComponent>();
-            glm::vec2 min = glm::min(start, end);
-            glm::vec2 max = glm::max(start, end);
-
-            if (isClick) {
-                // Determine if we clicked on a unit
-                bool clickedOnUnit = false;
-                for (auto e : view) {
-                    auto& t = view.get<TransformComponent>(e);
-                    if (glm::distance(worldToScreen(t.position), end) < 20.0f) {
-                        clickedOnUnit = true;
-                        break;
-                    }
-                }
-
-                if (clickedOnUnit) {
-                    // Select clicked unit(s)
-                    for (auto e : view) {
-                        auto& t = view.get<TransformComponent>(e);
-                        auto& s = view.get<SelectableComponent>(e);
-                        if (glm::distance(worldToScreen(t.position), end) < 20.0f) {
-                            s.isSelected = true;
-                        } else {
-                            if (!glfwGetKey(m_window.getHandle(), GLFW_KEY_LEFT_SHIFT)) s.isSelected = false;
-                        }
-                    }
-                } else {
-                    // Clicked on ground -> move selected units
-                    glm::vec3 targetWorld = screenToWorld(end.x, end.y);
-                    auto unitView = m_scene.getRegistry().view<SelectableComponent, CharacterComponent, UnitComponent>();
-
-                    int numSelected = 0;
-                    for (auto e : unitView) {
-                        if (unitView.get<SelectableComponent>(e).isSelected) numSelected++;
-                    }
-
-                    int unitIndex = 0;
-                    for (auto e : unitView) {
-                        auto& s = unitView.get<SelectableComponent>(e);
-                        if (s.isSelected) {
-                            auto& c = unitView.get<CharacterComponent>(e);
-                            auto& u = unitView.get<UnitComponent>(e);
-
-                            // Calculate simple circular formation offset
-                            glm::vec3 offset(0.0f);
-                            if (numSelected > 1) {
-                                float radius = 1.0f + (numSelected * 0.2f);
-                                float angle = (6.2831853f / numSelected) * unitIndex;
-                                offset = glm::vec3(std::cos(angle) * radius, 0.0f, std::sin(angle) * radius);
-                            }
-
-                            c.targetPosition = targetWorld + offset;
-                            c.hasTarget = true;
-                            u.state = UnitComponent::State::MOVING;
-                            u.targetPosition = targetWorld + offset;
-                            unitIndex++;
-                        }
-                    }
-                }
-            } else {
-                // Marquee selection
-                for (auto e : view) {
-                    auto& t = view.get<TransformComponent>(e);
-                    auto& s = view.get<SelectableComponent>(e);
-                    glm::vec2 screenPos = worldToScreen(t.position);
-                    if (screenPos.x >= min.x && screenPos.x <= max.x &&
-                        screenPos.y >= min.y && screenPos.y <= max.y) {
-                        s.isSelected = true;
-                    } else {
-                        if (!glfwGetKey(m_window.getHandle(), GLFW_KEY_LEFT_SHIFT)) s.isSelected = false;
-                    }
-                }
-            }
-        }
-    }
-
-    // ── Update minions movement ───────────────────────────────────────────
-    auto minionView = m_scene.getRegistry().view<UnitComponent, CharacterComponent, TransformComponent>();
-    for (auto e : minionView) {
-        if (e == m_playerEntity) continue;
-
-        // Stunned entities cannot move
-        if (m_scene.getRegistry().all_of<CombatComponent>(e)) {
-            auto& combat = m_scene.getRegistry().get<CombatComponent>(e);
-            if (combat.state == CombatState::STUNNED) {
-                auto& c2 = minionView.get<CharacterComponent>(e);
-                c2.hasTarget = false;
-                continue;
-            }
-        }
-
-        auto& c = minionView.get<CharacterComponent>(e);
-        auto& t = minionView.get<TransformComponent>(e);
-        auto& u = minionView.get<UnitComponent>(e);
-
-        const float accelRate = 30.0f;
-
-        if (c.hasTarget) {
-            glm::vec3 dir = c.targetPosition - t.position;
-            dir.y = 0.0f;
-            float dist = glm::length(dir);
-            if (dist < 0.05f) {
-                t.position.x = c.targetPosition.x;
-                t.position.z = c.targetPosition.z;
-                c.hasTarget = false;
-                u.state = UnitComponent::State::IDLE;
-            } else {
-                dir /= dist;
-                // League-style: snap rotation instantly to target direction
-                c.currentYaw = std::atan2(dir.x, dir.z);
-                t.rotation.y = c.currentYaw;
-
-                // Fast acceleration toward full speed
-                c.currentSpeed += (c.moveSpeed - c.currentSpeed) * std::min(accelRate * dt, 1.0f);
-
-                float step = c.currentSpeed * dt;
-                if (step >= dist) {
-                    t.position.x = c.targetPosition.x;
-                    t.position.z = c.targetPosition.z;
-                    c.hasTarget = false;
-                    u.state = UnitComponent::State::IDLE;
-                } else {
-                    t.position += dir * step;
-                    u.state = UnitComponent::State::MOVING;
-                }
-            }
-        } else {
-            c.currentSpeed *= std::max(1.0f - 30.0f * dt, 0.0f);
-        }
-    }
-
-    // ── Update character movement ─────────────────────────────────────────
-    if (m_playerEntity != entt::null &&
-        m_scene.getRegistry().valid(m_playerEntity) &&
-        m_scene.getRegistry().all_of<CharacterComponent, TransformComponent, CombatComponent>(m_playerEntity)) {
-
-        auto& reg = m_scene.getRegistry();
-        auto& c = reg.get<CharacterComponent>(m_playerEntity);
-        auto& t = reg.get<TransformComponent>(m_playerEntity);
-        auto& combat = reg.get<CombatComponent>(m_playerEntity);
-
-        // Chasing / Attack Logic
-        if (combat.targetEntity != entt::null && reg.valid(combat.targetEntity)) {
-            if (reg.all_of<TransformComponent>(combat.targetEntity)) {
-                auto& targetT = reg.get<TransformComponent>(combat.targetEntity);
-                float dist = glm::distance(t.position, targetT.position);
-
-                if (dist > combat.attackRange) {
-                    // OUT OF RANGE: Chase the target
-                    // Only update target position if we aren't currently windup/firing
-                    if (combat.state == CombatState::IDLE || combat.state == CombatState::ATTACK_WINDDOWN) {
-                        c.targetPosition = targetT.position;
-                        c.hasTarget = true;
-                    }
-                } else {
-                    // IN RANGE: Start attack cycle if possible
-                    if (combat.state == CombatState::IDLE && combat.attackCooldown <= 0.0f) {
-                        c.hasTarget = false; // Stop moving to attack
-                        combat.state = CombatState::ATTACK_WINDUP;
-                        // Windup duration scaled by Attack Speed
-                        combat.stateTimer = (1.0f / combat.attackSpeed) * combat.windupPercent;
-                    } else if (combat.state == CombatState::ATTACK_WINDUP || combat.state == CombatState::ATTACK_WINDDOWN) {
-                        c.hasTarget = false; // Stay still during attack
-                    }
-                }
-            }
-        }
-
-        // Stunned player cannot move
-        bool playerStunned = (combat.state == CombatState::STUNNED);
-        if (playerStunned) {
-            c.hasTarget = false;
-        }
-
-        if (!playerStunned) {
-        const float accelRate = 30.0f;
-        if (c.hasTarget) {
-            glm::vec3 dir = c.targetPosition - t.position;
-            dir.y = 0.0f;
-            float dist = glm::length(dir);
-            if (dist < 0.05f) {
-                t.position.x = c.targetPosition.x;
-                t.position.z = c.targetPosition.z;
-                c.hasTarget = false;
-            } else {
-                dir /= dist;
-                // League-style: snap rotation instantly to target direction
-                c.currentYaw = std::atan2(dir.x, dir.z);
-                t.rotation.y = c.currentYaw;
-
-                // Fast acceleration toward full speed
-                c.currentSpeed += (c.moveSpeed - c.currentSpeed) * std::min(accelRate * dt, 1.0f);
-
-                // Clamp step to remaining distance to prevent overshoot
-                float step = c.currentSpeed * dt;
-                if (step >= dist) {
-                    t.position.x = c.targetPosition.x;
-                    t.position.z = c.targetPosition.z;
-                    c.hasTarget = false;
-                } else {
-                    t.position += dir * step;
-                }
-            }
-        } else {
-            // Decelerate to stop
-            c.currentSpeed *= std::max(1.0f - 30.0f * dt, 0.0f);
-        }
-        } // end if (!playerStunned)
-        m_isoCam.setFollowTarget(t.position);
-    }
-
-    // ── Update animations ─────────────────────────────────────────────────
-    auto animView = m_scene.getRegistry()
-        .view<SkeletonComponent, AnimationComponent, GPUSkinnedMeshComponent, TransformComponent>();
-    for (auto&& [e, skel, anim, ssm, t] : animView.each()) {
-        // Switch clip based on movement/combat state
-        // (0=idle, 1=walk, 2=attack)
-        if (m_scene.getRegistry().all_of<CharacterComponent>(e)) {
-            auto& c = m_scene.getRegistry().get<CharacterComponent>(e);
-            int targetClip = 0; // default idle
-
-            if (m_scene.getRegistry().all_of<CombatComponent>(e)) {
-                auto& combat = m_scene.getRegistry().get<CombatComponent>(e);
-                if (combat.state == CombatState::ATTACK_WINDUP ||
-                    combat.state == CombatState::ATTACK_FIRE ||
-                    combat.state == CombatState::ATTACK_WINDDOWN) {
-                    targetClip = 2; // attack
-
-                    // Face the target while attacking
-                    if (m_scene.getRegistry().valid(combat.targetEntity) &&
-                        m_scene.getRegistry().all_of<TransformComponent>(combat.targetEntity)) {
-                        auto& targetTrans = m_scene.getRegistry().get<TransformComponent>(combat.targetEntity);
-                        glm::vec3 dir = targetTrans.position - t.position;
-                        dir.y = 0.0f;
-                        if (glm::length(dir) > 0.001f) {
-                            c.currentYaw = std::atan2(dir.x, dir.z);
-                            t.rotation.y = c.currentYaw;
-                        }
-                    }
-                }
-                else if (combat.state == CombatState::SHIELDING || combat.state == CombatState::STUNNED) {
-                    targetClip = 0; // idle/stunned
-                }
-                else if (c.hasTarget) {
-                    targetClip = 1; // walk
-                }
-            } else if (c.hasTarget) {
-                targetClip = 1; // walk fallback
-            }
-
-            if (anim.activeClipIndex != targetClip && targetClip < (int)anim.clips.size()) {
-                anim.activeClipIndex = targetClip;
-                // Shorter blend into attack (0.05s) for a snappy responsive feel;
-                // longer blend out of attack (0.12s) for a smooth recovery.
-                float blendTime = (targetClip == 2) ? 0.05f : 0.12f;
-                anim.player.crossfadeTo(&anim.clips[targetClip], blendTime);
-            }
-
-            // Scale animation speed
-            if (anim.activeClipIndex == 2 && m_scene.getRegistry().all_of<CombatComponent>(e)) {
-                // Attack: scale so the clip spans exactly one full attack cycle.
-                auto& combat = m_scene.getRegistry().get<CombatComponent>(e);
-                const auto& attackClip = anim.clips[anim.activeClipIndex];
-                float clipDuration = (attackClip.duration > 0.0f) ? attackClip.duration : 1.0f;
-                anim.player.setTimeScale(clipDuration * combat.attackSpeed);
-            } else if (anim.activeClipIndex == 1 && anim.activeClipIndex < (int)anim.clips.size()) {
-                // Walk: scale to match movement speed
-                const auto& walkClip = anim.clips[anim.activeClipIndex];
-                float rawTimeScale = 1.0f;
-                if (walkClip.strideLength > 0.0f && walkClip.duration > 0.0f) {
-                    float animNaturalSpeed = walkClip.strideLength / walkClip.duration;
-                    rawTimeScale = (animNaturalSpeed > 0.0f) ? (c.currentSpeed / animNaturalSpeed) : 1.0f;
-                } else if (c.moveSpeed > 0.0f) {
-                    // No strideLength data — estimate: at full moveSpeed the walk
-                    // cycle should take ~0.8s regardless of clip duration.  Scale
-                    // so that timeScale 1.0 maps to a relaxed walk, not a sprint.
-                    constexpr float kDesiredCycleSec = 0.85f;
-                    float clipDur = (walkClip.duration > 0.0f) ? walkClip.duration : 1.0f;
-                    float baseScale = clipDur / kDesiredCycleSec;
-                    rawTimeScale = (c.currentSpeed / c.moveSpeed) * baseScale;
-                }
-                // Smooth toward the raw target; lag constant ~15 Hz keeps the
-                // walk cycle visually continuous across rapid speed changes.
-                const float kSmooth = 15.0f;
-                anim.smoothedTimeScale += (rawTimeScale - anim.smoothedTimeScale)
-                                         * std::min(kSmooth * dt, 1.0f);
-                anim.player.setTimeScale(anim.smoothedTimeScale);
-            } else {
-                // Idle: reset smoothed scale so next walk starts clean.
-                anim.smoothedTimeScale = 1.0f;
-                anim.player.setTimeScale(1.0f);
-            }
-        }
-        anim.player.refreshSkeleton(&skel.skeleton);
-        // NOTE: anim.player.update(dt) is NOT called here — it is already
-        // called once per tick by AnimationUpdateSystem in the SimulationLoop.
-        // Calling it again would double the animation playback speed.
+        if (go.clickAnim) m_clickAnim = *go.clickAnim;
+        if (go.cameraFollowTarget) m_isoCam.setFollowTarget(*go.cameraFollowTarget);
     }
 }
 
@@ -2519,6 +2081,9 @@ void Renderer::buildScene() {
     }
     
     m_playerEntity = character;
+    m_gameplaySystem.init(m_scene, m_abilitySystem.get(), m_combatSystem.get(),
+                          &m_gpuCollision, &m_debugRenderer);
+    m_gameplaySystem.setPlayerEntity(m_playerEntity);
     m_isoCam.setFollowTarget(glm::vec3(100.0f, 0.0f, 100.0f));
 
     // ── Load Minion assets for spawning ───────────────────────────────────
@@ -2537,7 +2102,6 @@ void Renderer::buildScene() {
         } else {
             spdlog::warn("Minion texture not found in GLB — using default white texture (slot {})", minionTex);
         }
-        m_minionTexIndex = minionTex;
 
         if (!skinnedData.bindPoseVertices.empty() && !skinnedData.skinVertices.empty()) {
             std::vector<SkinnedVertex> sverts;
@@ -2552,13 +2116,14 @@ void Renderer::buildScene() {
                 sv.weights  = skinnedData.skinVertices[0][vi].weights;
                 sverts.push_back(sv);
             }
-            m_minionMeshIndex = m_scene.addStaticSkinnedMesh(
+            uint32_t minionMeshIdx = m_scene.addStaticSkinnedMesh(
                 StaticSkinnedMesh(*m_device, m_device->getAllocator(),
                                   sverts, skinnedData.indices[0]));
 
-            m_minionSkeleton         = std::move(skinnedData.skeleton);
-            m_minionSkinVertices     = std::move(skinnedData.skinVertices);
-            m_minionBindPoseVertices = std::move(skinnedData.bindPoseVertices);
+            Skeleton minionSkeleton          = std::move(skinnedData.skeleton);
+            auto     minionSkinVertices      = std::move(skinnedData.skinVertices);
+            auto     minionBindPoseVertices  = std::move(skinnedData.bindPoseVertices);
+            std::vector<AnimationClip> minionClips;
 
             // Load idle animation from melee_minion_idle.glb (clip[0])
             // Falls back to empty clip if file not found
@@ -2569,8 +2134,8 @@ void Renderer::buildScene() {
                     *m_device, m_device->getAllocator(),
                     minionAnimBase + "melee_minion_idle.glb", 0.0f);
                 if (!idleData.animations.empty()) {
-                    m_minionClips.push_back(std::move(idleData.animations[0]));
-                    retargetClip(m_minionClips.back(), m_minionSkeleton);
+                    minionClips.push_back(std::move(idleData.animations[0]));
+                    retargetClip(minionClips.back(), minionSkeleton);
                     idleOk = true;
                     spdlog::info("Minion idle animation loaded and retargeted");
                 }
@@ -2578,11 +2143,11 @@ void Renderer::buildScene() {
                 spdlog::warn("Could not load minion idle animation: {}", ie.what());
             }
             if (!idleOk)
-                m_minionClips.push_back(AnimationClip{}); // empty fallback
+                minionClips.push_back(AnimationClip{}); // empty fallback
 
             // Walk animation is embedded in the base model (clip[1])
             if (!skinnedData.animations.empty()) {
-                m_minionClips.push_back(std::move(skinnedData.animations[0]));
+                minionClips.push_back(std::move(skinnedData.animations[0]));
             } else {
                 spdlog::warn("No walk animation found in minion base model.");
             }
@@ -2594,9 +2159,9 @@ void Renderer::buildScene() {
                     *m_device, m_device->getAllocator(),
                     minionAnimBase + "melee_minion_attack1.glb", 0.0f);
                 if (!attackData.animations.empty()) {
-                    m_minionClips.push_back(std::move(attackData.animations[0]));
-                    retargetClip(m_minionClips.back(), m_minionSkeleton);
-                    m_minionClips.back().looping = false; // Attack plays once, don't loop
+                    minionClips.push_back(std::move(attackData.animations[0]));
+                    retargetClip(minionClips.back(), minionSkeleton);
+                    minionClips.back().looping = false; // Attack plays once, don't loop
                     attackOk = true;
                     spdlog::info("Minion attack animation loaded and retargeted");
                 }
@@ -2604,9 +2169,19 @@ void Renderer::buildScene() {
                 spdlog::warn("Could not load minion attack animation: {}", ae.what());
             }
             if (!attackOk)
-                m_minionClips.push_back(AnimationClip{}); // empty fallback
+                minionClips.push_back(AnimationClip{}); // empty fallback
 
-            spdlog::info("Minion model and {} animations loaded for spawning", m_minionClips.size());
+            spdlog::info("Minion model and {} animations loaded for spawning", minionClips.size());
+
+            MinionSpawnConfig spawnCfg;
+            spawnCfg.meshIndex        = minionMeshIdx;
+            spawnCfg.texIndex         = minionTex;
+            spawnCfg.flatNormIndex    = flatNorm;
+            spawnCfg.skeleton         = std::move(minionSkeleton);
+            spawnCfg.skinVertices     = std::move(minionSkinVertices);
+            spawnCfg.bindPoseVertices = std::move(minionBindPoseVertices);
+            spawnCfg.clips            = std::move(minionClips);
+            m_gameplaySystem.setSpawnConfig(std::move(spawnCfg));
         }    } catch (const std::exception& e) {
         spdlog::warn("Could not load minion model: {}", e.what());
     }
@@ -2745,19 +2320,20 @@ void Renderer::spawnTestEnemy() {
     reg.emplace<StatsComponent>(enemy, stats);
 
     // Reuse cached minion visuals
-    reg.emplace<GPUSkinnedMeshComponent>(enemy, GPUSkinnedMeshComponent{ m_minionMeshIndex });
+    const auto& spawnCfg = m_gameplaySystem.getSpawnConfig();
+    reg.emplace<GPUSkinnedMeshComponent>(enemy, GPUSkinnedMeshComponent{ spawnCfg.meshIndex });
     uint32_t flatNorm = 0;
     reg.emplace<MaterialComponent>(enemy,
-        MaterialComponent{ m_minionTexIndex, flatNorm, 0.0f, 0.0f, 0.5f, 0.2f });
+        MaterialComponent{ spawnCfg.texIndex, flatNorm, 0.0f, 0.0f, 0.5f, 0.2f });
 
     SkeletonComponent skelComp;
-    skelComp.skeleton         = m_minionSkeleton;
-    skelComp.skinVertices     = m_minionSkinVertices;
-    skelComp.bindPoseVertices = m_minionBindPoseVertices;
+    skelComp.skeleton         = spawnCfg.skeleton;
+    skelComp.skinVertices     = spawnCfg.skinVertices;
+    skelComp.bindPoseVertices = spawnCfg.bindPoseVertices;
 
     AnimationComponent animComp;
     animComp.player.setSkeleton(&skelComp.skeleton);
-    animComp.clips = m_minionClips;
+    animComp.clips = spawnCfg.clips;
     if (!animComp.clips.empty()) {
         animComp.activeClipIndex = 0; // idle
         animComp.player.setClip(&animComp.clips[0]);

@@ -65,6 +65,7 @@
 #include "audio/GameAudioEvents.h"
 #include "core/FrameAllocator.h"
 #include "core/PoolAllocator.h"
+#include "core/GameplaySystem.h"
 #include "renderer/StagingPool.h"
 #include "hud/HUD.h"
 #include "hud/PerfOverlay.h"
@@ -185,6 +186,7 @@ private:
     std::unique_ptr<CombatSystem>  m_combatSystem;    // auto-attack / shield / trick
     GpuCollisionSystem             m_gpuCollision;    // GPU spatial hash + broadphase
     SimulationLoop                 m_simLoop;         // parallel ECS system scheduler
+    GameplaySystem                 m_gameplaySystem;  // extracted gameplay logic
     ScriptEngine                   m_scriptEngine;    // Lua 5.4 scripting VM
 
     // ── Audio ─────────────────────────────────────────────────────────────
@@ -211,23 +213,9 @@ private:
     entt::entity m_playerEntity  = entt::null;
     entt::entity m_hoveredEntity = entt::null;
 
-    struct ClickAnim {
-        glm::vec3 position{};
-        float     lifetime = 0.0f;
-        float     maxLife  = 0.25f;
-    };
     std::optional<ClickAnim> m_clickAnim;
 
-    // ── Unit System state ─────────────────────────────────────────────────
-    SelectionState m_selection;
-    uint32_t m_minionMeshIndex = 0;
-    uint32_t m_minionTexIndex = 0;
     uint32_t m_flatNormIndex  = 0;   // shared flat normal map texture index
-    Skeleton m_minionSkeleton;
-    std::vector<std::vector<SkinVertex>> m_minionSkinVertices;
-    std::vector<std::vector<Vertex>> m_minionBindPoseVertices;
-    std::vector<AnimationClip> m_minionClips;
-    float m_spawnTimer = 0.0f;
 
     // ── Per-frame CPU→GPU instance buffer (InstanceData per draw call) ────
     static constexpr uint32_t MAX_INSTANCES = 512;
