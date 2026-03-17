@@ -57,6 +57,7 @@
 #include "ability/ProjectileSystem.h"
 #include "combat/CombatComponents.h"
 #include "combat/CombatSystem.h"
+#include "combat/HeroRegistry.h"
 #include "combat/GpuCollisionSystem.h"
 #include "core/SimulationLoop.h"
 #include "scripting/ScriptEngine.h"
@@ -100,6 +101,9 @@ public:
     void setMenuRenderer(std::function<void()> fn) { m_menuRenderer = std::move(fn); }
 
     void buildScene();
+
+    void setSelectedHeroId(const std::string& id) { m_selectedHeroId = id; }
+    const HeroRegistry& getHeroRegistry() const { return m_heroRegistry; }
 
     entt::registry&       getRegistry()       { return m_scene.getRegistry(); }
     const entt::registry& getRegistry() const { return m_scene.getRegistry(); }
@@ -263,6 +267,10 @@ private:
     // ── Menu mode state ─────────────────────────────────────────────────
     bool m_menuMode = true;
     std::function<void()> m_menuRenderer;
+
+    // ── Hero system ──────────────────────────────────────────────────────
+    HeroRegistry m_heroRegistry;
+    std::string  m_selectedHeroId;
 
     // Per-pass recording methods (called from render graph execute lambdas)
     void recordShadowPass(VkCommandBuffer cmd, const FrameContext& ctx);

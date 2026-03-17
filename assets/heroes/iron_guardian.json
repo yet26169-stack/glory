@@ -1,0 +1,31 @@
+{
+    "heroId": "iron_guardian",
+    "name": "Titan",
+    "modelPath": "models/scientist/scientist.glb",
+    "baseHP": 750,
+    "baseMP": 350,
+    "baseMoveSpeed": 6.5,
+    "baseAttackDamage": 68,
+    "baseAttackRange": 3.0,
+    "baseAttackSpeed": 0.7,
+    "baseArmor": 55,
+    "baseMagicResist": 40,
+    "baseAbilityPower": 0,
+    "hpPerLevel": 110,
+    "mpPerLevel": 30,
+    "damagePerLevel": 4.0,
+    "armorPerLevel": 5.5,
+    "magicResistPerLevel": 2.0,
+    "abilityPowerPerLevel": 0,
+    "isRanged": false,
+    "projectileSpeed": 0,
+    "projectileVfx": "",
+    "abilities": {
+        "Q": "iron_guardian_charge",
+        "W": "iron_guardian_shield_wall",
+        "E": "iron_guardian_ground_slam",
+        "R": "iron_guardian_fortress"
+    },
+    "summoner": "",
+    "portraitColor": [0.7, 0.7, 0.3, 1.0]
+}

@@ -295,6 +295,7 @@ set(SOURCES
     src/ability/AbilitySystem.cpp
     src/ability/ProjectileSystem.cpp
     src/combat/CombatSystem.cpp
+    src/combat/HeroRegistry.cpp
     src/combat/GpuCollisionSystem.cpp
     src/audio/AudioEngine.cpp
     src/audio/SoundHandle.cpp

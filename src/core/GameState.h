@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <memory>
+#include <string>
 #include <unordered_map>
 
 namespace glory {
@@ -46,6 +47,9 @@ public:
     void setVictory(bool v) { m_victory = v; }
     bool isVictory() const  { return m_victory; }
 
+    void setSelectedHeroId(const std::string& id) { m_selectedHeroId = id; }
+    const std::string& selectedHeroId() const { return m_selectedHeroId; }
+
 private:
     void doTransition(GameStateType newState);
 
@@ -58,6 +62,7 @@ private:
     bool           m_hasPending  = false;
     bool           m_quit        = false;
     bool           m_victory     = false;
+    std::string    m_selectedHeroId;
 };
 
 // ── Concrete states ──────────────────────────────────────────────────────────

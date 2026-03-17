@@ -9,6 +9,7 @@
 #include "core/Profiler.h"
 #include "scene/Components.h"
 #include "combat/CombatComponents.h"
+#include "combat/HeroDefinition.h"
 #include "ability/AbilityComponents.h"
 #include "scripting/LuaBindings.h"
 #include "map/MapLoader.h"
@@ -330,6 +331,9 @@ Renderer::Renderer(Window& window) : m_window(window) {
 
     // Re-compile after wiring callbacks (order doesn't change, but ensures consistency)
     m_renderGraph.compile();
+
+    // ── Hero definitions ────────────────────────────────────────────────
+    m_heroRegistry.loadFromDirectory(std::string(ASSET_DIR) + "heroes");
 
     spdlog::info("Renderer initialized");
 }
@@ -2035,46 +2039,90 @@ void Renderer::buildScene() {
         ct.scale    = glm::vec3(1.0f);
     }
 
+    // Look up selected hero definition
+    const HeroDefinition* heroDef = m_heroRegistry.find(m_selectedHeroId);
+    if (!heroDef && m_heroRegistry.count() > 0)
+        heroDef = &m_heroRegistry.all()[0];
+
+    float moveSpeed = heroDef ? heroDef->baseMoveSpeed : 8.0f;
     m_scene.getRegistry().emplace<CharacterComponent>(character,
-        CharacterComponent{ glm::vec3(100.0f, 0.0f, 100.0f), 8.0f });
+        CharacterComponent{ glm::vec3(100.0f, 0.0f, 100.0f), moveSpeed });
     m_scene.getRegistry().emplace<TeamComponent>(character, TeamComponent{ Team::PLAYER });
     auto& combat = m_scene.getRegistry().emplace<CombatComponent>(character);
-    combat.isRanged = true;
-    combat.projectileSpeed = 30.0f;
-    combat.projectileVfx = "vfx_fireball_projectile";
-    combat.attackRange = 15.0f;
-    combat.attackSpeed = 1.2f;
+    if (heroDef) {
+        combat.isRanged = heroDef->isRanged;
+        combat.projectileSpeed = heroDef->projectileSpeed;
+        combat.projectileVfx = heroDef->projectileVfx;
+        combat.attackRange = heroDef->baseAttackRange;
+        combat.attackSpeed = heroDef->baseAttackSpeed;
+        combat.attackDamage = heroDef->baseAttackDamage;
+    } else {
+        combat.isRanged = true;
+        combat.projectileSpeed = 30.0f;
+        combat.projectileVfx = "vfx_fireball_projectile";
+        combat.attackRange = 15.0f;
+        combat.attackSpeed = 1.2f;
+    }
 
     m_scene.getRegistry().emplace<SelectableComponent>(character, SelectableComponent{ false, 2.5f });
-    m_scene.getRegistry().emplace<ResourceComponent>(character);
+
+    ResourceComponent res;
+    if (heroDef) {
+        res.maximum = heroDef->baseMP;
+        res.current = heroDef->baseMP;
+    }
+    m_scene.getRegistry().emplace<ResourceComponent>(character, res);
     
     StatsComponent playerStats;
-    playerStats.base.maxHP = 600.0f;
-    playerStats.base.currentHP = 600.0f;
+    if (heroDef) {
+        playerStats.base.maxHP = heroDef->baseHP;
+        playerStats.base.currentHP = heroDef->baseHP;
+        playerStats.base.attackDamage = heroDef->baseAttackDamage;
+        playerStats.base.armor = heroDef->baseArmor;
+        playerStats.base.magicResist = heroDef->baseMagicResist;
+        playerStats.base.abilityPower = heroDef->baseAbilityPower;
+    } else {
+        playerStats.base.maxHP = 600.0f;
+        playerStats.base.currentHP = 600.0f;
+    }
     m_scene.getRegistry().emplace<StatsComponent>(character, playerStats);
 
     m_scene.getRegistry().emplace<StatusEffectsComponent>(character);
+
+    HeroComponent heroComp;
+    heroComp.definition = heroDef;
+    heroComp.level = 1;
+    m_scene.getRegistry().emplace<HeroComponent>(character, heroComp);
     
     if (m_abilitySystem) {
-        // QWER: Q=Fireball, W=Flame Pillar, E=Molten Shield, R=Incendiary Bomb (ultimate)
-        m_abilitySystem->initEntity(m_scene.getRegistry(), character,
-                                    {"fire_mage_fireball",  // Q — multi-layer skillshot fireball
-                                     "ice_zone",            // W — Glacial Storm AoE freeze
-                                     "nature_shield",       // E — Living Barrier shield + HoT
-                                     "storm_strike"});      // R — Storm Strike ultimate burst
+        std::array<std::string, 4> abilityIds;
+        if (heroDef) {
+            abilityIds = heroDef->abilityIds;
+        }
+        bool hasAbilities = false;
+        for (auto& id : abilityIds) {
+            if (!id.empty()) { hasAbilities = true; break; }
+        }
+        if (!hasAbilities) {
+            abilityIds = {"fire_mage_fireball", "ice_zone", "nature_shield", "storm_strike"};
+        }
+        m_abilitySystem->initEntity(m_scene.getRegistry(), character, abilityIds);
         m_abilitySystem->setAbilityLevel(m_scene.getRegistry(), character, AbilitySlot::Q, 1);
         m_abilitySystem->setAbilityLevel(m_scene.getRegistry(), character, AbilitySlot::W, 1);
         m_abilitySystem->setAbilityLevel(m_scene.getRegistry(), character, AbilitySlot::E, 1);
         m_abilitySystem->setAbilityLevel(m_scene.getRegistry(), character, AbilitySlot::R, 1);
 
-        // D-key: Arcane Bolt (trick skillshot) — SUMMONER slot
-        const auto* trickDef = m_abilitySystem->findDefinition("fire_mage_trick");
-        if (trickDef) {
-            auto& book = m_scene.getRegistry().get<AbilityBookComponent>(character);
-            auto& inst = book.abilities[static_cast<size_t>(AbilitySlot::SUMMONER)];
-            inst.def   = trickDef;
-            inst.level = 1;
-            inst.currentPhase = AbilityPhase::READY;
+        // D-key summoner ability
+        std::string summonerId = heroDef ? heroDef->summonerAbilityId : "fire_mage_trick";
+        if (!summonerId.empty()) {
+            const auto* trickDef = m_abilitySystem->findDefinition(summonerId);
+            if (trickDef) {
+                auto& book = m_scene.getRegistry().get<AbilityBookComponent>(character);
+                auto& inst = book.abilities[static_cast<size_t>(AbilitySlot::SUMMONER)];
+                inst.def   = trickDef;
+                inst.level = 1;
+                inst.currentPhase = AbilityPhase::READY;
+            }
         }
     }
     

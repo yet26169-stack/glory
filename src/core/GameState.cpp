@@ -1,5 +1,6 @@
 #include "core/GameState.h"
 #include "renderer/Renderer.h"
+#include "combat/HeroDefinition.h"
 #include "window/Window.h"
 
 #include <imgui.h>
@@ -149,21 +150,25 @@ void HeroSelectState::render(GameStateMachine& sm, float /*alpha*/) {
             ImGui::SetCursorPosX((w - tw) * 0.5f);
             ImGui::Text("%s", title);
 
-            // Hero grid: 4x2
-            const char* names[HERO_COUNT] = {
+            // Build hero list from registry, fall back to hardcoded if empty
+            const auto& registry = sm.renderer().getHeroRegistry();
+            const bool useRegistry = registry.count() > 0;
+
+            // Hardcoded fallback names/colors
+            const char* fallbackNames[HERO_COUNT] = {
                 "Warrior", "Mage", "Ranger", "Tank",
                 "Assassin", "Support", "Summoner", "Berserker"
             };
-            ImVec4 colors[HERO_COUNT] = {
-                {0.8f, 0.2f, 0.2f, 1.0f}, // red
-                {0.2f, 0.3f, 0.9f, 1.0f}, // blue
-                {0.2f, 0.8f, 0.3f, 1.0f}, // green
-                {0.8f, 0.8f, 0.2f, 1.0f}, // yellow
-                {0.6f, 0.2f, 0.8f, 1.0f}, // purple
-                {0.2f, 0.8f, 0.8f, 1.0f}, // cyan
-                {0.9f, 0.5f, 0.1f, 1.0f}, // orange
-                {0.9f, 0.4f, 0.7f, 1.0f}, // pink
+            ImVec4 fallbackColors[HERO_COUNT] = {
+                {0.8f, 0.2f, 0.2f, 1.0f}, {0.2f, 0.3f, 0.9f, 1.0f},
+                {0.2f, 0.8f, 0.3f, 1.0f}, {0.8f, 0.8f, 0.2f, 1.0f},
+                {0.6f, 0.2f, 0.8f, 1.0f}, {0.2f, 0.8f, 0.8f, 1.0f},
+                {0.9f, 0.5f, 0.1f, 1.0f}, {0.9f, 0.4f, 0.7f, 1.0f},
             };
+
+            const int heroCount = useRegistry
+                ? static_cast<int>(registry.count())
+                : HERO_COUNT;
 
             constexpr float cardW = 100.0f;
             constexpr float cardH = 100.0f;
@@ -173,7 +178,7 @@ void HeroSelectState::render(GameStateMachine& sm, float /*alpha*/) {
             float startX = (w - gridW) * 0.5f;
             float startY = h * 0.20f;
 
-            for (int i = 0; i < HERO_COUNT; ++i) {
+            for (int i = 0; i < heroCount; ++i) {
                 int col = i % cols;
                 int row = i / cols;
                 float x = startX + col * (cardW + gap);
@@ -181,13 +186,25 @@ void HeroSelectState::render(GameStateMachine& sm, float /*alpha*/) {
 
                 ImGui::SetCursorPos(ImVec2(x, y));
 
+                const char* heroName;
+                ImVec4 heroColor;
+                if (useRegistry) {
+                    const auto& def = registry.all()[i];
+                    heroName = def.name.c_str();
+                    heroColor = ImVec4(def.portraitColor.x, def.portraitColor.y,
+                                       def.portraitColor.z, def.portraitColor.w);
+                } else {
+                    heroName = fallbackNames[i];
+                    heroColor = fallbackColors[i];
+                }
+
                 bool selected = (m_selectedHero == i);
                 if (selected) {
                     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 1.0f, 1.0f, 0.3f));
                     ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 3.0f);
                     ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(1.0f, 0.84f, 0.0f, 1.0f));
                 } else {
-                    ImGui::PushStyleColor(ImGuiCol_Button, colors[i]);
+                    ImGui::PushStyleColor(ImGuiCol_Button, heroColor);
                 }
 
                 ImGui::PushID(i);
@@ -204,9 +221,9 @@ void HeroSelectState::render(GameStateMachine& sm, float /*alpha*/) {
                 }
 
                 // Label beneath card
-                float labelW = ImGui::CalcTextSize(names[i]).x;
+                float labelW = ImGui::CalcTextSize(heroName).x;
                 ImGui::SetCursorPos(ImVec2(x + (cardW - labelW) * 0.5f, y + cardH + 4.0f));
-                ImGui::Text("%s", names[i]);
+                ImGui::Text("%s", heroName);
             }
 
             // Lock In button
@@ -215,7 +232,13 @@ void HeroSelectState::render(GameStateMachine& sm, float /*alpha*/) {
             bool canLock = (m_selectedHero >= 0);
             if (!canLock) ImGui::BeginDisabled();
             if (ImGui::Button("LOCK IN", lockSize)) {
-                spdlog::info("Hero locked: {}", names[m_selectedHero]);
+                if (useRegistry && m_selectedHero < static_cast<int>(registry.count())) {
+                    const auto& heroId = registry.all()[m_selectedHero].heroId;
+                    sm.setSelectedHeroId(heroId);
+                    spdlog::info("Hero locked: {} ({})", registry.all()[m_selectedHero].name, heroId);
+                } else {
+                    spdlog::info("Hero locked: {}", fallbackNames[m_selectedHero]);
+                }
                 sm.transition(GameStateType::LOADING);
             }
             if (!canLock) ImGui::EndDisabled();
@@ -245,6 +268,7 @@ void LoadingState::enter(GameStateMachine& sm) {
     m_sceneBuilt = false;
     m_timer = 0.0f;
 
+    sm.renderer().setSelectedHeroId(sm.selectedHeroId());
     sm.renderer().buildScene();
     m_sceneBuilt = true;
 }

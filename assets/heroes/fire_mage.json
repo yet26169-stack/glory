@@ -1,0 +1,31 @@
+{
+    "heroId": "fire_mage",
+    "name": "Pyra",
+    "modelPath": "models/scientist/scientist.glb",
+    "baseHP": 520,
+    "baseMP": 600,
+    "baseMoveSpeed": 7.5,
+    "baseAttackDamage": 52,
+    "baseAttackRange": 15.0,
+    "baseAttackSpeed": 0.8,
+    "baseArmor": 24,
+    "baseMagicResist": 34,
+    "baseAbilityPower": 40,
+    "hpPerLevel": 76,
+    "mpPerLevel": 55,
+    "damagePerLevel": 2.5,
+    "armorPerLevel": 3.0,
+    "magicResistPerLevel": 1.5,
+    "abilityPowerPerLevel": 6.0,
+    "isRanged": true,
+    "projectileSpeed": 30.0,
+    "projectileVfx": "vfx_fireball_projectile",
+    "abilities": {
+        "Q": "fire_mage_fireball",
+        "W": "ice_zone",
+        "E": "nature_shield",
+        "R": "storm_strike"
+    },
+    "summoner": "fire_mage_trick",
+    "portraitColor": [0.9, 0.3, 0.1, 1.0]
+}
