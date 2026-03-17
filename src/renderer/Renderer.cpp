@@ -1026,7 +1026,13 @@ void Renderer::simulateStep(float dt) {
                     float animNaturalSpeed = walkClip.strideLength / walkClip.duration;
                     rawTimeScale = (animNaturalSpeed > 0.0f) ? (c.currentSpeed / animNaturalSpeed) : 1.0f;
                 } else if (c.moveSpeed > 0.0f) {
-                    rawTimeScale = c.currentSpeed / c.moveSpeed;
+                    // No strideLength data — estimate: at full moveSpeed the walk
+                    // cycle should take ~0.8s regardless of clip duration.  Scale
+                    // so that timeScale 1.0 maps to a relaxed walk, not a sprint.
+                    constexpr float kDesiredCycleSec = 0.85f;
+                    float clipDur = (walkClip.duration > 0.0f) ? walkClip.duration : 1.0f;
+                    float baseScale = clipDur / kDesiredCycleSec;
+                    rawTimeScale = (c.currentSpeed / c.moveSpeed) * baseScale;
                 }
                 // Smooth toward the raw target; lag constant ~15 Hz keeps the
                 // walk cycle visually continuous across rapid speed changes.
@@ -2307,7 +2313,7 @@ void Renderer::buildScene() {
                     float walked = 0.0f;
                     while (walked < segLen) {
                         glm::vec3 pos = a + dir * (walked + stride * 0.5f);
-                        pos.y = 0.0f;
+                        pos.y = 0.02f;  // slight offset to avoid Z-fighting with grid/decals
 
                         auto tile = m_scene.createEntity(
                             laneName + "_tile_" + std::to_string(tileCount));

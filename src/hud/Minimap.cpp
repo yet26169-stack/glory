@@ -52,7 +52,7 @@ void Minimap::update(MinimapUpdateContext& ctx) {
     // Process input first (may consume clicks)
     handleInput(ctx);
 
-    ImDrawList* dl = ImGui::GetBackgroundDrawList();
+    ImDrawList* dl = ImGui::GetForegroundDrawList();
 
     // Clip all drawing to minimap bounds
     dl->PushClipRect(ImVec2(m_origin.x, m_origin.y),
