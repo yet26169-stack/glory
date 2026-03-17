@@ -193,6 +193,7 @@ Renderer::Renderer(Window& window) : m_window(window) {
     m_projectileSystem = std::make_unique<ProjectileSystem>();
     m_combatSystem  = std::make_unique<CombatSystem>(*m_combatVfxQueue);
     m_economySystem = std::make_unique<EconomySystem>();
+    m_structureSystem = std::make_unique<StructureSystem>();
 
     // Wire economy system into combat and projectile systems
     m_combatSystem->setEconomySystem(m_economySystem.get());
@@ -478,6 +479,7 @@ void Renderer::simulateStep(float dt) {
             .projectiles    = m_projectileSystem.get(),
             .combat         = m_combatSystem.get(),
             .economy        = m_economySystem.get(),
+            .structures     = m_structureSystem.get(),
             .gpuCollision   = &m_gpuCollision,
             .vfxRenderer    = m_vfxRenderer.get(),
             .vfxQueue       = m_vfxQueue.get(),
@@ -1763,6 +1765,24 @@ void Renderer::buildScene() {
         m_pathfinding.init(emptyNav);
         m_pathfinding.initFlowFields(m_mapData);
         spdlog::info("[Renderer] Flow fields ready for {} lanes x 2 teams", 3);
+    }
+
+    // ── Spawn MOBA structures (towers, inhibitors, nexus) ────────────────
+    {
+        m_structureSystem->setVictoryCallback([this](uint8_t winningTeam) {
+            spdlog::info("[Renderer] Victory callback: team {} wins!", winningTeam);
+            if (m_onVictory) m_onVictory(winningTeam);
+        });
+        auto result = m_structureSystem->spawnStructures(m_scene.getRegistry(), m_mapData);
+        int totalTowers = 0, totalInhibitors = 0;
+        for (int t = 0; t < 2; ++t) {
+            totalInhibitors += static_cast<int>(result.inhibitors[t].size());
+            for (auto& lane : result.laneTowers[t])
+                for (auto e : lane) if (e != entt::null) totalTowers++;
+            totalTowers += static_cast<int>(result.nexusTowers[t].size());
+        }
+        spdlog::info("[Renderer] Structures spawned: {} towers, {} inhibitors, 2 nexus",
+                     totalTowers, totalInhibitors);
     }
 
     // Default textures

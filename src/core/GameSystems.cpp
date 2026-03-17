@@ -4,6 +4,7 @@
 #include "ability/ProjectileSystem.h"
 #include "combat/CombatSystem.h"
 #include "combat/EconomySystem.h"
+#include "combat/StructureSystem.h"
 #include "physics/PhysicsSystem.h"
 #include "vfx/VFXRenderer.h"
 #include "vfx/VFXEventQueue.h"
@@ -118,6 +119,13 @@ void AnimationUpdateSystem::execute(entt::registry& registry, float dt) {
 void EconomyUpdateSystem::execute(entt::registry& registry, float dt) {
     if (m_econ && m_gameTime)
         m_econ->update(registry, *m_gameTime, dt);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// StructureUpdateSystem
+// ═══════════════════════════════════════════════════════════════════════════════
+void StructureUpdateSystem::execute(entt::registry& registry, float dt) {
+    if (m_structures) m_structures->update(registry, dt);
 }
 
 } // namespace glory

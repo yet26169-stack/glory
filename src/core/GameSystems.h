@@ -27,6 +27,7 @@ class ExplosionRenderer;
 class ConeAbilityRenderer;
 class SpriteEffectRenderer;
 class EconomySystem;
+class StructureSystem;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // VFXFlushSystem — flushes VFX event queues and updates VFX subsystems
@@ -230,6 +231,25 @@ public:
 private:
     EconomySystem* m_econ;
     float*         m_gameTime;
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// StructureUpdateSystem — tower AI, inhibitor respawn, nexus death
+// Depends on CombatUpdateSystem (needs fresh HP after combat tick).
+// ═══════════════════════════════════════════════════════════════════════════════
+class StructureUpdateSystem : public ISystem {
+public:
+    explicit StructureUpdateSystem(StructureSystem* structures)
+        : m_structures(structures) {}
+
+    void execute(entt::registry& registry, float dt) override;
+    std::vector<std::type_index> dependsOn() const override {
+        return { std::type_index(typeid(CombatUpdateSystem)) };
+    }
+    std::string_view name() const override { return "StructureUpdate"; }
+
+private:
+    StructureSystem* m_structures;
 };
 
 } // namespace glory

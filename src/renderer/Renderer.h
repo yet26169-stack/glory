@@ -59,6 +59,7 @@
 #include "combat/CombatSystem.h"
 #include "combat/EconomySystem.h"
 #include "combat/EconomySystem.h"
+#include "combat/StructureSystem.h"
 #include "combat/HeroRegistry.h"
 #include "combat/GpuCollisionSystem.h"
 #include "core/SimulationLoop.h"
@@ -101,6 +102,8 @@ public:
     void setMenuMode(bool menu) { m_menuMode = menu; }
     bool isMenuMode() const { return m_menuMode; }
     void setMenuRenderer(std::function<void()> fn) { m_menuRenderer = std::move(fn); }
+
+    void setVictoryCallback(std::function<void(uint8_t)> cb) { m_onVictory = std::move(cb); }
 
     void buildScene();
 
@@ -198,6 +201,8 @@ private:
     std::unique_ptr<ProjectileSystem> m_projectileSystem; // moves projectile entities
     std::unique_ptr<CombatSystem>  m_combatSystem;    // auto-attack / shield / trick
     std::unique_ptr<EconomySystem> m_economySystem;   // gold, xp, leveling
+    std::unique_ptr<StructureSystem> m_structureSystem; // towers, inhibitors, nexus
+    std::function<void(uint8_t)> m_onVictory;           // nexus death callback
     GpuCollisionSystem             m_gpuCollision;    // GPU spatial hash + broadphase
     SimulationLoop                 m_simLoop;         // parallel ECS system scheduler
     GameplaySystem                 m_gameplaySystem;  // extracted gameplay logic

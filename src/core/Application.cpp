@@ -15,6 +15,12 @@ Application::Application(const std::string& name, int width, int height,
 {
     spdlog::info("Application '{}' initialized ({}x{})", name, width, height);
 
+    // Wire nexus-death → post-game victory screen
+    m_renderer.setVictoryCallback([this](uint8_t winningTeam) {
+        m_stateMachine.setVictory(winningTeam == 0); // team 0 = player team
+        m_stateMachine.transition(GameStateType::POST_GAME);
+    });
+
     uint8_t localId = (netCfg.role == NetworkRole::Server) ? 0 : 1;
     m_netLoop.init(netCfg.role, localId, netCfg.playerCount);
 

@@ -18,6 +18,7 @@ class GpuCollisionSystem;
 class ProjectileSystem;
 class CombatSystem;
 class EconomySystem;
+class StructureSystem;
 class VFXRenderer;
 class TrailRenderer;
 class GroundDecalRenderer;
@@ -46,6 +47,7 @@ struct SimulationContext {
     ProjectileSystem*     projectiles     = nullptr;
     CombatSystem*         combat          = nullptr;
     EconomySystem*        economy         = nullptr;
+    StructureSystem*      structures      = nullptr;
     const GpuCollisionSystem* gpuCollision = nullptr;
 
     // VFX subsystems (non-owning references)

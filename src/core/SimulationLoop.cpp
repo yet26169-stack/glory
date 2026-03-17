@@ -4,6 +4,7 @@
 #include "ability/ProjectileSystem.h"
 #include "combat/CombatSystem.h"
 #include "combat/EconomySystem.h"
+#include "combat/StructureSystem.h"
 #include "physics/PhysicsSystem.h"
 #include "vfx/VFXRenderer.h"
 #include "vfx/VFXEventQueue.h"
@@ -45,6 +46,8 @@ void SimulationLoop::init(const SimulationContext& ctx) {
     m_scheduler.add<CombatUpdateSystem>(ctx.combat);
 
     m_scheduler.add<EconomyUpdateSystem>(ctx.economy, ctx.gameTime);
+
+    m_scheduler.add<StructureUpdateSystem>(ctx.structures);
 
     m_scheduler.add<PhysicsUpdateSystem>();
 
