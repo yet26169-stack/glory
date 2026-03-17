@@ -1,6 +1,7 @@
 #include "combat/StructureSystem.h"
 #include "combat/EconomySystem.h"
 #include "combat/HeroDefinition.h"
+#include "fog/FogComponents.h"
 #include "vfx/VFXEventQueue.h"
 #include "core/FixedPoint.h"
 
@@ -280,6 +281,9 @@ StructureSystem::SpawnResult StructureSystem::spawnStructures(
         sc.attackRange = range;
         sc.isDestroyed = false;
         reg.emplace<StructureComponent>(e, sc);
+
+        // FoW vision: towers provide vision around them
+        reg.emplace<VisionComponent>(e, VisionComponent{8.0f});
 
         return e;
     };

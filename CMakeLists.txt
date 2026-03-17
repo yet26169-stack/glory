@@ -267,6 +267,7 @@ set(SOURCES
     src/renderer/RenderGraph.cpp
     src/renderer/passes/PassSetup.cpp
     src/fog/FogSystem.cpp
+    src/fog/FogOfWarGameplay.cpp
     src/renderer/FogOfWarRenderer.cpp
     src/map/MapLoader.cpp
     src/terrain/IsometricCamera.cpp

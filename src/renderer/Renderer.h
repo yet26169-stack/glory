@@ -13,6 +13,7 @@
 #include "renderer/OutlineRenderer.h"
 #include "renderer/WaterRenderer.h"
 #include "fog/FogSystem.h"
+#include "fog/FogOfWarGameplay.h"
 #include "renderer/ShieldBubbleRenderer.h"
 #include "renderer/ConeAbilityRenderer.h"
 #include "renderer/ExplosionRenderer.h"
@@ -140,6 +141,7 @@ private:
     std::unique_ptr<OutlineRenderer>        m_outlineRenderer;
     std::unique_ptr<WaterRenderer>          m_waterRenderer;
     FogSystem                               m_fogSystem;
+    FogOfWarGameplay                        m_fowGameplay;
     std::unique_ptr<ShieldBubbleRenderer>   m_shieldBubble;
     std::unique_ptr<ConeAbilityRenderer>    m_coneEffect;
     std::unique_ptr<ExplosionRenderer>      m_explosionRenderer;
@@ -235,6 +237,7 @@ private:
     bool      m_fogEnabled    = true;    // Fog on/off (toggle from debug UI)
     entt::entity m_playerEntity  = entt::null;
     entt::entity m_hoveredEntity = entt::null;
+    bool         m_prevFKeyDown  = false;  // edge-detect ward placement
 
     std::optional<ClickAnim> m_clickAnim;
 

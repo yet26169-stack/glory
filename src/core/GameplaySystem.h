@@ -43,6 +43,7 @@ struct GameplayInput {
     bool leftClicked = false;  // single-frame left mouse click event
     bool ctrlHeld    = false;  // Ctrl key held (for ability level-up)
     bool escPressed  = false;  // cancel targeting mode
+    bool fKeyPressed = false;  // ward placement
 
     // Camera matrices for screen↔world conversion
     glm::mat4 view{1.0f};

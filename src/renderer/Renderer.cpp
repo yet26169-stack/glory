@@ -537,19 +537,9 @@ void Renderer::simulateStep(float dt) {
         // ── Fog of War vision update ──────────────────────────────────
         if (m_fogOfWar) {
             auto& reg = m_scene.getRegistry();
-            std::vector<VisionEntity> visionEnts;
-            visionEnts.reserve(32);
-
-            // Friendly (PLAYER team) units reveal the map.
-            // The player's champion gets a larger personal sight range.
-            auto view = reg.view<TransformComponent, TeamComponent>();
-            for (auto [ent, tf, team] : view.each()) {
-                if (team.team != Team::PLAYER) continue;
-                float range = (ent == m_playerEntity) ? 18.0f : 10.0f;
-                visionEnts.push_back({ tf.position, range });
-            }
-
-            m_fogSystem.update(visionEnts);
+            // FogOfWarGameplay gathers vision sources, updates FogSystem,
+            // and manages enemy visibility states (fade-in/out/ghost).
+            m_fowGameplay.update(reg, m_fogSystem, dt, Team::PLAYER);
             m_fogOfWar->updateVisibility(
                 m_fogSystem.getVisibilityBuffer().data(), 128, 128);
         }
@@ -647,6 +637,7 @@ void Renderer::simulateStep(float dt) {
         gi.ctrlHeld       = glfwGetKey(m_window.getHandle(), GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS
                          || glfwGetKey(m_window.getHandle(), GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS;
         gi.escPressed     = glfwGetKey(m_window.getHandle(), GLFW_KEY_ESCAPE) == GLFW_PRESS;
+        gi.fKeyPressed    = glfwGetKey(m_window.getHandle(), GLFW_KEY_F) == GLFW_PRESS;
         gi.view           = m_isoCam.getViewMatrix();
         gi.proj           = m_isoCam.getProjectionMatrix(aspect);
         gi.screenW        = static_cast<float>(winW);
@@ -663,6 +654,16 @@ void Renderer::simulateStep(float dt) {
             if (!isDead)
                 m_isoCam.setFollowTarget(*go.cameraFollowTarget);
         }
+
+        // Ward placement (F key, edge-detected)
+        if (gi.fKeyPressed && !m_prevFKeyDown && m_playerEntity != entt::null) {
+            auto& reg = m_scene.getRegistry();
+            if (reg.valid(m_playerEntity) && reg.all_of<TransformComponent>(m_playerEntity)) {
+                glm::vec3 pos = reg.get<TransformComponent>(m_playerEntity).position;
+                m_fowGameplay.placeWard(reg, pos, Team::PLAYER);
+            }
+        }
+        m_prevFKeyDown = gi.fKeyPressed;
     }
 }
 
@@ -1189,6 +1190,10 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
         for (auto&& [e, t, mc, mat] : staticView.each()) {
             if (objectCount >= MAX_INSTANCES) break;
 
+            // FoW: skip enemies not in vision
+            if (!FogOfWarGameplay::shouldRender(m_scene.getRegistry(), e, Team::PLAYER))
+                continue;
+
             glm::mat4 model = t.getInterpolatedModelMatrix(m_renderAlpha);
             glm::vec3 worldPos = glm::vec3(model[3]);
             float dist = glm::length(worldPos - camPos);
@@ -1196,6 +1201,10 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
             glm::vec4 tint(1.0f);
             if (e == m_hoveredEntity) tint = glm::vec4(1.0f, 0.4f, 0.4f, 1.0f);
             else if (auto* tc = m_scene.getRegistry().try_get<TintComponent>(e)) tint = tc->color;
+
+            // FoW fade: modulate alpha for enemies fading in/out
+            float fowAlpha = FogOfWarGameplay::getRenderAlpha(m_scene.getRegistry(), e);
+            tint.a *= fowAlpha;
 
             // Beyond impostor distance → render as billboard, skip mesh
             if (m_lodSystem.shouldBeImpostor(dist)) {
@@ -1255,6 +1264,11 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
             .view<TransformComponent, MaterialComponent, GPUSkinnedMeshComponent>();
         for (auto&& [e, t, mat, ssm] : skinnedView.each()) {
             if (instanceIndex >= MAX_INSTANCES) break;
+
+            // FoW: skip enemies not in vision
+            if (!FogOfWarGameplay::shouldRender(m_scene.getRegistry(), e, Team::PLAYER))
+                continue;
+
             glm::mat4 model = t.getInterpolatedModelMatrix(m_renderAlpha);
             instances[instanceIndex].model        = model;
             instances[instanceIndex].normalMatrix = glm::transpose(glm::inverse(model));
@@ -1265,6 +1279,11 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
             } else if (auto* tc = m_scene.getRegistry().try_get<TintComponent>(e)) {
                 tint = tc->color;
             }
+
+            // FoW fade: modulate alpha for enemies fading in/out
+            float fowAlpha = FogOfWarGameplay::getRenderAlpha(m_scene.getRegistry(), e);
+            tint.a *= fowAlpha;
+
             instances[instanceIndex].tint = tint;
             instances[instanceIndex].params = glm::vec4(mat.shininess, mat.metallic, mat.roughness, mat.emissive);
             instances[instanceIndex].texIndices = glm::vec4(
@@ -2189,6 +2208,11 @@ void Renderer::buildScene() {
     // Respawn: hero can die and respawn
     m_scene.getRegistry().emplace<RespawnComponent>(character, RespawnComponent{
         LifeState::ALIVE, 0.f, 0.f, glm::vec3(0.f), true /*isHero*/
+    });
+
+    // FoW vision: hero sight radius
+    m_scene.getRegistry().emplace<VisionComponent>(character, VisionComponent{
+        FogOfWarGameplay::HERO_VISION
     });
     if (m_abilitySystem) {
         std::array<std::string, 4> abilityIds;

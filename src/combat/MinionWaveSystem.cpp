@@ -2,6 +2,7 @@
 #include "combat/CombatComponents.h"
 #include "combat/EconomySystem.h"
 #include "combat/RespawnSystem.h"
+#include "fog/FogComponents.h"
 #include "ability/AbilityComponents.h"
 #include "nav/PathfindingSystem.h"
 #include "scene/Scene.h"
@@ -201,6 +202,9 @@ entt::entity MinionWaveSystem::spawnMinion(entt::registry& reg,
     reg.emplace<RespawnComponent>(e, RespawnComponent{
         LifeState::ALIVE, 0.f, 0.f, glm::vec3(0.f), false /*isHero=false*/
     });
+
+    // FoW vision: minions have small sight radius
+    reg.emplace<VisionComponent>(e, VisionComponent{6.0f});
 
     // Mesh + material + animation (from shared spawn config)
     reg.emplace<GPUSkinnedMeshComponent>(e, GPUSkinnedMeshComponent{m_spawnCfg.meshIndex});

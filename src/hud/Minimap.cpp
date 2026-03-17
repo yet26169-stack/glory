@@ -1,6 +1,7 @@
 #include "hud/Minimap.h"
 #include "scene/Components.h"
 #include "combat/CombatComponents.h"
+#include "fog/FogOfWarGameplay.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <algorithm>
@@ -151,6 +152,11 @@ void Minimap::drawEntities(ImDrawList* dl, const entt::registry& reg,
                            entt::entity player, float /*gameTime*/) const {
     auto view = reg.view<const TransformComponent, const TeamComponent>();
     for (auto [entity, transform, team] : view.each()) {
+        // FoW: skip enemies not visible to the player's team
+        if (team.team == Team::ENEMY &&
+            !FogOfWarGameplay::isVisibleOnMinimap(reg, entity, Team::PLAYER))
+            continue;
+
         glm::vec2 pos = worldToMinimap(transform.position);
         ImVec2 imPos(pos.x, pos.y);
 
