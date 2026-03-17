@@ -133,12 +133,20 @@ Renderer::Renderer(Window& window) : m_window(window) {
     // Sprite-atlas-based VFX renderer
     m_spriteEffectRenderer = std::make_unique<SpriteEffectRenderer>();
     m_spriteEffectRenderer->init(*m_device, m_hdrFB->mainFormats());
-    m_spriteEffectConeW = m_spriteEffectRenderer->registerEffect(
-        "cone_w", std::string(ASSET_DIR) + "textures/cone_w_atlas.png",
-        8, 56, 3.5f, true);
-    m_spriteEffectExplosionE = m_spriteEffectRenderer->registerEffect(
-        "explosion_e", std::string(ASSET_DIR) + "textures/explosion_e_atlas.png",
-        8, 56, 4.2f, true);
+    try {
+        m_spriteEffectConeW = m_spriteEffectRenderer->registerEffect(
+            "cone_w", std::string(ASSET_DIR) + "textures/cone_w_atlas.png",
+            8, 56, 3.5f, true);
+    } catch (const std::exception& e) {
+        spdlog::warn("Sprite atlas cone_w not found: {} — effect disabled", e.what());
+    }
+    try {
+        m_spriteEffectExplosionE = m_spriteEffectRenderer->registerEffect(
+            "explosion_e", std::string(ASSET_DIR) + "textures/explosion_e_atlas.png",
+            8, 56, 4.2f, true);
+    } catch (const std::exception& e) {
+        spdlog::warn("Sprite atlas explosion_e not found: {} — effect disabled", e.what());
+    }
 
     m_debugRenderer.init(*m_device, m_hdrFB->mainFormats());
 

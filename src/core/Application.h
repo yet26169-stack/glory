@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/FramePacer.h"
+#include "core/GameConfig.h"
 #include "core/GameState.h"
 #include "window/Window.h"
 #include "renderer/Renderer.h"
@@ -19,8 +20,9 @@ struct NetworkConfig {
 
 class Application {
 public:
-    Application(const std::string& name, int width, int height,
-                const NetworkConfig& netCfg = {});
+    Application(const std::string& name,
+                const NetworkConfig& netCfg,
+                const GameConfig& gameConfig);
     ~Application();
 
     void run();
@@ -41,6 +43,7 @@ private:
     Renderer        m_renderer;
     FramePacer      m_pacer{60}; // default 60 fps cap
     NetworkConfig   m_netConfig;
+    GameConfig      m_gameConfig;
     NetworkGameLoop m_netLoop;
     GameStateMachine m_stateMachine;
 };

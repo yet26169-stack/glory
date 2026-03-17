@@ -1,0 +1,27 @@
+{
+    "windowWidth": 1280,
+    "windowHeight": 720,
+    "fullscreen": false,
+    "targetFps": 60,
+    "vsync": true,
+
+    "masterVolume": 1.0,
+    "sfxVolume": 1.0,
+    "musicVolume": 0.7,
+
+    "keybindings": {
+        "abilityQ": 81,
+        "abilityW": 87,
+        "abilityE": 69,
+        "abilityR": 82,
+        "abilityD": 68,
+        "ward": 70,
+        "spawn": 88,
+        "recall": 66
+    },
+
+    "renderQuality": 2,
+    "bloomEnabled": true,
+    "fowEnabled": true,
+    "cameraZoom": 18.0
+}

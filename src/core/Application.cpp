@@ -6,14 +6,20 @@
 
 namespace glory {
 
-Application::Application(const std::string& name, int width, int height,
-                         const NetworkConfig& netCfg)
-    : m_window(width, height, name)
+Application::Application(const std::string& name,
+                         const NetworkConfig& netCfg,
+                         const GameConfig& gameConfig)
+    : m_window(gameConfig.windowWidth, gameConfig.windowHeight, name)
     , m_renderer(m_window)
     , m_netConfig(netCfg)
+    , m_gameConfig(gameConfig)
     , m_stateMachine(m_renderer, m_window)
 {
-    spdlog::info("Application '{}' initialized ({}x{})", name, width, height);
+    spdlog::info("Application '{}' initialized ({}x{}, fps={})",
+                 name, gameConfig.windowWidth, gameConfig.windowHeight,
+                 gameConfig.targetFps);
+
+    m_pacer.setTargetFps(gameConfig.targetFps);
 
     // Wire nexus-death → post-game victory screen
     m_renderer.setVictoryCallback([this](uint8_t winningTeam) {

@@ -12,7 +12,12 @@ struct IndicatorVertex {
 
 ClickIndicatorRenderer::ClickIndicatorRenderer(const Device& device, const RenderFormats& formats)
     : m_device(device) {
-    m_texture = std::make_unique<Texture>(device, std::string(ASSET_DIR) + "textures/click_indicator_atlas.png");
+    try {
+        m_texture = std::make_unique<Texture>(device, std::string(ASSET_DIR) + "textures/click_indicator_atlas.png");
+    } catch (const std::exception& e) {
+        spdlog::warn("Click indicator atlas not found: {} — using checkerboard fallback", e.what());
+        m_texture = std::make_unique<Texture>(Texture::createCheckerboard(device, 4, 8));
+    }
     
     createDescriptorSet();
     createPipeline(formats);
