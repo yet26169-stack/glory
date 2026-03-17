@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "scene/Components.h"
+#include "ability/AbilityTypes.h"
 #include "animation/AnimationClip.h"
 #include "animation/Skeleton.h"
 #include "renderer/Buffer.h"   // Vertex, SkinVertex
@@ -17,6 +18,7 @@ class CombatSystem;
 class GpuCollisionSystem;
 class Scene;
 class DebugRenderer;
+class GroundDecalRenderer;
 
 struct ClickAnim {
     glm::vec3 position{};
@@ -38,6 +40,9 @@ struct GameplayInput {
     bool qPressed = false, wPressed = false, ePressed = false, rPressed = false;
     bool aPressed = false, sPressed = false, dPressed = false;
     bool xKeyDown = false;
+    bool leftClicked = false;  // single-frame left mouse click event
+    bool ctrlHeld    = false;  // Ctrl key held (for ability level-up)
+    bool escPressed  = false;  // cancel targeting mode
 
     // Camera matrices for screen↔world conversion
     glm::mat4 view{1.0f};
@@ -68,6 +73,7 @@ public:
     void init(Scene& scene, AbilitySystem* abilities, CombatSystem* combat,
               GpuCollisionSystem* gpuCollision, DebugRenderer* debugRenderer);
 
+    void setGroundDecals(GroundDecalRenderer* decals) { m_groundDecals = decals; }
     void setPlayerEntity(entt::entity e) { m_playerEntity = e; }
     entt::entity getPlayerEntity() const { return m_playerEntity; }
 
@@ -82,6 +88,7 @@ private:
 
     void processRightClick(float dt, const GameplayInput& input, GameplayOutput& output);
     void processAbilityKeys(const GameplayInput& input);
+    void processTargetingMode(const GameplayInput& input);
     void processCombatKeys(const GameplayInput& input);
     void processSpawning(float dt, const GameplayInput& input);
     void processSelection(const GameplayInput& input, GameplayOutput& output);
@@ -99,6 +106,13 @@ private:
     SelectionState    m_selection;
     float             m_spawnTimer = 0.0f;
     MinionSpawnConfig m_spawnConfig;
+
+    // ── Targeting mode ──────────────────────────────────────────────────
+    GroundDecalRenderer* m_groundDecals = nullptr;
+    bool        m_inTargetingMode = false;
+    AbilitySlot m_targetingSlot   = AbilitySlot::Q;
+    uint32_t    m_targetingDecalHandle = 0;  // ground decal for indicator
+    uint32_t    m_rangeDecalHandle     = 0;  // range ring indicator
 };
 
 } // namespace glory

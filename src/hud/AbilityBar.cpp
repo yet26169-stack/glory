@@ -31,8 +31,17 @@ void AbilityBar::render(const entt::registry& reg, entt::entity player,
     float startX = (screenW - totalW) * 0.5f;
     float startY = screenH - m_config.bottomMargin - m_config.iconSize;
 
+    // Skill point availability
+    int heroLevel = 1;
+    if (reg.all_of<EconomyComponent>(player))
+        heroLevel = reg.get<EconomyComponent>(player).level;
+    int spentPoints = 0;
+    for (const auto& a : book.abilities) spentPoints += a.level;
+    bool hasSkillPoints = (spentPoints < heroLevel);
+
     for (int i = 0; i < 4; ++i) {
         const auto& inst = book.abilities[i]; // Q=0, W=1, E=2, R=3
+        int maxLvl = (i == 3) ? 3 : 5; // R max 3, others max 5
         float x = startX + i * (m_config.iconSize + m_config.iconSpacing);
         float y = startY;
 
@@ -57,6 +66,28 @@ void AbilityBar::render(const entt::registry& reg, entt::entity player,
 
         dl->AddRectFilled(tl, br, bgCol, 4.0f);
         dl->AddRect(tl, br, m_config.borderColor, 4.0f, 0, 1.5f);
+
+        // Skill-point-available indicator (green glow border)
+        if (hasSkillPoints && inst.def && inst.level < maxLvl) {
+            bool canLevel = true;
+            // R requires hero levels 6/11/16
+            if (i == 3) {
+                int reqLvl = (inst.level == 0) ? 6 : (inst.level == 1) ? 11 : 16;
+                if (heroLevel < reqLvl) canLevel = false;
+            }
+            if (canLevel) {
+                ImU32 glowCol = IM_COL32(50, 255, 100, 180);
+                dl->AddRect(ImVec2(tl.x - 2, tl.y - 2), ImVec2(br.x + 2, br.y + 2),
+                            glowCol, 5.0f, 0, 2.5f);
+                // "Ctrl+KEY" text above icon
+                char ctrlBuf[16];
+                std::snprintf(ctrlBuf, sizeof(ctrlBuf), "Ctrl+%s", SLOT_KEYS[i]);
+                ImVec2 ctrlSize = ImGui::CalcTextSize(ctrlBuf);
+                dl->AddText(ImVec2(x + (m_config.iconSize - ctrlSize.x) * 0.5f,
+                                   y - ctrlSize.y - 2.0f),
+                            glowCol, ctrlBuf);
+            }
+        }
 
         // Cooldown pie overlay
         if (onCD && learned && inst.def) {
@@ -95,12 +126,11 @@ void AbilityBar::render(const entt::registry& reg, entt::entity player,
 
         // Level dots (below icon)
         if (learned) {
-            int maxLevel = 5;
             float dotSpacing = 8.0f;
-            float dotsWidth = maxLevel * dotSpacing;
+            float dotsWidth = maxLvl * dotSpacing;
             float dotStartX = x + (m_config.iconSize - dotsWidth) * 0.5f + dotSpacing * 0.5f;
             float dotY = y + m_config.iconSize + 4.0f;
-            for (int lv = 0; lv < maxLevel; ++lv) {
+            for (int lv = 0; lv < maxLvl; ++lv) {
                 ImU32 dotCol = (lv < inst.level) ? m_config.levelDotOn : m_config.levelDotOff;
                 dl->AddCircleFilled(ImVec2(dotStartX + lv * dotSpacing, dotY), 2.5f, dotCol);
             }

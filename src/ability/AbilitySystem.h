@@ -114,7 +114,8 @@ private:
                                const TargetInfo& target);
     void applyEffectToEntity(entt::registry& reg, entt::entity caster,
                              entt::entity target, const EffectDef& effect,
-                             const AbilityDefinition& def, int level);
+                             const AbilityDefinition& def, int level,
+                             const glm::vec3& abilityDirection = {0,0,1});
 
     // ── VFX helpers ───────────────────────────────────────────────────────
     uint32_t emitVFX(const std::string& effectID,

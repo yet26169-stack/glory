@@ -1,5 +1,6 @@
 #include "ability/AbilitySystem.h"
 #include "audio/GameAudioEvents.h"
+#include "combat/CombatComponents.h"  // TeamComponent
 #include "scene/Components.h"  // TransformComponent
 #include "scripting/ScriptEngine.h"
 #include "vfx/TrailRenderer.h"
@@ -84,7 +85,7 @@ void AbilitySystem::initEntity(entt::registry& registry, entt::entity entity,
         }
         auto& inst = book.abilities[static_cast<size_t>(slots[i])];
         inst.def   = def;
-        inst.level = 1;  // starts at level 1
+        inst.level = 0;  // starts unlearned; level up via Ctrl+Q/W/E/R
         inst.currentPhase = AbilityPhase::READY;
     }
 
@@ -423,14 +424,20 @@ void AbilitySystem::spawnLobProjectile(entt::registry& reg, entt::entity caster,
 void AbilitySystem::resolveInstantEffects(entt::registry& reg, entt::entity caster,
                                            const AbilityDefinition& def,
                                            const TargetInfo& target) {
-    // Apply onSelfEffects to caster
+    int level = 1;
+    if (reg.all_of<AbilityBookComponent>(caster))
+        level = reg.get<AbilityBookComponent>(caster)
+                    .abilities[static_cast<size_t>(def.slot)].level;
+
+    // Apply onSelfEffects to caster (pass direction for DASH/BLINK)
     for (const auto& eff : def.onSelfEffects) {
-        applyEffectToEntity(reg, caster, caster, eff, def,
-                            reg.all_of<AbilityBookComponent>(caster)
-                            ? reg.get<AbilityBookComponent>(caster)
-                                   .abilities[static_cast<size_t>(def.slot)].level
-                            : 1);
+        applyEffectToEntity(reg, caster, caster, eff, def, level, target.direction);
     }
+
+    // Determine caster team for enemy filtering
+    Team casterTeam = Team::NEUTRAL;
+    if (reg.all_of<TeamComponent>(caster))
+        casterTeam = reg.get<TeamComponent>(caster).team;
 
     // For TARGETED: apply to target entity
     if (def.targeting == TargetingType::TARGETED &&
@@ -439,11 +446,40 @@ void AbilitySystem::resolveInstantEffects(entt::registry& reg, entt::entity cast
         for (const auto& eff : def.onHitEffects) {
             applyEffectToEntity(reg, caster,
                                 static_cast<entt::entity>(target.targetEntity),
-                                eff, def, 1);
+                                eff, def, level);
+        }
+        return;
+    }
+
+    // POINT / SELF AoE: collect enemies within areaRadius
+    float radius = def.areaRadius;
+    if (radius <= 0.0f && !def.onHitEffects.empty()) {
+        // For non-AoE instant abilities, treat as single-target at location
+        return;
+    }
+
+    glm::vec3 center = (def.targeting == TargetingType::SELF && reg.all_of<TransformComponent>(caster))
+                        ? reg.get<TransformComponent>(caster).position
+                        : target.targetPosition;
+
+    float r2 = radius * radius;
+    auto view = reg.view<TransformComponent, StatsComponent>();
+    for (auto [entity, tc, stats] : view.each()) {
+        if (entity == caster) continue;
+
+        // Only hit enemies
+        if (reg.all_of<TeamComponent>(entity)) {
+            if (reg.get<TeamComponent>(entity).team == casterTeam) continue;
+        }
+
+        glm::vec3 diff = tc.position - center;
+        diff.y = 0.0f;
+        if (glm::dot(diff, diff) <= r2) {
+            for (const auto& eff : def.onHitEffects) {
+                applyEffectToEntity(reg, caster, entity, eff, def, level);
+            }
         }
     }
-    // POINT / SELF AoE: collect entities in range (simplified: direct hit only)
-    // A full spatial query would be done by the TargetingSystem.
 }
 
 // ── applyEffectToEntity ───────────────────────────────────────────────────────
@@ -451,7 +487,8 @@ void AbilitySystem::applyEffectToEntity(entt::registry& reg, entt::entity caster
                                          entt::entity target,
                                          const EffectDef& effect,
                                          const AbilityDefinition& def,
-                                         int level) {
+                                         int level,
+                                         const glm::vec3& abilityDirection) {
     if (!reg.valid(target)) return;
 
     switch (effect.type) {
@@ -496,6 +533,36 @@ void AbilitySystem::applyEffectToEntity(entt::registry& reg, entt::entity caster
                     emitVFX(effect.applyVFX, pos);
                 }
                 sc.activeEffects.push_back(ase);
+            }
+            break;
+        }
+        case EffectType::DASH: {
+            // Move caster in the ability direction by effect.value units
+            if (reg.all_of<TransformComponent>(caster)) {
+                auto& tc = reg.get<TransformComponent>(caster);
+                glm::vec3 dir = abilityDirection;
+                dir.y = 0.0f;
+                if (glm::dot(dir, dir) > 0.001f)
+                    dir = glm::normalize(dir);
+                tc.position += dir * effect.value;
+            }
+            break;
+        }
+        case EffectType::BLINK: {
+            // Teleport caster to target position
+            if (reg.all_of<TransformComponent>(caster)) {
+                auto& tc = reg.get<TransformComponent>(caster);
+                // Use the target entity position if available, otherwise use ability target position
+                if (target != caster && reg.all_of<TransformComponent>(target)) {
+                    tc.position = reg.get<TransformComponent>(target).position;
+                } else {
+                    // Blink to a point: effect.value units in direction
+                    glm::vec3 dir = abilityDirection;
+                    dir.y = 0.0f;
+                    if (glm::dot(dir, dir) > 0.001f)
+                        dir = glm::normalize(dir);
+                    tc.position += dir * effect.value;
+                }
             }
             break;
         }

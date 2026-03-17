@@ -80,6 +80,31 @@ Renderer::Renderer(Window& window) : m_window(window) {
     circleDecal.duration = 2.0f;
     m_groundDecalRenderer->registerDecal(circleDecal);
 
+    // Targeting indicator decals — long duration, destroyed manually
+    GroundDecalRenderer::DecalDef skillshotDecal;
+    skillshotDecal.id = "ability_skillshot";
+    skillshotDecal.color = {0.3f, 0.6f, 1.0f, 0.4f};
+    skillshotDecal.duration = 60.0f;
+    skillshotDecal.fadeInTime = 0.0f;
+    skillshotDecal.fadeOutTime = 0.0f;
+    m_groundDecalRenderer->registerDecal(skillshotDecal);
+
+    GroundDecalRenderer::DecalDef aoeDecal;
+    aoeDecal.id = "ability_aoe";
+    aoeDecal.color = {1.0f, 0.3f, 0.3f, 0.35f};
+    aoeDecal.duration = 60.0f;
+    aoeDecal.fadeInTime = 0.0f;
+    aoeDecal.fadeOutTime = 0.0f;
+    m_groundDecalRenderer->registerDecal(aoeDecal);
+
+    GroundDecalRenderer::DecalDef rangeDecal;
+    rangeDecal.id = "ability_range";
+    rangeDecal.color = {1.0f, 1.0f, 1.0f, 0.15f};
+    rangeDecal.duration = 60.0f;
+    rangeDecal.fadeInTime = 0.0f;
+    rangeDecal.fadeOutTime = 0.0f;
+    m_groundDecalRenderer->registerDecal(rangeDecal);
+
     m_distortionRenderer = std::make_unique<DistortionRenderer>(
         *m_device, m_hdrFB->loadFormats(), m_hdrFB->colorCopyView(), m_hdrFB->sampler());
     // Register basic ripple distortion
@@ -615,6 +640,10 @@ void Renderer::simulateStep(float dt) {
         gi.sPressed       = m_input->wasSPressed();
         gi.dPressed       = m_input->wasDPressed();
         gi.xKeyDown       = glfwGetKey(m_window.getHandle(), GLFW_KEY_X) == GLFW_PRESS;
+        gi.leftClicked    = m_input->wasLeftClicked();
+        gi.ctrlHeld       = glfwGetKey(m_window.getHandle(), GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS
+                         || glfwGetKey(m_window.getHandle(), GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS;
+        gi.escPressed     = glfwGetKey(m_window.getHandle(), GLFW_KEY_ESCAPE) == GLFW_PRESS;
         gi.view           = m_isoCam.getViewMatrix();
         gi.proj           = m_isoCam.getProjectionMatrix(aspect);
         gi.screenW        = static_cast<float>(winW);
@@ -2169,6 +2198,7 @@ void Renderer::buildScene() {
     m_playerEntity = character;
     m_gameplaySystem.init(m_scene, m_abilitySystem.get(), m_combatSystem.get(),
                           &m_gpuCollision, &m_debugRenderer);
+    m_gameplaySystem.setGroundDecals(m_groundDecalRenderer.get());
     m_gameplaySystem.setPlayerEntity(m_playerEntity);
     m_isoCam.setFollowTarget(glm::vec3(100.0f, 0.0f, 100.0f));
 

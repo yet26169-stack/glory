@@ -7,6 +7,7 @@
 #include "combat/GpuCollisionSystem.h"
 #include "ability/AbilitySystem.h"
 #include "ability/AbilityComponents.h"
+#include "renderer/GroundDecalRenderer.h"
 #include "nav/DebugRenderer.h"
 
 #include <glm/glm.hpp>
@@ -32,6 +33,7 @@ void GameplaySystem::init(Scene& scene, AbilitySystem* abilities, CombatSystem* 
 
 void GameplaySystem::update(float dt, const GameplayInput& input, GameplayOutput& output) {
     processRightClick(dt, input, output);
+    processTargetingMode(input);
     processAbilityKeys(input);
     processCombatKeys(input);
     processSpawning(dt, input);
@@ -105,45 +107,222 @@ void GameplaySystem::processRightClick(float /*dt*/, const GameplayInput& input,
     }
 }
 
+// ── Targeting mode: visual indicators while aiming ──────────────────────────
+
+void GameplaySystem::processTargetingMode(const GameplayInput& input) {
+    if (!m_inTargetingMode) return;
+    if (!m_abilitySystem || m_playerEntity == entt::null) {
+        m_inTargetingMode = false;
+        return;
+    }
+
+    auto& reg = m_scene->getRegistry();
+    if (!reg.all_of<AbilityBookComponent>(m_playerEntity)) {
+        m_inTargetingMode = false;
+        return;
+    }
+
+    const auto& book = reg.get<AbilityBookComponent>(m_playerEntity);
+    const auto& inst = book.abilities[static_cast<size_t>(m_targetingSlot)];
+    if (!inst.def || inst.level == 0) {
+        m_inTargetingMode = false;
+        return;
+    }
+
+    // Cancel on Esc or right-click
+    if (input.escPressed || input.rightClicked) {
+        if (m_groundDecals && m_targetingDecalHandle)
+            m_groundDecals->destroy(m_targetingDecalHandle);
+        if (m_groundDecals && m_rangeDecalHandle)
+            m_groundDecals->destroy(m_rangeDecalHandle);
+        m_targetingDecalHandle = 0;
+        m_rangeDecalHandle = 0;
+        m_inTargetingMode = false;
+        return;
+    }
+
+    glm::vec3 worldPos = screenToWorld(input.mousePos.x, input.mousePos.y, input);
+    glm::vec3 playerPos{0.f};
+    if (reg.all_of<TransformComponent>(m_playerEntity))
+        playerPos = reg.get<TransformComponent>(m_playerEntity).position;
+
+    // Update indicator position each frame
+    if (m_groundDecals) {
+        const auto& def = *inst.def;
+
+        // Range ring centered on player
+        if (m_rangeDecalHandle != 0)
+            m_groundDecals->destroy(m_rangeDecalHandle);
+        m_rangeDecalHandle = m_groundDecals->spawn("ability_range",
+            playerPos, def.castRange, 0.0f);
+
+        // Targeting indicator — recreate each tick for position updates
+        if (m_targetingDecalHandle != 0)
+            m_groundDecals->destroy(m_targetingDecalHandle);
+
+        if (def.targeting == TargetingType::SKILLSHOT) {
+            glm::vec3 dir = worldPos - playerPos;
+            dir.y = 0.0f;
+            float len = glm::length(dir);
+            if (len > 0.001f) dir /= len;
+            float halfRange = std::min(len, def.castRange) * 0.5f;
+            glm::vec3 center = playerPos + dir * halfRange;
+            float rot = std::atan2(dir.x, dir.z);
+            m_targetingDecalHandle = m_groundDecals->spawn("ability_skillshot",
+                center, halfRange, rot);
+        } else if (def.targeting == TargetingType::POINT) {
+            float radius = def.areaRadius > 0.0f ? def.areaRadius : 3.0f;
+            m_targetingDecalHandle = m_groundDecals->spawn("ability_aoe",
+                worldPos, radius, 0.0f);
+        } else {
+            m_targetingDecalHandle = 0;
+        }
+    }
+
+    // Confirm on left-click
+    if (input.leftClicked) {
+        if (m_groundDecals && m_targetingDecalHandle)
+            m_groundDecals->destroy(m_targetingDecalHandle);
+        if (m_groundDecals && m_rangeDecalHandle)
+            m_groundDecals->destroy(m_rangeDecalHandle);
+        m_targetingDecalHandle = 0;
+        m_rangeDecalHandle = 0;
+        m_inTargetingMode = false;
+
+        TargetInfo target;
+        target.targetPosition = worldPos;
+        glm::vec3 toMouse = worldPos - playerPos;
+        toMouse.y = 0.0f;
+        target.direction = glm::length(toMouse) > 0.001f
+                           ? glm::normalize(toMouse) : glm::vec3(0, 0, 1);
+        target.type = inst.def->targeting == TargetingType::SKILLSHOT
+                      ? TargetingType::SKILLSHOT
+                      : TargetingType::POINT;
+        if (inst.def->targeting == TargetingType::TARGETED && input.hoveredEntity != entt::null)
+            target.targetEntity = static_cast<EntityID>(
+                entt::to_integral(input.hoveredEntity));
+
+        m_abilitySystem->enqueueRequest(m_playerEntity, m_targetingSlot, target);
+    }
+}
+
 // ── Ability keys: Q / W / E / R / D ─────────────────────────────────────────
 
 void GameplaySystem::processAbilityKeys(const GameplayInput& input) {
     if (!m_abilitySystem || m_playerEntity == entt::null)
         return;
 
-    glm::vec3 worldPos = screenToWorld(input.mousePos.x, input.mousePos.y, input);
-    TargetInfo groundTarget;
-    groundTarget.type           = TargetingType::POINT;
-    groundTarget.targetPosition = worldPos;
-
-    // Compute the fire direction from the player toward the mouse cursor.
-    // Skillshot abilities (Q) read target.direction for their velocity.
     auto& reg = m_scene->getRegistry();
-    if (reg.all_of<TransformComponent>(m_playerEntity)) {
-        const auto& pt = reg.get<TransformComponent>(m_playerEntity);
-        glm::vec3 toMouse = worldPos - pt.position;
-        toMouse.y = 0.0f;
-        groundTarget.direction = glm::length(toMouse) > 0.001f
-                                  ? glm::normalize(toMouse)
-                                  : glm::vec3(0.f, 0.f, 1.f);
+    if (!reg.all_of<AbilityBookComponent>(m_playerEntity))
+        return;
+
+    auto& book = reg.get<AbilityBookComponent>(m_playerEntity);
+
+    // Ctrl+Q/W/E/R → level up ability
+    if (input.ctrlHeld) {
+        auto tryLevelUp = [&](bool pressed, AbilitySlot slot) {
+            if (!pressed) return;
+            auto& inst = book.abilities[static_cast<size_t>(slot)];
+            if (!inst.def) return;
+
+            // Max 5 for basic, 3 for R
+            int maxLevel = (slot == AbilitySlot::R) ? 3 : 5;
+            if (inst.level >= maxLevel) return;
+
+            // R requires hero levels 6/11/16
+            if (slot == AbilitySlot::R) {
+                auto* eco = reg.try_get<EconomyComponent>(m_playerEntity);
+                int heroLevel = eco ? eco->level : 1;
+                int reqLevel = (inst.level == 0) ? 6 : (inst.level == 1) ? 11 : 16;
+                if (heroLevel < reqLevel) return;
+            }
+
+            // Check skill points: 1 point per hero level, spent = sum of ability levels
+            auto* eco = reg.try_get<EconomyComponent>(m_playerEntity);
+            int heroLevel = eco ? eco->level : 1;
+            int spentPoints = 0;
+            for (const auto& a : book.abilities) spentPoints += a.level;
+            if (spentPoints >= heroLevel) return;
+
+            m_abilitySystem->setAbilityLevel(reg, m_playerEntity, slot, inst.level + 1);
+            spdlog::info("Ability {} leveled up to {}", static_cast<int>(slot), inst.level + 1);
+        };
+        tryLevelUp(input.qPressed, AbilitySlot::Q);
+        tryLevelUp(input.wPressed, AbilitySlot::W);
+        tryLevelUp(input.ePressed, AbilitySlot::E);
+        tryLevelUp(input.rPressed, AbilitySlot::R);
+        return; // don't also cast
     }
 
-    auto tryAbility = [&](bool pressed, AbilitySlot slot) {
+    // If already in targeting mode, pressing same key cancels, different key switches
+    auto enterTargeting = [&](bool pressed, AbilitySlot slot) {
         if (!pressed) return;
-        m_abilitySystem->enqueueRequest(m_playerEntity, slot, groundTarget);
+        const auto& inst = book.abilities[static_cast<size_t>(slot)];
+        if (!inst.def || inst.level == 0) return;
+        if (!inst.isReady()) return;
+
+        // SELF abilities fire immediately (no targeting needed)
+        if (inst.def->targeting == TargetingType::SELF ||
+            inst.def->targeting == TargetingType::NONE) {
+            glm::vec3 worldPos = screenToWorld(input.mousePos.x, input.mousePos.y, input);
+            TargetInfo target;
+            target.type = inst.def->targeting;
+            target.targetPosition = worldPos;
+            if (reg.all_of<TransformComponent>(m_playerEntity)) {
+                const auto& pt = reg.get<TransformComponent>(m_playerEntity);
+                glm::vec3 toMouse = worldPos - pt.position;
+                toMouse.y = 0.0f;
+                target.direction = glm::length(toMouse) > 0.001f
+                                   ? glm::normalize(toMouse) : glm::vec3(0, 0, 1);
+            }
+            m_abilitySystem->enqueueRequest(m_playerEntity, slot, target);
+            return;
+        }
+
+        // Toggle same slot off
+        if (m_inTargetingMode && m_targetingSlot == slot) {
+            if (m_groundDecals && m_targetingDecalHandle)
+                m_groundDecals->destroy(m_targetingDecalHandle);
+            if (m_groundDecals && m_rangeDecalHandle)
+                m_groundDecals->destroy(m_rangeDecalHandle);
+            m_targetingDecalHandle = 0;
+            m_rangeDecalHandle = 0;
+            m_inTargetingMode = false;
+            return;
+        }
+
+        // Clean up previous targeting decals if switching slot
+        if (m_inTargetingMode && m_groundDecals) {
+            if (m_targetingDecalHandle) m_groundDecals->destroy(m_targetingDecalHandle);
+            if (m_rangeDecalHandle) m_groundDecals->destroy(m_rangeDecalHandle);
+            m_targetingDecalHandle = 0;
+            m_rangeDecalHandle = 0;
+        }
+
+        m_inTargetingMode = true;
+        m_targetingSlot = slot;
     };
-    tryAbility(input.qPressed, AbilitySlot::Q);
-    tryAbility(input.wPressed, AbilitySlot::W);
 
-    // E: nature_shield — self-buff (SELF targeting; no cone visual)
-    if (input.ePressed) {
-        m_abilitySystem->enqueueRequest(m_playerEntity, AbilitySlot::E, groundTarget);
+    enterTargeting(input.qPressed, AbilitySlot::Q);
+    enterTargeting(input.wPressed, AbilitySlot::W);
+    enterTargeting(input.ePressed, AbilitySlot::E);
+    enterTargeting(input.rPressed, AbilitySlot::R);
+
+    // D — summoner fires immediately
+    if (input.dPressed) {
+        glm::vec3 worldPos = screenToWorld(input.mousePos.x, input.mousePos.y, input);
+        TargetInfo groundTarget;
+        groundTarget.type           = TargetingType::POINT;
+        groundTarget.targetPosition = worldPos;
+        if (reg.all_of<TransformComponent>(m_playerEntity)) {
+            const auto& pt = reg.get<TransformComponent>(m_playerEntity);
+            glm::vec3 toMouse = worldPos - pt.position;
+            toMouse.y = 0.0f;
+            groundTarget.direction = glm::length(toMouse) > 0.001f
+                                     ? glm::normalize(toMouse) : glm::vec3(0, 0, 1);
+        }
+        m_abilitySystem->enqueueRequest(m_playerEntity, AbilitySlot::SUMMONER, groundTarget);
     }
-
-    tryAbility(input.rPressed, AbilitySlot::R);
-
-    // D — purple trick skillshot (uses SUMMONER slot in AbilityBook)
-    tryAbility(input.dPressed, AbilitySlot::SUMMONER);
 }
 
 // ── Combat keys: A (auto-attack), S (shield) ────────────────────────────────
