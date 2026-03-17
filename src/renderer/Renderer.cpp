@@ -1370,10 +1370,10 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
         light.ambientStrength = 0.5f;
         light.lights[0].position = glm::vec3(100.0f, 60.0f, 100.0f);
         light.lights[0].color    = glm::vec3(1.0f, 0.95f, 0.85f);
-        light.fogDensity = m_fogEnabled ? 0.03f : 0.0f;
+        light.fogDensity = m_fogEnabled ? 0.008f : 0.0f;  // subtle — FoW is the primary fog
         light.fogColor   = glm::vec3(0.6f, 0.65f, 0.75f);
-        light.fogStart   = 5.0f;
-        light.fogEnd     = 50.0f;
+        light.fogStart   = 30.0f;
+        light.fogEnd     = 80.0f;
         light.appTime    = m_gameTime;
         m_descriptors->updateLightBuffer(m_currentFrame, light);
     }

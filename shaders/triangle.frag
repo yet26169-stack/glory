@@ -314,11 +314,15 @@ void main() {
     // Blend: unexplored → previously seen → fully visible
     result = mix(unexploredColor, mix(prevSeenColor, result, fowMid), fowEdge);
 
-    // Exponential distance fog
+    // Exponential distance fog — only apply in non-visible areas to avoid washing
+    // out the LoL-style clear vision area.  Attenuate fog by FoW visibility so
+    // fully-visible regions get no distance fog, while unexplored areas can still
+    // have atmospheric depth.
     float fogDist   = length(lightData.viewPos - fragWorldPos);
     float fogFactor = exp(-lightData.fogDensity * max(fogDist - lightData.fogStart, 0.0));
     fogFactor = clamp(fogFactor, 0.0, 1.0);
-    result = mix(lightData.fogColor, result, fogFactor);
+    float fogStrength = 1.0 - visibility;  // 0 in clear areas, 1 in unexplored
+    result = mix(result, mix(lightData.fogColor, result, fogFactor), fogStrength);
 
     outColor = vec4(result, 1.0);
     outCharDepth = gl_FragCoord.z;
