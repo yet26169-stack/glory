@@ -228,6 +228,13 @@ entt::entity MinionWaveSystem::spawnMinion(entt::registry& reg,
     reg.emplace<SkeletonComponent>(e, std::move(skelComp));
     reg.emplace<AnimationComponent>(e, std::move(animComp));
 
+    // Re-point raw pointers to registry-owned copies
+    auto& regSkel = reg.get<SkeletonComponent>(e);
+    auto& regAnim = reg.get<AnimationComponent>(e);
+    regAnim.player.setSkeleton(&regSkel.skeleton);
+    if (!regAnim.clips.empty())
+        regAnim.player.setClip(&regAnim.clips[regAnim.activeClipIndex]);
+
     return e;
 }
 

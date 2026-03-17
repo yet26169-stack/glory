@@ -421,6 +421,13 @@ void GameplaySystem::processSpawning(float dt, const GameplayInput& input) {
     reg.emplace<SkeletonComponent>(minion, std::move(skelComp));
     reg.emplace<AnimationComponent>(minion, std::move(animComp));
 
+    // Re-point raw pointers to registry-owned copies
+    auto& regSkel = reg.get<SkeletonComponent>(minion);
+    auto& regAnim = reg.get<AnimationComponent>(minion);
+    regAnim.player.setSkeleton(&regSkel.skeleton);
+    if (!regAnim.clips.empty())
+        regAnim.player.setClip(&regAnim.clips[regAnim.activeClipIndex]);
+
     m_spawnTimer = 0.5f; // Debounce
     spdlog::info("Spawned minion at ({}, {}, {})", worldPos.x, worldPos.y, worldPos.z);
 }

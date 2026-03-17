@@ -2128,6 +2128,14 @@ void Renderer::buildScene() {
 
             m_scene.getRegistry().emplace<SkeletonComponent>(character, std::move(skelComp));
             m_scene.getRegistry().emplace<AnimationComponent>(character, std::move(animComp));
+
+            // Re-point raw pointers to the registry-owned copies (the locals were moved-from)
+            auto& regSkel = m_scene.getRegistry().get<SkeletonComponent>(character);
+            auto& regAnim = m_scene.getRegistry().get<AnimationComponent>(character);
+            regAnim.player.setSkeleton(&regSkel.skeleton);
+            if (!regAnim.clips.empty())
+                regAnim.player.setClip(&regAnim.clips[regAnim.activeClipIndex]);
+
             m_scene.getRegistry().emplace<GPUSkinnedMeshComponent>(character,
                 GPUSkinnedMeshComponent{ ssIdx });
             m_scene.getRegistry().emplace<MaterialComponent>(character,
@@ -2533,6 +2541,13 @@ void Renderer::spawnTestEnemy() {
     }
     reg.emplace<SkeletonComponent>(enemy, std::move(skelComp));
     reg.emplace<AnimationComponent>(enemy, std::move(animComp));
+
+    // Re-point raw pointers to registry-owned copies
+    auto& regSkel = reg.get<SkeletonComponent>(enemy);
+    auto& regAnim = reg.get<AnimationComponent>(enemy);
+    regAnim.player.setSkeleton(&regSkel.skeleton);
+    if (!regAnim.clips.empty())
+        regAnim.player.setClip(&regAnim.clips[regAnim.activeClipIndex]);
 
     spdlog::info("Spawned test dummy at ({:.1f}, {:.1f}, {:.1f})",
                  spawnPos.x, spawnPos.y, spawnPos.z);
