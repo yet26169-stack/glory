@@ -1942,6 +1942,35 @@ void Renderer::buildScene() {
     }
 
     // ── Flat map removed for testing (replaced by lane tiles) ─────────────
+
+    // ── Give structures placeholder cube meshes so they render ──────────
+    {
+        uint32_t cubeMesh = m_scene.addMesh(
+            Model::createCube(*m_device, m_device->getAllocator()));
+        auto& reg = m_scene.getRegistry();
+        auto structView = reg.view<StructureComponent, TransformComponent>();
+        for (auto e : structView) {
+            if (reg.all_of<MeshComponent>(e)) continue;
+            auto& sc = structView.get<StructureComponent>(e);
+            auto& tc = structView.get<TransformComponent>(e);
+
+            float s = 1.0f;
+            switch (sc.type) {
+                case StructureType::TOWER_T1:
+                case StructureType::TOWER_T2:
+                case StructureType::TOWER_T3:
+                case StructureType::TOWER_NEXUS: s = 2.0f;  break;
+                case StructureType::INHIBITOR:   s = 2.5f;  break;
+                case StructureType::NEXUS:       s = 3.5f;  break;
+            }
+            tc.scale = glm::vec3(s, s * 2.0f, s);
+
+            reg.emplace<MeshComponent>(e, MeshComponent{ cubeMesh });
+            reg.emplace<MaterialComponent>(e,
+                MaterialComponent{ defaultTex, flatNorm, 0.0f, 0.0f, 0.9f, 0.0f });
+        }
+        spdlog::info("[Renderer] Structure meshes assigned (cube placeholders)");
+    }
     // uint32_t mapMesh = m_scene.addMesh(
     //     Model::createTerrain(*m_device, m_device->getAllocator(), 200.0f, 64, 0.0f));
     // auto map = m_scene.createEntity("FlatMap");
@@ -2036,19 +2065,19 @@ void Renderer::buildScene() {
             placeLaneTiles({
                 {22,0,22}, {22,0,60}, {22,0,100}, {22,0,140}, {22,0,178},
                 {60,0,178}, {100,0,178}, {140,0,178}, {178,0,178}
-            }, 12.0f, "TopLane", 0.02f);
+            }, 12.0f, "TopLane", 0.05f);
 
             // Mid Lane: diagonal base to base
             placeLaneTiles({
                 {22,0,22}, {40,0,40}, {60,0,60}, {80,0,80}, {100,0,100},
                 {120,0,120}, {140,0,140}, {160,0,160}, {178,0,178}
-            }, 14.0f, "MidLane", 0.06f);
+            }, 14.0f, "MidLane", 0.15f);
 
             // Bot Lane: across the bottom then up the right edge
             placeLaneTiles({
                 {22,0,22}, {60,0,22}, {100,0,22}, {140,0,22}, {178,0,22},
                 {178,0,60}, {178,0,100}, {178,0,140}, {178,0,178}
-            }, 12.0f, "BotLane", 0.04f);
+            }, 12.0f, "BotLane", 0.10f);
         }
     }
 

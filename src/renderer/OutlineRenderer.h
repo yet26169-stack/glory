@@ -23,6 +23,7 @@ namespace glory {
 //   to the outline fringe (not covered by the original silhouette) are drawn.
 class OutlineRenderer {
 public:
+    ~OutlineRenderer() { destroy(); }
     // Push constant layout matching GLSL std430 order:
     //   boneBaseIndex @ offset  0 (4 bytes)
     //   outlineScale  @ offset  4 (4 bytes)

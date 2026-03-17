@@ -69,15 +69,21 @@ void DistortionRenderer::render(VkCommandBuffer cmd, const glm::mat4& viewProj, 
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &m_descSet, 0, nullptr);
 
     for (const auto& inst : m_active) {
-        DistortionPC pc;
-        pc.viewProj = viewProj;
-        pc.center = inst.position;
-        pc.radius = inst.def->radius;
-        pc.strength = inst.def->strength;
-        pc.elapsed = inst.elapsed;
-        pc.screenSize = glm::vec2(static_cast<float>(width), static_cast<float>(height));
+        // mesh_effect.vert reads 128-byte MeshEffectPC; pack DistortionPC fields
+        // into the first 96 bytes and zero-fill the remaining 32 for the vertex
+        // shader's posRot/dir fields.
+        struct {
+            DistortionPC base;
+            char pad[128 - sizeof(DistortionPC)];
+        } pcFull{};
+        pcFull.base.viewProj = viewProj;
+        pcFull.base.center = inst.position;
+        pcFull.base.radius = inst.def->radius;
+        pcFull.base.strength = inst.def->strength;
+        pcFull.base.elapsed = inst.elapsed;
+        pcFull.base.screenSize = glm::vec2(static_cast<float>(width), static_cast<float>(height));
 
-        vkCmdPushConstants(cmd, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(DistortionPC), &pc);
+        vkCmdPushConstants(cmd, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 128, &pcFull);
         m_sphereMesh->draw(cmd);
     }
 }
@@ -134,7 +140,9 @@ void DistortionRenderer::createPipeline() {
 
     VkPushConstantRange pcRange{};
     pcRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-    pcRange.size = sizeof(DistortionPC);
+    // mesh_effect.vert declares 128-byte MeshEffectPC; distortion.frag uses 96-byte
+    // DistortionPC.  Pipeline range must cover the larger of the two.
+    pcRange.size = 128;
 
     VkPipelineLayoutCreateInfo layoutCI{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
     layoutCI.setLayoutCount = 1;
