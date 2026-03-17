@@ -77,7 +77,7 @@ void DistortionRenderer::render(VkCommandBuffer cmd, const glm::mat4& viewProj, 
         pc.elapsed = inst.elapsed;
         pc.screenSize = glm::vec2(static_cast<float>(width), static_cast<float>(height));
 
-        vkCmdPushConstants(cmd, m_pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(DistortionPC), &pc);
+        vkCmdPushConstants(cmd, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(DistortionPC), &pc);
         m_sphereMesh->draw(cmd);
     }
 }
@@ -133,7 +133,7 @@ void DistortionRenderer::createPipeline() {
     VkDevice dev = m_device.getDevice();
 
     VkPushConstantRange pcRange{};
-    pcRange.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    pcRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     pcRange.size = sizeof(DistortionPC);
 
     VkPipelineLayoutCreateInfo layoutCI{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };

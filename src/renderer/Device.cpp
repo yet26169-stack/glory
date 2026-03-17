@@ -3,6 +3,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <cstring>
 #include <map>
 #include <set>
 #include <stdexcept>
@@ -257,6 +258,11 @@ void Device::createLogicalDevice() {
     vk12Features.shaderStorageBufferArrayNonUniformIndexing =
         available12.shaderStorageBufferArrayNonUniformIndexing;
 
+    // Timeline semaphores (required by Sync and AsyncComputeManager)
+    vk12Features.timelineSemaphore = available12.timelineSemaphore;
+    if (!available12.timelineSemaphore)
+        spdlog::warn("Device: timelineSemaphore not supported — timeline sync disabled");
+
     // Vulkan 1.3 features — dynamic rendering, synchronization2, maintenance4
     VkPhysicalDeviceVulkan13Features vk13Features{};
     vk13Features.sType              = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
@@ -266,9 +272,59 @@ void Device::createLogicalDevice() {
     vk13Features.maintenance4       = VK_TRUE;
     vk13Features.shaderDemoteToHelperInvocation = VK_TRUE;
 
+    // Portability subset (MoltenVK) — enable mutableComparisonSamplers for shadow PCF
+    // The VK_KHR_portability_subset types live in vulkan_beta.h; define locally to avoid
+    // pulling in all beta extensions.
+    struct PortabilitySubsetFeaturesKHR {
+        VkStructureType sType;
+        void*           pNext;
+        VkBool32        constantAlphaColorBlendFactors;
+        VkBool32        events;
+        VkBool32        imageViewFormatReinterpretation;
+        VkBool32        imageViewFormatSwizzle;
+        VkBool32        imageView2DOn3DImage;
+        VkBool32        multisampleArrayImage;
+        VkBool32        mutableComparisonSamplers;
+        VkBool32        pointPolygons;
+        VkBool32        samplerMipLodBias;
+        VkBool32        separateStencilMaskRef;
+        VkBool32        shaderSampleRateInterpolationFunctions;
+        VkBool32        tessellationIsolines;
+        VkBool32        tessellationPointMode;
+        VkBool32        triangleFans;
+        VkBool32        vertexAttributeAccessBeyondStride;
+    };
+    constexpr VkStructureType VK_STRUCTURE_TYPE_PORTABILITY_SUBSET_FEATURES =
+        static_cast<VkStructureType>(1000163000);
+
+    PortabilitySubsetFeaturesKHR portabilityFeatures{};
+    portabilityFeatures.sType = VK_STRUCTURE_TYPE_PORTABILITY_SUBSET_FEATURES;
+    bool hasPortability = false;
+    {
+        const auto& exts = getRequiredExtensions();
+        for (auto e : exts) {
+            if (std::strcmp(e, "VK_KHR_portability_subset") == 0) { hasPortability = true; break; }
+        }
+    }
+    if (hasPortability) {
+        // Query available portability features
+        PortabilitySubsetFeaturesKHR availablePort{};
+        availablePort.sType = VK_STRUCTURE_TYPE_PORTABILITY_SUBSET_FEATURES;
+        VkPhysicalDeviceFeatures2 portQuery{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
+        portQuery.pNext = &availablePort;
+        vkGetPhysicalDeviceFeatures2(m_physicalDevice, &portQuery);
+
+        portabilityFeatures.mutableComparisonSamplers = availablePort.mutableComparisonSamplers;
+        if (!availablePort.mutableComparisonSamplers)
+            spdlog::warn("Device: mutableComparisonSamplers not supported — shadow PCF may not work");
+
+        portabilityFeatures.pNext = vk13Features.pNext;
+        vk13Features.pNext = &portabilityFeatures;
+    }
+
     VkDeviceCreateInfo ci{};
     ci.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    ci.pNext                   = &vk13Features;        // 1.3 → 1.2 chain
+    ci.pNext                   = &vk13Features;        // 1.3 → 1.2 → (portability) chain
     ci.queueCreateInfoCount    = static_cast<uint32_t>(queueCIs.size());
     ci.pQueueCreateInfos       = queueCIs.data();
     ci.pEnabledFeatures        = &features;

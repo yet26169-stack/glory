@@ -442,6 +442,8 @@ Renderer::~Renderer() {
     destroyGridPipeline();
     destroySkinnedPipeline();
     m_dummyShadow = Texture{};
+    m_toonRamp    = Texture{};
+    m_impostorSystem.cleanup();
     m_shadowPass.destroy();
     m_descriptors.reset();
     m_bindless.reset();

@@ -569,7 +569,7 @@ void GpuCuller::createDescriptors() {
 
     std::array<VkDescriptorPoolSize, 3> poolSizes{};
     poolSizes[0].type            = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    poolSizes[0].descriptorCount = frameCount * 3; // scene + draw + visibility per frame
+    poolSizes[0].descriptorCount = frameCount * 4; // scene + draw + visibility + LOD per frame
     poolSizes[1].type            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     poolSizes[1].descriptorCount = frameCount;     // HiZ per frame
     poolSizes[2].type            = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
