@@ -253,8 +253,6 @@ Renderer::Renderer(Window& window) : m_window(window) {
     m_isoCam.setBounds(glm::vec3(0, 0, 0), glm::vec3(200, 0, 200));
     m_isoCam.setTarget(glm::vec3(100, 0, 100));
 
-    buildScene();
-
     // ── InputManager — MUST be created before ImGui so ImGui chains on top ──
     m_input = std::make_unique<InputManager>(m_window.getHandle(), m_camera);
     m_input->setCaptureEnabled(false); // MOBA mode: IsometricCamera drives view
@@ -424,7 +422,7 @@ void Renderer::waitIdle() { vkDeviceWaitIdle(m_device->getDevice()); }
 // ── simulateStep ─────────────────────────────────────────────────────────────
 void Renderer::simulateStep(float dt) {
     GLORY_ZONE_N("SimulateStep");
-    if (m_state == AppState::Launcher) return;
+    if (m_menuMode) return;
 
     // Clear debug draws at start of each physics step
     m_debugRenderer.clear();
@@ -630,8 +628,8 @@ void Renderer::renderFrame(float alpha) {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    if (m_state == AppState::Launcher) {
-        drawLauncherUI();
+    if (m_menuMode && m_menuRenderer) {
+        m_menuRenderer();
     }
 
     // ── GPU: wait + acquire swapchain image ─────────────────────────────────
@@ -659,7 +657,7 @@ void Renderer::renderFrame(float alpha) {
     }
 
     // ── Bone SSBO write (safe after fence — GPU done with this frame's SSBO) ──
-    if (m_state != AppState::Launcher) {
+    if (!m_menuMode) {
         auto animView = m_scene.getRegistry()
             .view<SkeletonComponent, AnimationComponent, GPUSkinnedMeshComponent, TransformComponent>();
         uint32_t currentBoneSlot = 0;
@@ -673,7 +671,7 @@ void Renderer::renderFrame(float alpha) {
     }
 
     // ── Debug UI (ImGui) ─────────────────────────────────────────────────
-    if (m_showDebugUI && m_state != AppState::Launcher) {
+    if (m_showDebugUI && !m_menuMode) {
         ImGui::Begin("Debug Tools", &m_showDebugUI);
 
         if (ImGui::Button("Spawn Test Enemy")) {
@@ -712,7 +710,7 @@ void Renderer::renderFrame(float alpha) {
                        static_cast<float>(realDt * 1000.0f));
 
     // ── In-game HUD overlays (health bars, ability bar, floating text, etc.)
-    if (m_state != AppState::Launcher) {
+    if (!m_menuMode) {
         auto ext2 = m_swapchain->getExtent();
         float a2  = static_cast<float>(ext2.width) / static_cast<float>(ext2.height);
         glm::mat4 vp = m_isoCam.getProjectionMatrix(a2) * m_isoCam.getViewMatrix();
@@ -742,7 +740,7 @@ void Renderer::renderFrame(float alpha) {
 
     // ── Async compute: particle simulation + GPU spatial hash ────────────
     uint64_t computeSignal = 0;
-    if (m_state != AppState::Launcher) {
+    if (!m_menuMode) {
         m_asyncCompute.waitForCompute(m_currentFrame); // wait for prev frame's compute
 
         // Upload entity positions for GPU spatial hash
@@ -895,7 +893,7 @@ FrameContext Renderer::buildFrameContext(VkCommandBuffer cmd, uint32_t imageInde
     ctx.wireframe             = m_wireframe;
     ctx.showGrid              = m_showGrid;
     ctx.fogEnabled            = m_fogEnabled;
-    ctx.isLauncher            = (m_state == AppState::Launcher);
+    ctx.isLauncher            = m_menuMode;
 
     return ctx;
 }
@@ -949,7 +947,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
     }
 
     // ── Conditional pass enable/disable ─────────────────────────────────────
-    bool isLauncher = (m_state == AppState::Launcher);
+    bool isLauncher = m_menuMode;
     m_renderGraph.setPassEnabled("FogOfWar",      m_fogEnabled && !isLauncher);
     m_renderGraph.setPassEnabled("VFXAcquire",    !isLauncher);
     m_renderGraph.setPassEnabled("Shadow",        !isLauncher);
@@ -1123,7 +1121,7 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
     uint32_t objectCount   = 0;
     uint32_t instanceIndex = 0;
 
-    if (m_state != AppState::Launcher) {
+    if (!m_menuMode) {
         auto* instances = static_cast<InstanceData*>(m_instanceMapped[m_currentFrame]);
         auto* sceneData = static_cast<GpuObjectData*>(m_sceneMapped[m_currentFrame]);
         VkDescriptorSet ds = m_descriptors->getSet(m_currentFrame);
@@ -1229,7 +1227,7 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
     // ── Phase 2: HDR Scope 1 — parallel geometry draws ──────────────────────
     if (m_gpuTimer) m_gpuTimer->beginZone(cmd, m_currentFrame, "Geometry");
 
-    if (m_state != AppState::Launcher) {
+    if (!m_menuMode) {
         VkDescriptorSet ds = m_descriptors->getSet(m_currentFrame);
         auto* sceneData = static_cast<GpuObjectData*>(m_sceneMapped[m_currentFrame]);
         RenderFormats hdrFormats = m_hdrFB->mainFormats();
@@ -2682,52 +2680,6 @@ void Renderer::destroySkinnedPipeline() {
     VkDevice dev = m_device->getDevice();
     if (m_skinnedPipeline)       { vkDestroyPipeline(dev, m_skinnedPipeline, nullptr);            m_skinnedPipeline       = VK_NULL_HANDLE; }
     if (m_skinnedPipelineLayout) { vkDestroyPipelineLayout(dev, m_skinnedPipelineLayout, nullptr); m_skinnedPipelineLayout = VK_NULL_HANDLE; }
-}
-
-void Renderer::drawLauncherUI() {
-    const ImGuiViewport* viewport = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(viewport->WorkPos);
-    ImGui::SetNextWindowSize(viewport->WorkSize);
-    
-    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings;
-    
-    // Add a dark background
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.1f, 0.1f, 0.12f, 1.0f));
-    
-    if (ImGui::Begin("Launcher", nullptr, window_flags)) {
-        float window_width = ImGui::GetWindowWidth();
-        float window_height = ImGui::GetWindowHeight();
-        
-        // Centered Logo/Title
-        ImGui::SetCursorPosY(window_height * 0.3f);
-        const char* title = "GLORY ENGINE";
-        float title_width = ImGui::CalcTextSize(title).x;
-        ImGui::SetCursorPosX((window_width - title_width) * 0.5f);
-        ImGui::Text("%s", title);
-
-        ImGui::SetCursorPosY(window_height * 0.35f);
-        const char* sub = "Alpha Client";
-        float sub_width = ImGui::CalcTextSize(sub).x;
-        ImGui::SetCursorPosX((window_width - sub_width) * 0.5f);
-        ImGui::TextDisabled("%s", sub);
-
-        // Centered Button
-        ImVec2 btn_size(240, 80);
-        ImGui::SetCursorPos(ImVec2((window_width - btn_size.x) * 0.5f, (window_height - btn_size.y) * 0.5f));
-        
-        if (ImGui::Button("LAUNCH TEST MODE", btn_size)) {
-            m_state = AppState::TestMode;
-            spdlog::info("Transitioning to Test Mode");
-        }
-        
-        // Footer
-        const char* footer = "Press TAB in-game for Debug Tools";
-        float footer_width = ImGui::CalcTextSize(footer).x;
-        ImGui::SetCursorPos(ImVec2((window_width - footer_width) * 0.5f, window_height - 40));
-        ImGui::TextDisabled("%s", footer);
-    }
-    ImGui::End();
-    ImGui::PopStyleColor();
 }
 
 } // namespace glory

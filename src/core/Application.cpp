@@ -11,6 +11,7 @@ Application::Application(const std::string& name, int width, int height,
     : m_window(width, height, name)
     , m_renderer(m_window)
     , m_netConfig(netCfg)
+    , m_stateMachine(m_renderer, m_window)
 {
     spdlog::info("Application '{}' initialized ({}x{})", name, width, height);
 
@@ -36,7 +37,7 @@ void Application::run() {
     double accumulator = 0.0;
     uint32_t simTick = 0;
 
-    while (!m_window.shouldClose()) {
+    while (!m_window.shouldClose() && !m_stateMachine.shouldQuit()) {
         GLORY_ZONE_N("GameLoop");
 
         m_pacer.beginFrame();
@@ -50,17 +51,20 @@ void Application::run() {
         while (accumulator >= fixedDt) {
             GLORY_ZONE_N("PhysicsStep");
 
-            m_netLoop.preSimulation(simTick);
-
-            if (m_netLoop.shouldAdvanceTick()) {
-                m_renderer.simulateStep(static_cast<float>(fixedDt));
-                m_netLoop.postSimulation(simTick, m_renderer.getRegistry());
-                ++simTick;
+            if (m_stateMachine.currentState() == GameStateType::IN_GAME) {
+                m_netLoop.preSimulation(simTick);
+                if (m_netLoop.shouldAdvanceTick()) {
+                    m_stateMachine.update(static_cast<float>(fixedDt));
+                    m_netLoop.postSimulation(simTick, m_renderer.getRegistry());
+                    ++simTick;
+                }
+            } else {
+                m_stateMachine.update(static_cast<float>(fixedDt));
             }
 
             accumulator -= fixedDt;
         }
-        m_renderer.renderFrame(static_cast<float>(accumulator / fixedDt));
+        m_stateMachine.render(static_cast<float>(accumulator / fixedDt));
 
         {
             GLORY_ZONE_N("FramePacerSleep");

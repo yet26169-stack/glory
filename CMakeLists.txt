@@ -218,6 +218,7 @@ set(SOURCES
     src/core/FrameAllocator.cpp
     src/core/PoolAllocator.cpp
     src/core/GameplaySystem.cpp
+    src/core/GameState.cpp
     src/physics/PhysicsSystem.cpp
     src/window/Window.cpp
     src/camera/Camera.cpp

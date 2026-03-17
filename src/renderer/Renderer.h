@@ -72,6 +72,7 @@
 #include "map/MapTypes.h"
 
 #include <glm/glm.hpp>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -93,6 +94,12 @@ public:
     void simulateStep(float dt);
     void renderFrame(float alpha);
     void waitIdle();
+
+    void setMenuMode(bool menu) { m_menuMode = menu; }
+    bool isMenuMode() const { return m_menuMode; }
+    void setMenuRenderer(std::function<void()> fn) { m_menuRenderer = std::move(fn); }
+
+    void buildScene();
 
     entt::registry&       getRegistry()       { return m_scene.getRegistry(); }
     const entt::registry& getRegistry() const { return m_scene.getRegistry(); }
@@ -253,6 +260,10 @@ private:
     // ── Render graph ─────────────────────────────────────────────────────
     RenderGraph m_renderGraph;
 
+    // ── Menu mode state ─────────────────────────────────────────────────
+    bool m_menuMode = true;
+    std::function<void()> m_menuRenderer;
+
     // Per-pass recording methods (called from render graph execute lambdas)
     void recordShadowPass(VkCommandBuffer cmd, const FrameContext& ctx);
     void recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx);
@@ -261,7 +272,6 @@ private:
     FrameContext buildFrameContext(VkCommandBuffer cmd, uint32_t imageIndex);
 
     // ── Helpers ───────────────────────────────────────────────────────────
-    void buildScene();
     void recreateSwapchain();
     void recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, float dt);
     void createInstanceBuffers();
@@ -276,10 +286,7 @@ private:
     void spawnTestEnemy();
     entt::entity pickEntityUnderCursor();
 
-    enum class AppState { Launcher, TestMode };
-    AppState m_state = AppState::Launcher;
 
-    void drawLauncherUI();
 };
 
 } // namespace glory

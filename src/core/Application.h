@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/FramePacer.h"
+#include "core/GameState.h"
 #include "window/Window.h"
 #include "renderer/Renderer.h"
 #include "network/NetworkGameLoop.h"
@@ -39,6 +40,7 @@ private:
     FramePacer      m_pacer{60}; // default 60 fps cap
     NetworkConfig   m_netConfig;
     NetworkGameLoop m_netLoop;
+    GameStateMachine m_stateMachine;
 };
 
 } // namespace glory
