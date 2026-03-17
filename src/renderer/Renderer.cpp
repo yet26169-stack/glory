@@ -1943,10 +1943,50 @@ void Renderer::buildScene() {
 
     // ── Flat map removed for testing (replaced by lane tiles) ─────────────
 
-    // ── Give structures placeholder cube meshes so they render ──────────
+    // ── Load map models from "map models/" ─────────────────────────────
+    struct MapAsset {
+        uint32_t mesh;
+        uint32_t texture;
+    };
+    std::unordered_map<std::string, MapAsset> mapAssets;
+
+    auto loadMapAsset = [&](const std::string& filename) {
+        std::string path = std::string(MODEL_DIR) + "map models/" + filename;
+        try {
+            Model model = Model::loadFromGLB(*m_device, m_device->getAllocator(), path);
+            uint32_t meshIdx = m_scene.addMesh(std::move(model));
+            uint32_t texIdx = defaultTex; // fallback
+
+            auto glbTextures = Model::loadGLBTextures(*m_device, path);
+            if (!glbTextures.empty()) {
+                texIdx = m_scene.addTexture(std::move(glbTextures[0].texture));
+                m_bindless->registerTexture(
+                    m_scene.getTexture(texIdx).getImageView(),
+                    m_scene.getTexture(texIdx).getSampler());
+            }
+            mapAssets[filename] = { meshIdx, texIdx };
+            spdlog::info("Loaded map asset: {} (mesh={}, tex={})", filename, meshIdx, texIdx);
+        } catch (const std::exception& e) {
+            spdlog::warn("Failed to load map asset '{}': {}", filename, e.what());
+        }
+    };
+
+    loadMapAsset("blue_team_tower_1.glb");
+    loadMapAsset("blue_team_tower_2.glb");
+    loadMapAsset("blue_team_tower_3.glb");
+    loadMapAsset("blue_team_inhib.glb");
+    loadMapAsset("blue_team_nexus.glb");
+    loadMapAsset("red_team_tower_1.glb");
+    loadMapAsset("read_team_tower_2.glb");
+    loadMapAsset("red_team_tower3.glb");
+    loadMapAsset("red_team_inhib.glb");
+    loadMapAsset("red_team_nexus.glb");
+    loadMapAsset("arcane+tile+3d+model.glb");
+    loadMapAsset("jungle_tile.glb");
+    loadMapAsset("river_tile.glb");
+
+    // ── Give structures proper meshes from map models ───────────────────
     {
-        uint32_t cubeMesh = m_scene.addMesh(
-            Model::createCube(*m_device, m_device->getAllocator()));
         auto& reg = m_scene.getRegistry();
         auto structView = reg.view<StructureComponent, TransformComponent>();
         for (auto e : structView) {
@@ -1954,72 +1994,78 @@ void Renderer::buildScene() {
             auto& sc = structView.get<StructureComponent>(e);
             auto& tc = structView.get<TransformComponent>(e);
 
-            float s = 1.0f;
-            switch (sc.type) {
-                case StructureType::TOWER_T1:
-                case StructureType::TOWER_T2:
-                case StructureType::TOWER_T3:
-                case StructureType::TOWER_NEXUS: s = 2.0f;  break;
-                case StructureType::INHIBITOR:   s = 2.5f;  break;
-                case StructureType::NEXUS:       s = 3.5f;  break;
+            std::string modelFile;
+            if (sc.teamIndex == 0) { // Blue
+                switch (sc.type) {
+                    case StructureType::TOWER_T1:    modelFile = "blue_team_tower_1.glb"; break;
+                    case StructureType::TOWER_T2:    modelFile = "blue_team_tower_2.glb"; break;
+                    case StructureType::TOWER_T3:    modelFile = "blue_team_tower_3.glb"; break;
+                    case StructureType::TOWER_NEXUS: modelFile = "blue_team_tower_3.glb"; break;
+                    case StructureType::INHIBITOR:   modelFile = "blue_team_inhib.glb";   break;
+                    case StructureType::NEXUS:       modelFile = "blue_team_nexus.glb";   break;
+                }
+            } else { // Red
+                switch (sc.type) {
+                    case StructureType::TOWER_T1:    modelFile = "red_team_tower_1.glb";  break;
+                    case StructureType::TOWER_T2:    modelFile = "read_team_tower_2.glb"; break;
+                    case StructureType::TOWER_T3:    modelFile = "red_team_tower3.glb";   break;
+                    case StructureType::TOWER_NEXUS: modelFile = "red_team_tower3.glb";   break;
+                    case StructureType::INHIBITOR:   modelFile = "red_team_inhib.glb";    break;
+                    case StructureType::NEXUS:       modelFile = "red_team_nexus.glb";    break;
+                }
             }
-            tc.scale = glm::vec3(s, s * 2.0f, s);
 
-            reg.emplace<MeshComponent>(e, MeshComponent{ cubeMesh });
-            reg.emplace<MaterialComponent>(e,
-                MaterialComponent{ defaultTex, flatNorm, 0.0f, 0.0f, 0.9f, 0.0f });
+            if (mapAssets.count(modelFile)) {
+                reg.emplace<MeshComponent>(e, MeshComponent{ mapAssets[modelFile].mesh });
+                reg.emplace<MaterialComponent>(e,
+                    MaterialComponent{ mapAssets[modelFile].texture, flatNorm, 0.0f, 0.0f, 0.9f, 0.0f });
+                tc.scale = glm::vec3(1.0f); 
+            } else {
+                // Fallback to cube if model failed to load
+                uint32_t cubeMesh = m_scene.addMesh(Model::createCube(*m_device, m_device->getAllocator()));
+                float s = 1.0f;
+                switch (sc.type) {
+                    case StructureType::TOWER_T1:
+                    case StructureType::TOWER_T2:
+                    case StructureType::TOWER_T3:
+                    case StructureType::TOWER_NEXUS: s = 2.0f;  break;
+                    case StructureType::INHIBITOR:   s = 2.5f;  break;
+                    case StructureType::NEXUS:       s = 3.5f;  break;
+                }
+                tc.scale = glm::vec3(s, s * 2.0f, s);
+                reg.emplace<MeshComponent>(e, MeshComponent{ cubeMesh });
+                reg.emplace<MaterialComponent>(e,
+                    MaterialComponent{ defaultTex, flatNorm, 0.0f, 0.0f, 0.9f, 0.0f });
+            }
         }
-        spdlog::info("[Renderer] Structure meshes assigned (cube placeholders)");
+        spdlog::info("[Renderer] Structure meshes assigned from map models");
     }
-    // uint32_t mapMesh = m_scene.addMesh(
-    //     Model::createTerrain(*m_device, m_device->getAllocator(), 200.0f, 64, 0.0f));
-    // auto map = m_scene.createEntity("FlatMap");
-    // m_scene.getRegistry().emplace<MeshComponent>(map, MeshComponent{ mapMesh });
-    // m_scene.getRegistry().emplace<MaterialComponent>(map,
-    //     MaterialComponent{ checkerTex, flatNorm, 0.0f, 0.0f, 0.9f, 0.0f });
-    // auto& mapT = m_scene.getRegistry().get<TransformComponent>(map);
-    // mapT.position = glm::vec3(100.0f, 0.0f, 100.0f);
 
     // ── Lane tiles (stone-textured flat quads along each lane path) ─────────
     {
         std::string laneTilePath = std::string(MODEL_DIR) +
-                                   "models/maps/stone+tile+ground+lane.glb";
+                                   "map models/arcane+tile+3d+model.glb";
         uint32_t laneTileMesh = 0;
         uint32_t laneTileTex  = checkerTex;
         bool     laneTileOK   = false;
 
         // Procedural 1×1 flat quad — fast (2 tris), reused for all 86 tiles.
-        // The GLB is ~1.9 M tris and unsuitable for instancing; we only borrow
-        // its texture for the stone appearance.
         auto tileQuad = Model::createTerrain(*m_device, m_device->getAllocator(),
                                              1.0f, 1, 0.0f);
         laneTileMesh = m_scene.addMesh(std::move(tileQuad));
 
-        try {
-            auto glbTextures = Model::loadGLBTextures(*m_device, laneTilePath);
-            if (!glbTextures.empty()) {
-                laneTileTex = m_scene.addTexture(std::move(glbTextures[0].texture));
-                m_bindless->registerTexture(
-                    m_scene.getTexture(laneTileTex).getImageView(),
-                    m_scene.getTexture(laneTileTex).getSampler());
-            }
+        if (mapAssets.count("arcane+tile+3d+model.glb")) {
+            laneTileTex = mapAssets["arcane+tile+3d+model.glb"].texture;
             laneTileOK = true;
-            spdlog::info("Lane tile texture loaded (tex={})", laneTileTex);
-        } catch (const std::exception& e) {
-            spdlog::warn("Lane tile GLB not found at '{}': {} — using checkerboard",
-                         laneTilePath, e.what());
-            laneTileOK = true;  // still place tiles with fallback texture
         }
 
         if (laneTileOK) {
             // Quad is 1×1; scale it so it covers the lane width in both axes.
-            // Stride = scale factor, so tiles step exactly their own width along the lane.
             auto placeLaneTiles = [&](const std::vector<glm::vec3>& waypoints,
                                       float laneWidth, const std::string& laneName,
                                       float laneY)
             {
                 int tileCount = 0;
-                // Each tile is scaled to laneWidth × laneWidth world units.
                 float stride = laneWidth;
 
                 for (size_t i = 0; i + 1 < waypoints.size(); ++i) {
@@ -2030,7 +2076,6 @@ void Renderer::buildScene() {
                     if (segLen < 0.001f) continue;
                     glm::vec3 dir = diff / segLen;
 
-                    // Align tile's +Z to travel direction
                     float yaw = std::atan2(dir.x, dir.z);
 
                     float walked = 0.0f;
@@ -2038,19 +2083,42 @@ void Renderer::buildScene() {
                         glm::vec3 pos = a + dir * (walked + stride * 0.5f);
                         pos.y = laneY;
 
+                        uint32_t currentMesh = laneTileMesh;
+                        uint32_t currentTex  = laneTileTex;
+
+                        // River area: use river tile model
+                        if (std::abs(pos.x + pos.z - 200.0f) < 25.0f) {
+                            if (mapAssets.count("river_tile.glb")) {
+                                currentMesh = mapAssets["river_tile.glb"].mesh;
+                                currentTex  = mapAssets["river_tile.glb"].texture;
+                            }
+                        } else if (laneName != "MidLane") {
+                            // Non-mid lanes: use jungle tile model
+                            if (mapAssets.count("jungle_tile.glb")) {
+                                currentMesh = mapAssets["jungle_tile.glb"].mesh;
+                                currentTex  = mapAssets["jungle_tile.glb"].texture;
+                            }
+                        }
+
                         auto tile = m_scene.createEntity(
                             laneName + "_tile_" + std::to_string(tileCount));
                         m_scene.getRegistry().emplace<MeshComponent>(
-                            tile, MeshComponent{ laneTileMesh });
+                            tile, MeshComponent{ currentMesh });
                         m_scene.getRegistry().emplace<MaterialComponent>(
-                            tile, MaterialComponent{ laneTileTex, flatNorm,
+                            tile, MaterialComponent{ currentTex, flatNorm,
                                                      0.0f, 0.0f, 0.9f, 0.0f });
                         m_scene.getRegistry().emplace<MapComponent>(tile);
 
                         auto& tt    = m_scene.getRegistry().get<TransformComponent>(tile);
                         tt.position = pos;
                         tt.rotation = glm::vec3(0.0f, yaw, 0.0f);
-                        tt.scale    = glm::vec3(laneWidth);
+                        
+                        // If using a 3D model mesh instead of the flat quad, use scale 1.0 (it should be sized correctly)
+                        if (currentMesh != laneTileMesh) {
+                            tt.scale = glm::vec3(laneWidth * 0.1f); // heuristic for model scale
+                        } else {
+                            tt.scale = glm::vec3(laneWidth);
+                        }
 
                         ++tileCount;
                         walked += stride;

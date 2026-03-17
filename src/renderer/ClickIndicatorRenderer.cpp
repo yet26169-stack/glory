@@ -201,12 +201,12 @@ void ClickIndicatorRenderer::createPipeline(const RenderFormats& formats) {
 
 void ClickIndicatorRenderer::createVertexBuffer() {
     IndicatorVertex vertices[6] = {
-        {{-1.0f, 0.15f, -1.0f}, {0.0f, 0.0f}},
-        {{ 1.0f, 0.15f, -1.0f}, {1.0f, 0.0f}},
-        {{ 1.0f, 0.15f,  1.0f}, {1.0f, 1.0f}},
-        {{-1.0f, 0.15f, -1.0f}, {0.0f, 0.0f}},
-        {{ 1.0f, 0.15f,  1.0f}, {1.0f, 1.0f}},
-        {{-1.0f, 0.15f,  1.0f}, {0.0f, 1.0f}}
+        {{-1.0f, 0.18f, -1.0f}, {0.0f, 0.0f}},
+        {{ 1.0f, 0.18f, -1.0f}, {1.0f, 0.0f}},
+        {{ 1.0f, 0.18f,  1.0f}, {1.0f, 1.0f}},
+        {{-1.0f, 0.18f, -1.0f}, {0.0f, 0.0f}},
+        {{ 1.0f, 0.18f,  1.0f}, {1.0f, 1.0f}},
+        {{-1.0f, 0.18f,  1.0f}, {0.0f, 1.0f}}
     };
     VkDeviceSize size = sizeof(vertices);
     

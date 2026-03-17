@@ -752,8 +752,9 @@ void GameplaySystem::updateAnimations(float dt) {
                     rawTimeScale = (animNaturalSpeed > 0.0f) ? (c.currentSpeed / animNaturalSpeed) : 1.0f;
                 } else if (c.moveSpeed > 0.0f) {
                     // No strideLength data — estimate: at full moveSpeed the walk
-                    // cycle should take ~0.8s regardless of clip duration.
-                    constexpr float kDesiredCycleSec = 0.85f;
+                    // cycle should take ~1.2s regardless of clip duration to match
+                    // the stride visually and prevent sliding.
+                    constexpr float kDesiredCycleSec = 1.2f;
                     float clipDur = (walkClip.duration > 0.0f) ? walkClip.duration : 1.0f;
                     float baseScale = clipDur / kDesiredCycleSec;
                     rawTimeScale = (c.currentSpeed / c.moveSpeed) * baseScale;

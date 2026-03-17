@@ -23,8 +23,8 @@ layout(push_constant) uniform ExplosionPC {
 
 void main() {
     float ringFrac = inUV.x;
-    // Extend disk to 2.5× maxRadius so spike geometry reaches outward
-    vec3 worldPos = pc.center + vec3(inPos.x, 0.02, inPos.z) * (ringFrac * pc.maxRadius * 2.5);
+    // Extend disk to 2.5× maxRadius so spike geometry reaches outward (Y=0.19)
+    vec3 worldPos = pc.center + vec3(inPos.x, 0.19, inPos.z) * (ringFrac * pc.maxRadius * 2.5);
 
     fragUV       = inUV;
     fragWorldPos = worldPos;
