@@ -1,6 +1,7 @@
 #include "core/GameState.h"
 #include "renderer/Renderer.h"
 #include "combat/HeroDefinition.h"
+#include "network/NetworkGameLoop.h"
 #include "window/Window.h"
 
 #include <imgui.h>
@@ -122,6 +123,8 @@ void MainMenuState::exit(GameStateMachine& sm) {
 void HeroSelectState::enter(GameStateMachine& sm) {
     sm.renderer().setMenuMode(true);
     m_selectedHero = -1;
+    m_locked = false;
+    m_waitingForServer = false;
 }
 
 void HeroSelectState::update(GameStateMachine& /*sm*/, float /*dt*/) {}
@@ -229,19 +232,62 @@ void HeroSelectState::render(GameStateMachine& sm, float /*alpha*/) {
             // Lock In button
             ImVec2 lockSize(200, 50);
             ImGui::SetCursorPos(ImVec2((w - lockSize.x) * 0.5f, h * 0.75f));
-            bool canLock = (m_selectedHero >= 0);
+            bool canLock = (m_selectedHero >= 0) && !m_locked;
             if (!canLock) ImGui::BeginDisabled();
-            if (ImGui::Button("LOCK IN", lockSize)) {
+
+            const char* lockLabel = m_waitingForServer ? "WAITING..." :
+                                    m_locked ? "LOCKED" : "LOCK IN";
+            if (ImGui::Button(lockLabel, lockSize)) {
+                std::string heroId;
                 if (useRegistry && m_selectedHero < static_cast<int>(registry.count())) {
-                    const auto& heroId = registry.all()[m_selectedHero].heroId;
-                    sm.setSelectedHeroId(heroId);
-                    spdlog::info("Hero locked: {} ({})", registry.all()[m_selectedHero].name, heroId);
+                    heroId = registry.all()[m_selectedHero].heroId;
+                    spdlog::info("Hero selected: {} ({})", registry.all()[m_selectedHero].name, heroId);
                 } else {
-                    spdlog::info("Hero locked: {}", fallbackNames[m_selectedHero]);
+                    heroId = fallbackNames[m_selectedHero];
+                    spdlog::info("Hero selected: {}", heroId);
                 }
-                sm.transition(GameStateType::LOADING);
+
+                sm.setSelectedHeroId(heroId);
+
+                // Network: send pick to server
+                auto* netLoop = sm.netLoop();
+                if (netLoop && netLoop->getRole() != NetworkRole::Offline) {
+                    netLoop->lobby().requestHeroPick(netLoop->transport(), heroId);
+                    m_waitingForServer = true;
+
+                    // Server also locks locally for itself (slot 0)
+                    if (netLoop->getRole() == NetworkRole::Server) {
+                        m_locked = true;
+                        m_waitingForServer = false;
+                    }
+                } else {
+                    // Offline: go straight to loading
+                    m_locked = true;
+                    sm.transition(GameStateType::LOADING);
+                }
             }
             if (!canLock) ImGui::EndDisabled();
+
+            // Show status for network games
+            auto* netLoop = sm.netLoop();
+            if (netLoop && netLoop->getRole() != NetworkRole::Offline) {
+                auto& lobby = netLoop->lobby();
+                ImGui::SetCursorPos(ImVec2((w - 300) * 0.5f, h * 0.82f));
+                int lockedCount = 0;
+                for (uint8_t i = 0; i < lobby.playerCount(); ++i)
+                    if (lobby.getSlot(i).heroLocked) ++lockedCount;
+                ImGui::Text("Players locked: %d / %d",
+                            lockedCount, lobby.playerCount());
+
+                // Check if our pick was confirmed
+                if (m_waitingForServer) {
+                    uint8_t myId = lobby.localPlayerId();
+                    if (lobby.getSlot(myId).heroLocked) {
+                        m_locked = true;
+                        m_waitingForServer = false;
+                    }
+                }
+            }
 
             // Back button
             ImVec2 backSize(120, 36);
@@ -266,6 +312,7 @@ void HeroSelectState::exit(GameStateMachine& sm) {
 void LoadingState::enter(GameStateMachine& sm) {
     sm.renderer().setMenuMode(true);
     m_sceneBuilt = false;
+    m_notifiedServer = false;
     m_timer = 0.0f;
 
     sm.renderer().setSelectedHeroId(sm.selectedHeroId());
@@ -276,7 +323,27 @@ void LoadingState::enter(GameStateMachine& sm) {
 void LoadingState::update(GameStateMachine& sm, float dt) {
     m_timer += dt;
     if (m_sceneBuilt) {
-        sm.transition(GameStateType::IN_GAME);
+        auto* netLoop = sm.netLoop();
+        if (netLoop && netLoop->getRole() != NetworkRole::Offline) {
+            // Notify server that we finished loading
+            if (!m_notifiedServer) {
+                netLoop->lobby().notifyLoaded(netLoop->transport());
+                m_notifiedServer = true;
+
+                // Server also marks itself loaded and checks all-loaded
+                if (netLoop->getRole() == NetworkRole::Server) {
+                    // Server's slot 0 is already loaded; check if we can start
+                    if (netLoop->lobby().allPlayersLoaded()) {
+                        netLoop->lobby().broadcastStartGame(
+                            netLoop->transport(), netLoop->getCurrentTick());
+                    }
+                }
+            }
+            // Wait for START_GAME message (lobby callback handles transition)
+        } else {
+            // Offline: go straight to in-game
+            sm.transition(GameStateType::IN_GAME);
+        }
     }
 }
 

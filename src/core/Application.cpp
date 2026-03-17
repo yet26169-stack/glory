@@ -26,12 +26,49 @@ Application::Application(const std::string& name, int width, int height,
 
     if (netCfg.role != NetworkRole::Offline) {
         m_netLoop.initTransport(netCfg.host, netCfg.port);
+        wireLobbyCallbacks();
     }
+
+    // Expose lobby to the state machine so HeroSelectState can do network picks
+    m_stateMachine.setNetworkGameLoop(&m_netLoop);
 }
 
 Application::~Application() {
     m_netLoop.shutdown();
     spdlog::info("Application shutting down");
+}
+
+void Application::wireLobbyCallbacks() {
+    auto& lobby = m_netLoop.lobby();
+
+    // When all heroes are locked, transition everyone to LOADING
+    lobby.onAllReady = [this]() {
+        spdlog::info("[App] All heroes locked → LOADING");
+        m_stateMachine.transition(GameStateType::LOADING);
+    };
+
+    // When all players loaded, transition to IN_GAME
+    lobby.onStartGame = [this]() {
+        spdlog::info("[App] All players loaded → IN_GAME");
+        m_stateMachine.transition(GameStateType::IN_GAME);
+    };
+
+    // When a player disconnects during gameplay, their hero stands still
+    lobby.onPlayerDisconnected = [this](uint8_t playerId) {
+        m_netLoop.markPeerDisconnected(playerId);
+    };
+
+    // When a player reconnects, send full snapshot
+    lobby.onPlayerReconnected = [this](uint8_t playerId) {
+        m_netLoop.markPeerReconnected(playerId);
+        // Send full state snapshot to help them catch up
+        auto& slot = m_netLoop.lobby().getSlot(playerId);
+        if (m_netLoop.lobby().phase() == LobbyPhase::IN_GAME) {
+            m_netLoop.sendFullSnapshot(slot.peerId,
+                                        m_netLoop.getCurrentTick(),
+                                        m_renderer.getRegistry());
+        }
+    };
 }
 
 void Application::run() {
@@ -54,6 +91,10 @@ void Application::run() {
         prevTime = now;
         if (frameTime > maxFrameTime) frameTime = maxFrameTime;
         accumulator += frameTime;
+
+        // Poll network events every frame (lobby + gameplay routing)
+        m_netLoop.pollAndRoute();
+
         while (accumulator >= fixedDt) {
             GLORY_ZONE_N("PhysicsStep");
 

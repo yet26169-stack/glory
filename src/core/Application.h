@@ -33,6 +33,8 @@ public:
     Application& operator=(const Application&) = delete;
 
 private:
+    void wireLobbyCallbacks();
+
     // Window is declared before Renderer so it outlives the renderer.
     // Renderer explicitly manages surface destruction before instance teardown.
     Window          m_window;

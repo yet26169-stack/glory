@@ -316,6 +316,7 @@ set(SOURCES
     src/network/InputSync.cpp
     src/network/StateSnapshot.cpp
     src/network/NetworkGameLoop.cpp
+    src/network/LobbySystem.cpp
     src/replay/ReplayRecorder.cpp
     src/replay/ReplayPlayer.cpp
     extern/vma/vma_impl.cpp
