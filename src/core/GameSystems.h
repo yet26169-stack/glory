@@ -26,6 +26,7 @@ class DistortionRenderer;
 class ExplosionRenderer;
 class ConeAbilityRenderer;
 class SpriteEffectRenderer;
+class EconomySystem;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // VFXFlushSystem — flushes VFX event queues and updates VFX subsystems
@@ -209,6 +210,26 @@ public:
         };
     }
     std::string_view name() const override { return "AnimationUpdate"; }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EconomyUpdateSystem — passive gold income, level-up checks
+// Depends on CombatUpdateSystem (kill rewards happen during combat tick).
+// ═══════════════════════════════════════════════════════════════════════════════
+class EconomyUpdateSystem : public ISystem {
+public:
+    EconomyUpdateSystem(EconomySystem* econ, float* gameTime)
+        : m_econ(econ), m_gameTime(gameTime) {}
+
+    void execute(entt::registry& registry, float dt) override;
+    std::vector<std::type_index> dependsOn() const override {
+        return { std::type_index(typeid(CombatUpdateSystem)) };
+    }
+    std::string_view name() const override { return "EconomyUpdate"; }
+
+private:
+    EconomySystem* m_econ;
+    float*         m_gameTime;
 };
 
 } // namespace glory

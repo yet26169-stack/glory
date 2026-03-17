@@ -1,6 +1,7 @@
 #include "ability/ProjectileSystem.h"
 #include "ability/AbilitySystem.h"
 #include "combat/GpuCollisionSystem.h"
+#include "combat/EconomySystem.h"
 #include "vfx/TrailRenderer.h"
 #include "scene/Components.h"
 #include "combat/CombatComponents.h"
@@ -55,6 +56,12 @@ void ProjectileSystem::update(entt::registry& reg, float dt,
                         Fixed32 fArmor(stats.total().armor);
                         Fixed32 fFinal = fDamage * (Fixed32(100) / (Fixed32(100) + fArmor));
                         stats.base.currentHP = std::max(0.0f, stats.base.currentHP - fFinal.toFloat());
+                        
+                        // Kill detection: award gold/xp if target died
+                        if (stats.base.currentHP <= 0.0f && m_economy) {
+                            auto caster = static_cast<entt::entity>(pc.casterEntity);
+                            m_economy->awardKill(reg, caster, target);
+                        }
                         
                         // Hit VFX
                         VFXEvent ev{};

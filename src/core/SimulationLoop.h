@@ -17,6 +17,7 @@ class AbilitySystem;
 class GpuCollisionSystem;
 class ProjectileSystem;
 class CombatSystem;
+class EconomySystem;
 class VFXRenderer;
 class TrailRenderer;
 class GroundDecalRenderer;
@@ -44,6 +45,7 @@ struct SimulationContext {
     AbilitySystem*        abilities       = nullptr;
     ProjectileSystem*     projectiles     = nullptr;
     CombatSystem*         combat          = nullptr;
+    EconomySystem*        economy         = nullptr;
     const GpuCollisionSystem* gpuCollision = nullptr;
 
     // VFX subsystems (non-owning references)
@@ -68,6 +70,9 @@ struct SimulationContext {
 
     // Thread pool for parallel system execution
     ThreadPool* threadPool = nullptr;
+
+    // Game time for economy passive income
+    float* gameTime = nullptr;
 };
 
 // Runs all gameplay/simulation updates decoupled from the render loop.

@@ -3,6 +3,7 @@
 #include "scene/Components.h"
 #include "combat/CombatComponents.h"
 #include "combat/CombatSystem.h"
+#include "combat/EconomySystem.h"
 #include "combat/GpuCollisionSystem.h"
 #include "ability/AbilitySystem.h"
 #include "ability/AbilityComponents.h"
@@ -194,6 +195,20 @@ void GameplaySystem::processSpawning(float dt, const GameplayInput& input) {
     reg.emplace<UnitComponent>(minion, UnitComponent{ UnitComponent::State::IDLE, worldPos, 5.0f });
     reg.emplace<CharacterComponent>(minion, CharacterComponent{ worldPos, 5.0f });
     reg.emplace<GPUSkinnedMeshComponent>(minion, GPUSkinnedMeshComponent{ m_spawnConfig.meshIndex });
+
+    // Combat components for minions
+    reg.emplace<TeamComponent>(minion, TeamComponent{ Team::ENEMY });
+    auto& minionStats = reg.emplace<StatsComponent>(minion);
+    minionStats.base.maxHP = 300.0f;
+    minionStats.base.currentHP = 300.0f;
+    minionStats.base.armor = 10.0f;
+    minionStats.base.attackDamage = 12.0f;
+    auto& minionCombat = reg.emplace<CombatComponent>(minion);
+    minionCombat.attackRange = 2.0f;
+    minionCombat.attackSpeed = 0.8f;
+    minionCombat.attackDamage = 12.0f;
+    reg.emplace<MinionComponent>(minion, MinionComponent{ MinionType::MELEE, 20, 60 });
+    reg.emplace<EconomyComponent>(minion);
 
     // Setup simple Material
     reg.emplace<MaterialComponent>(minion,

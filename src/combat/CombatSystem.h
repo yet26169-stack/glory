@@ -11,12 +11,14 @@
 namespace glory {
 
 class GameAudioEvents;
+class EconomySystem;
 
 class CombatSystem {
 public:
     explicit CombatSystem(VFXEventQueue& vfxQueue);
 
     void setAudioEvents(GameAudioEvents* audio) { m_audio = audio; }
+    void setEconomySystem(EconomySystem* econ) { m_economy = econ; }
 
     // ── Input requests (called from Renderer in response to player keys) ──
     void requestAutoAttack(entt::entity attacker, entt::entity target);
@@ -33,6 +35,7 @@ public:
 private:
     VFXEventQueue&   m_vfxQueue;
     GameAudioEvents* m_audio = nullptr;
+    EconomySystem*   m_economy = nullptr;
 
     void processAttackWindup(entt::registry& reg, entt::entity entity, CombatComponent& combat, float dt);
     void processAttackFire(entt::registry& reg, entt::entity entity, CombatComponent& combat, float dt);

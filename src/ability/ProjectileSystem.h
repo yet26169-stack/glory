@@ -15,11 +15,14 @@ namespace glory {
 class AbilitySystem;
 class GpuCollisionSystem;
 class TrailRenderer;
+class EconomySystem;
 
 // Moves projectile entities each frame, syncs their trail VFX, checks collisions,
 // and resolves hits via AbilitySystem when they connect or expire.
 class ProjectileSystem {
 public:
+    void setEconomySystem(EconomySystem* econ) { m_economy = econ; }
+
     void update(entt::registry& reg, float dt,
                 VFXEventQueue& vfxQueue, AbilitySystem& abilitySystem,
                 TrailRenderer* trailRenderer = nullptr,
@@ -41,6 +44,7 @@ public:
 private:
     std::unordered_map<std::string, ProjectileMeshInfo> m_abilityMeshes;
     std::vector<glm::vec3> m_landedPositions;  // filled each frame by lob landing events
+    EconomySystem* m_economy = nullptr;
     void destroyProjectile(entt::registry& reg, entt::entity e,
                            const ProjectileComponent& pc,
                            VFXEventQueue& vfxQueue,

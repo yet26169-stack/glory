@@ -192,6 +192,11 @@ Renderer::Renderer(Window& window) : m_window(window) {
 
     m_projectileSystem = std::make_unique<ProjectileSystem>();
     m_combatSystem  = std::make_unique<CombatSystem>(*m_combatVfxQueue);
+    m_economySystem = std::make_unique<EconomySystem>();
+
+    // Wire economy system into combat and projectile systems
+    m_combatSystem->setEconomySystem(m_economySystem.get());
+    m_projectileSystem->setEconomySystem(m_economySystem.get());
 
     // ── Audio engine ─────────────────────────────────────────────────────
     m_audioEngine.init();
@@ -472,6 +477,7 @@ void Renderer::simulateStep(float dt) {
             .abilities      = m_abilitySystem.get(),
             .projectiles    = m_projectileSystem.get(),
             .combat         = m_combatSystem.get(),
+            .economy        = m_economySystem.get(),
             .gpuCollision   = &m_gpuCollision,
             .vfxRenderer    = m_vfxRenderer.get(),
             .vfxQueue       = m_vfxQueue.get(),
@@ -490,6 +496,7 @@ void Renderer::simulateStep(float dt) {
             .coneApex        = m_coneApex,
             .coneDirection   = m_coneDirection,
             .threadPool      = &m_threadPool,
+            .gameTime        = &m_gameTime,
         };
         m_simLoop.tick(simCtx);
         m_coneEffectTimer = simCtx.coneEffectTimer;
@@ -2093,7 +2100,9 @@ void Renderer::buildScene() {
     heroComp.definition = heroDef;
     heroComp.level = 1;
     m_scene.getRegistry().emplace<HeroComponent>(character, heroComp);
-    
+
+    // Economy: starting gold + XP tracking
+    m_scene.getRegistry().emplace<EconomyComponent>(character, EconomyComponent{500, 0, 1});
     if (m_abilitySystem) {
         std::array<std::string, 4> abilityIds;
         if (heroDef) {

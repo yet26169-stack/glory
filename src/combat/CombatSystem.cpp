@@ -1,4 +1,5 @@
 #include "combat/CombatSystem.h"
+#include "combat/EconomySystem.h"
 #include "audio/GameAudioEvents.h"
 #include "scene/Components.h"
 #include "ability/AbilityComponents.h"
@@ -259,6 +260,11 @@ void CombatSystem::applyAutoAttackHit(entt::registry& reg, entt::entity attacker
             stats.base.currentHP = std::max(0.0f, stats.base.currentHP - finalDamage);
             spdlog::debug("Auto-attack hit for {:.1f} damage (HP: {:.1f})",
                           finalDamage, stats.base.currentHP);
+
+            // Kill detection: award gold/xp if target died
+            if (stats.base.currentHP <= 0.0f && m_economy) {
+                m_economy->awardKill(reg, attacker, target);
+            }
         }
     }
 }

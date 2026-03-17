@@ -9,6 +9,8 @@
 
 namespace glory {
 
+struct EconomyComponent;
+
 class AbilityBar {
 public:
     struct Config {

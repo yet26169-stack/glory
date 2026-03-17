@@ -1,6 +1,7 @@
 #include "hud/AbilityBar.h"
 #include "ability/AbilityComponents.h"
 #include "ability/AbilityTypes.h"
+#include "combat/EconomySystem.h"
 
 #include <cmath>
 #include <cstdio>
@@ -104,6 +105,27 @@ void AbilityBar::render(const entt::registry& reg, entt::entity player,
                 dl->AddCircleFilled(ImVec2(dotStartX + lv * dotSpacing, dotY), 2.5f, dotCol);
             }
         }
+    }
+
+    // ── Gold and level display flanking the ability bar ──────────────────
+    if (reg.all_of<EconomyComponent>(player)) {
+        const auto& eco = reg.get<EconomyComponent>(player);
+
+        // Level badge (left of ability bar)
+        float levelX = startX - 50.0f;
+        float levelY = startY + m_config.iconSize * 0.5f - 8.0f;
+        char levelBuf[8];
+        std::snprintf(levelBuf, sizeof(levelBuf), "Lv %d", eco.level);
+        dl->AddText(nullptr, 16.0f, ImVec2(levelX, levelY),
+                    IM_COL32(255, 215, 0, 255), levelBuf);
+
+        // Gold display (right of ability bar)
+        float goldX = startX + totalW + 10.0f;
+        float goldY = levelY;
+        char goldBuf[16];
+        std::snprintf(goldBuf, sizeof(goldBuf), "%d G", eco.gold);
+        dl->AddText(nullptr, 16.0f, ImVec2(goldX, goldY),
+                    IM_COL32(255, 215, 0, 255), goldBuf);
     }
 }
 

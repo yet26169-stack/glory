@@ -57,6 +57,8 @@
 #include "ability/ProjectileSystem.h"
 #include "combat/CombatComponents.h"
 #include "combat/CombatSystem.h"
+#include "combat/EconomySystem.h"
+#include "combat/EconomySystem.h"
 #include "combat/HeroRegistry.h"
 #include "combat/GpuCollisionSystem.h"
 #include "core/SimulationLoop.h"
@@ -195,6 +197,7 @@ private:
     std::unique_ptr<AbilitySystem> m_abilitySystem;   // ability state machine
     std::unique_ptr<ProjectileSystem> m_projectileSystem; // moves projectile entities
     std::unique_ptr<CombatSystem>  m_combatSystem;    // auto-attack / shield / trick
+    std::unique_ptr<EconomySystem> m_economySystem;   // gold, xp, leveling
     GpuCollisionSystem             m_gpuCollision;    // GPU spatial hash + broadphase
     SimulationLoop                 m_simLoop;         // parallel ECS system scheduler
     GameplaySystem                 m_gameplaySystem;  // extracted gameplay logic

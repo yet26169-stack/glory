@@ -3,6 +3,7 @@
 #include "ability/AbilitySystem.h"
 #include "ability/ProjectileSystem.h"
 #include "combat/CombatSystem.h"
+#include "combat/EconomySystem.h"
 #include "physics/PhysicsSystem.h"
 #include "vfx/VFXRenderer.h"
 #include "vfx/VFXEventQueue.h"
@@ -42,6 +43,8 @@ void SimulationLoop::init(const SimulationContext& ctx) {
     m_scheduler.add<ConeEffectSystem>(ctx.coneEffect, &m_coneState);
 
     m_scheduler.add<CombatUpdateSystem>(ctx.combat);
+
+    m_scheduler.add<EconomyUpdateSystem>(ctx.economy, ctx.gameTime);
 
     m_scheduler.add<PhysicsUpdateSystem>();
 
