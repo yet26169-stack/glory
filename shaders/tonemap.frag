@@ -48,13 +48,13 @@ void main() {
     // ── LoL/SC2 Color Grading — LINEAR space (Rec.709 luminance is valid here) ─
     if (pc.enableColorGrade != 0u) {
         float luminance = dot(mapped, vec3(0.2126, 0.7152, 0.0722));
-        // Shadows push toward cool purple-blue (LoL shadow palette)
-        vec3 shadowShift    = vec3(0.05, 0.0, 0.1);
+        // Shadows push toward a very subtle cool tint (avoid heavy purple wash)
+        vec3 shadowShift    = vec3(0.02, 0.01, 0.04);
         // Highlights push toward warm gold (LoL highlight palette)
-        vec3 highlightShift = vec3(0.08, 0.06, 0.0);
+        vec3 highlightShift = vec3(0.06, 0.04, 0.0);
         vec3 colorGrade = mapped + mix(shadowShift, highlightShift,
                                        smoothstep(0.2, 0.8, luminance));
-        mapped = mix(mapped, colorGrade, 0.4); // 40% grade intensity
+        mapped = mix(mapped, colorGrade, 0.25); // 25% grade intensity (was 40%)
     }
 
     // ── Saturation Boost — LINEAR space (SC2 midtone punch, mild 12%) ─────────

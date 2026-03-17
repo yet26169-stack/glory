@@ -36,6 +36,10 @@ struct WaveMinionComponent {
     entt::entity aggroTarget = entt::null;
     float aggroRange      = 6.0f;   // acquire-target radius
 
+    // Retarget cooldown — avoids O(N×M) registry scan every frame
+    float retargetCooldown = 0.0f;
+    static constexpr float RETARGET_INTERVAL = 0.25f; // seconds between target searches
+
     // Hero-aggro override (when hero attacks nearby allied hero)
     entt::entity heroAggroTarget = entt::null;
     float heroAggroTimer  = 0.0f;   // seconds remaining on hero aggro

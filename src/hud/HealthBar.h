@@ -17,7 +17,8 @@ public:
         float barWidth       = 64.0f;  // pixels at reference distance
         float barHeight      = 6.0f;
         float manaBarHeight  = 4.0f;
-        float yOffset        = 2.5f;   // world units above entity origin
+        float yOffset        = 3.2f;   // world units above entity origin (characters)
+        float structureYOffset = 8.0f; // world units above entity origin (towers/nexus)
         float minScreenSize  = 4.0f;   // skip if bar < this many pixels wide
         float borderSize     = 1.0f;
 

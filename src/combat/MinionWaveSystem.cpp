@@ -288,7 +288,33 @@ void MinionWaveSystem::updateMovementAndAggro(entt::registry& reg, float dt) {
         if (wmc.heroAggroTarget != entt::null) {
             target = wmc.heroAggroTarget;
         } else {
-            target = findTarget(reg, entity, wmc, pos);
+            // Validate current cached target before doing a full search
+            bool currentValid = false;
+            if (wmc.aggroTarget != entt::null && reg.valid(wmc.aggroTarget)) {
+                auto* tgt = reg.try_get<TransformComponent>(wmc.aggroTarget);
+                auto* tgtStats = reg.try_get<StatsComponent>(wmc.aggroTarget);
+                auto* tgtTeam = reg.try_get<TeamComponent>(wmc.aggroTarget);
+                if (tgt && tgtStats && tgtTeam && tgtStats->base.currentHP > 0.0f) {
+                    Team myTeam = (wmc.teamIndex == 0) ? Team::PLAYER : Team::ENEMY;
+                    if (tgtTeam->team != myTeam && tgtTeam->team != Team::NEUTRAL) {
+                        float dist = glm::length(tgt->position - pos);
+                        if (dist <= wmc.aggroRange * 1.5f) {
+                            currentValid = true;
+                            target = wmc.aggroTarget;
+                        }
+                    }
+                }
+            }
+
+            // Only do a full registry scan if we have no valid target and
+            // the retarget cooldown has elapsed.
+            if (!currentValid) {
+                wmc.retargetCooldown -= dt;
+                if (wmc.retargetCooldown <= 0.0f) {
+                    target = findTarget(reg, entity, wmc, pos);
+                    wmc.retargetCooldown = WaveMinionComponent::RETARGET_INTERVAL;
+                }
+            }
         }
         wmc.aggroTarget = target;
         combat.targetEntity = target;
@@ -304,7 +330,7 @@ void MinionWaveSystem::updateMovementAndAggro(entt::registry& reg, float dt) {
                 // Move toward target
                 glm::vec3 dir = toTarget / dist;
                 transform.position += dir * character.moveSpeed * dt;
-                transform.position.y = 0.0f;
+                transform.position.y = 0.2f;
 
                 // Update facing
                 character.currentYaw = std::atan2(dir.x, dir.z);
@@ -322,7 +348,7 @@ void MinionWaveSystem::updateMovementAndAggro(entt::registry& reg, float dt) {
                 if (glm::length(dir2) > 0.01f) {
                     glm::vec3 dir3(dir2.x, 0.0f, dir2.y);
                     transform.position += dir3 * character.moveSpeed * dt;
-                    transform.position.y = 0.0f;
+                    transform.position.y = 0.2f;
 
                     character.currentYaw = std::atan2(dir3.x, dir3.z);
                     character.hasTarget = true;

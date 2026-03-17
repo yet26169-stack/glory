@@ -35,11 +35,19 @@ void FogSystem::paintCircle(float worldX, float worldZ, float radius) {
             if (gx < 0 || gx >= static_cast<int>(MAP_SIZE) ||
                 gz < 0 || gz >= static_cast<int>(MAP_SIZE)) continue;
 
-            // Soft falloff: full brightness at centre, fades to 0 at edge
-            const float falloff = std::clamp(1.0f - std::sqrt(dist2) / rCells, 0.0f, 1.0f);
-            // Sharpen: keeps the inner ~70% at full brightness
-            const float sharpened = std::clamp(falloff * 3.0f - 1.0f, 0.0f, 1.0f);
-            const uint8_t v = static_cast<uint8_t>(255.0f * sharpened);
+            // LoL-style soft circular falloff: fully bright in the inner 60%,
+            // then a smooth cubic fade to 0 at the edge. This gives clean
+            // circular borders with a feathered outer fringe.
+            const float t = std::sqrt(dist2) / rCells;           // 0..1
+            const float inner = 0.6f;                             // fully bright up to 60% radius
+            float brightness;
+            if (t <= inner) {
+                brightness = 1.0f;
+            } else {
+                float s = (t - inner) / (1.0f - inner);          // 0..1 in fade zone
+                brightness = 1.0f - s * s * (3.0f - 2.0f * s);  // smoothstep fade
+            }
+            const uint8_t v = static_cast<uint8_t>(255.0f * brightness);
 
             const uint32_t idx = static_cast<uint32_t>(gz) * MAP_SIZE +
                                  static_cast<uint32_t>(gx);

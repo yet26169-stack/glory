@@ -260,6 +260,9 @@ StructureSystem::SpawnResult StructureSystem::spawnStructures(
 
         auto& tc = reg.emplace<TransformComponent>(e);
         tc.position = pos;
+        // Raise structures above the ground plane so they aren't clipped by
+        // lane tiles (which sit at Y ≈ 0.05–0.15).
+        tc.position.y = 0.2f;
         tc.scale = glm::vec3(1.0f);  // structures use world-scale
 
         Team team = teamFromIndex(teamIdx);

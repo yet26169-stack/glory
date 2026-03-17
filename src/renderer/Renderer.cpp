@@ -1002,8 +1002,8 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
         light.ambientStrength = 0.5f;
         light.lights[0].position = glm::vec3(100.0f, 60.0f, 100.0f);
         light.lights[0].color    = glm::vec3(1.0f, 0.95f, 0.85f);
-        light.fogDensity = m_fogEnabled ? 0.008f : 0.0f;  // subtle — FoW is the primary fog
-        light.fogColor   = glm::vec3(0.6f, 0.65f, 0.75f);
+        light.fogDensity = m_fogEnabled ? 0.015f : 0.0f;  // moderate — visible but not overpowering
+        light.fogColor   = glm::vec3(0.15f, 0.18f, 0.25f); // dark blue-grey, LoL-style
         light.fogStart   = 30.0f;
         light.fogEnd     = 80.0f;
         light.appTime    = m_gameTime;
@@ -1290,9 +1290,23 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
                 tint = tc->color;
             }
 
+            glm::vec3 worldPos = t.position;
+            float dist = glm::distance(worldPos, camPos);
+
             // FoW fade: modulate alpha for enemies fading in/out
             float fowAlpha = FogOfWarGameplay::getRenderAlpha(m_scene.getRegistry(), e);
             tint.a *= fowAlpha;
+
+            // Beyond impostor distance → render as billboard, skip mesh
+            if (m_lodSystem.shouldBeImpostor(dist)) {
+                std::string type = "minion";
+                if (auto* rc = m_scene.getRegistry().try_get<RespawnComponent>(e)) {
+                    if (rc->isHero) type = "hero";
+                }
+                auto inst = m_impostorSystem.buildInstance(type, worldPos, camPos, tint);
+                m_impostorSystem.addInstance(inst);
+                continue;
+            }
 
             instances[instanceIndex].tint = tint;
             instances[instanceIndex].params = glm::vec4(mat.shininess, mat.metallic, mat.roughness, mat.emissive);
@@ -1941,7 +1955,23 @@ void Renderer::buildScene() {
         }
     }
 
-    // ── Flat map removed for testing (replaced by lane tiles) ─────────────
+    // ── Base ground plane (200×200, Y=0, below all lane tiles) ───────────
+    {
+        auto groundMesh = Model::createTerrain(*m_device, m_device->getAllocator(),
+                                               200.0f, 1, 0.0f);
+        uint32_t groundMeshIdx = m_scene.addMesh(std::move(groundMesh));
+
+        auto groundEnt = m_scene.createEntity("ground_plane");
+        auto& reg      = m_scene.getRegistry();
+        reg.emplace<MeshComponent>(groundEnt, MeshComponent{ groundMeshIdx });
+        // Matte green-brown terrain: no metallic, rough, slight warm tint
+        reg.emplace<MaterialComponent>(groundEnt,
+            MaterialComponent{ defaultTex, flatNorm, 0.0f, 0.0f, 0.0f, 0.9f });
+        reg.emplace<MapComponent>(groundEnt);
+        auto& gt   = reg.get<TransformComponent>(groundEnt);
+        gt.position = glm::vec3(100.0f, -0.01f, 100.0f); // centred, just under lane tiles
+        gt.scale    = glm::vec3(1.0f);
+    }
 
     // ── Load map models from "map models/" ─────────────────────────────
     struct MapAsset {
@@ -2018,7 +2048,7 @@ void Renderer::buildScene() {
             if (mapAssets.count(modelFile)) {
                 reg.emplace<MeshComponent>(e, MeshComponent{ mapAssets[modelFile].mesh });
                 reg.emplace<MaterialComponent>(e,
-                    MaterialComponent{ mapAssets[modelFile].texture, flatNorm, 0.0f, 0.0f, 0.9f, 0.0f });
+                    MaterialComponent{ mapAssets[modelFile].texture, flatNorm, 0.0f, 0.0f, 0.3f, 0.6f });
                 tc.scale = glm::vec3(1.0f); 
             } else {
                 // Fallback to cube if model failed to load
@@ -2035,7 +2065,7 @@ void Renderer::buildScene() {
                 tc.scale = glm::vec3(s, s * 2.0f, s);
                 reg.emplace<MeshComponent>(e, MeshComponent{ cubeMesh });
                 reg.emplace<MaterialComponent>(e,
-                    MaterialComponent{ defaultTex, flatNorm, 0.0f, 0.0f, 0.9f, 0.0f });
+                    MaterialComponent{ defaultTex, flatNorm, 0.0f, 0.0f, 0.3f, 0.6f });
             }
         }
         spdlog::info("[Renderer] Structure meshes assigned from map models");
@@ -2086,18 +2116,13 @@ void Renderer::buildScene() {
                         uint32_t currentMesh = laneTileMesh;
                         uint32_t currentTex  = laneTileTex;
 
-                        // River area: use river tile model
+                        // River / jungle zones: swap texture only (keep flat quad mesh)
                         if (std::abs(pos.x + pos.z - 200.0f) < 25.0f) {
-                            if (mapAssets.count("river_tile.glb")) {
-                                currentMesh = mapAssets["river_tile.glb"].mesh;
-                                currentTex  = mapAssets["river_tile.glb"].texture;
-                            }
+                            if (mapAssets.count("river_tile.glb"))
+                                currentTex = mapAssets["river_tile.glb"].texture;
                         } else if (laneName != "MidLane") {
-                            // Non-mid lanes: use jungle tile model
-                            if (mapAssets.count("jungle_tile.glb")) {
-                                currentMesh = mapAssets["jungle_tile.glb"].mesh;
-                                currentTex  = mapAssets["jungle_tile.glb"].texture;
-                            }
+                            if (mapAssets.count("jungle_tile.glb"))
+                                currentTex = mapAssets["jungle_tile.glb"].texture;
                         }
 
                         auto tile = m_scene.createEntity(
@@ -2106,19 +2131,14 @@ void Renderer::buildScene() {
                             tile, MeshComponent{ currentMesh });
                         m_scene.getRegistry().emplace<MaterialComponent>(
                             tile, MaterialComponent{ currentTex, flatNorm,
-                                                     0.0f, 0.0f, 0.9f, 0.0f });
+                                                     0.0f, 0.0f, 0.0f, 0.8f });
                         m_scene.getRegistry().emplace<MapComponent>(tile);
 
                         auto& tt    = m_scene.getRegistry().get<TransformComponent>(tile);
                         tt.position = pos;
                         tt.rotation = glm::vec3(0.0f, yaw, 0.0f);
                         
-                        // If using a 3D model mesh instead of the flat quad, use scale 1.0 (it should be sized correctly)
-                        if (currentMesh != laneTileMesh) {
-                            tt.scale = glm::vec3(laneWidth * 0.1f); // heuristic for model scale
-                        } else {
-                            tt.scale = glm::vec3(laneWidth);
-                        }
+                        tt.scale = glm::vec3(laneWidth);
 
                         ++tileCount;
                         walked += stride;
@@ -2127,25 +2147,41 @@ void Renderer::buildScene() {
                 spdlog::info("Placed {} tiles for {}", tileCount, laneName);
             };
 
-            // Lanes converge at bases {22,22} and {178,178} — stagger Y per
-            // lane so overlapping tiles don't Z-fight.  Mid lane on top (widest,
-            // most visible), Top/Bot underneath at distinct heights.
-            placeLaneTiles({
-                {22,0,22}, {22,0,60}, {22,0,100}, {22,0,140}, {22,0,178},
-                {60,0,178}, {100,0,178}, {140,0,178}, {178,0,178}
-            }, 12.0f, "TopLane", 0.05f);
+            // Use actual lane waypoints from map data rather than hardcoded paths.
+            // Stagger Y per lane so overlapping tiles don't Z-fight.  Mid lane on
+            // top (widest, most visible), Top/Bot underneath at distinct heights.
+            const auto& blueTeam = m_mapData.teams[0];
+            if (!blueTeam.lanes[0].waypoints.empty()) {
+                placeLaneTiles(blueTeam.lanes[0].waypoints,
+                               blueTeam.lanes[0].width, "TopLane", 0.05f);
+            } else {
+                placeLaneTiles({
+                    {22,0,22}, {22,0,60}, {22,0,100}, {22,0,140}, {22,0,178},
+                    {60,0,178}, {100,0,178}, {140,0,178}, {178,0,178}
+                }, 12.0f, "TopLane", 0.05f);
+            }
 
-            // Mid Lane: diagonal base to base
-            placeLaneTiles({
-                {22,0,22}, {40,0,40}, {60,0,60}, {80,0,80}, {100,0,100},
-                {120,0,120}, {140,0,140}, {160,0,160}, {178,0,178}
-            }, 14.0f, "MidLane", 0.15f);
+            // Mid Lane
+            if (!blueTeam.lanes[1].waypoints.empty()) {
+                placeLaneTiles(blueTeam.lanes[1].waypoints,
+                               blueTeam.lanes[1].width, "MidLane", 0.15f);
+            } else {
+                placeLaneTiles({
+                    {22,0,22}, {40,0,40}, {60,0,60}, {80,0,80}, {100,0,100},
+                    {120,0,120}, {140,0,140}, {160,0,160}, {178,0,178}
+                }, 14.0f, "MidLane", 0.15f);
+            }
 
-            // Bot Lane: across the bottom then up the right edge
-            placeLaneTiles({
-                {22,0,22}, {60,0,22}, {100,0,22}, {140,0,22}, {178,0,22},
-                {178,0,60}, {178,0,100}, {178,0,140}, {178,0,178}
-            }, 12.0f, "BotLane", 0.10f);
+            // Bot Lane
+            if (!blueTeam.lanes[2].waypoints.empty()) {
+                placeLaneTiles(blueTeam.lanes[2].waypoints,
+                               blueTeam.lanes[2].width, "BotLane", 0.10f);
+            } else {
+                placeLaneTiles({
+                    {22,0,22}, {60,0,22}, {100,0,22}, {140,0,22}, {178,0,22},
+                    {178,0,60}, {178,0,100}, {178,0,140}, {178,0,178}
+                }, 12.0f, "BotLane", 0.10f);
+            }
         }
     }
 
@@ -2170,6 +2206,8 @@ void Renderer::buildScene() {
         } else {
             spdlog::warn("Character texture not found in GLB — using default white texture (slot {})", charTex);
         }
+
+        m_impostorSystem.registerUnitType("hero", &m_scene.getMesh(m_scene.addMesh(std::move(skinnedData.model))), 1.5f, 2.0f, 16);
 
         // Build StaticSkinnedMesh from first mesh in GLB
         if (!skinnedData.bindPoseVertices.empty() && !skinnedData.skinVertices.empty()) {
@@ -2207,7 +2245,9 @@ void Renderer::buildScene() {
                         retargetClip(animComp.clips.back(), skelComp.skeleton);
                         return true;
                     }
-                } catch (...) {}
+                } catch (const std::exception& e) {
+                    spdlog::warn("Failed to load animation '{}': {}", path, e.what());
+                }
                 return false;
             };
 
@@ -2385,6 +2425,9 @@ void Renderer::buildScene() {
             spdlog::warn("Minion texture not found in GLB — using default white texture (slot {})", minionTex);
         }
 
+        m_impostorSystem.registerUnitType("minion", &m_scene.getMesh(m_scene.addMesh(std::move(skinnedData.model))), 1.0f, 1.2f, 16);
+        m_impostorSystem.registerUnitType("default", &m_scene.getMesh(m_scene.getMeshes().size() - 1), 1.0f, 1.2f, 16);
+
         if (!skinnedData.bindPoseVertices.empty() && !skinnedData.skinVertices.empty()) {
             std::vector<SkinnedVertex> sverts;
             sverts.reserve(skinnedData.bindPoseVertices[0].size());
@@ -2479,7 +2522,8 @@ void Renderer::buildScene() {
                 wsc.ready         = true;
                 m_minionWaveSystem->setSpawnConfig(std::move(wsc));
             }
-        }    } catch (const std::exception& e) {
+        }
+    } catch (const std::exception& e) {
         spdlog::warn("Could not load minion model: {}", e.what());
     }
 
@@ -2584,7 +2628,14 @@ void Renderer::buildScene() {
     {
         RenderFormats impostorFmts = m_hdrFB->mainFormats();
         m_impostorSystem.init(*m_device, impostorFmts);
-        m_impostorSystem.generateAtlas();
+        
+        // Register default unit types for impostor capturing
+        // Note: we use pointers to models stored in m_scene to ensure they stay alive
+        if (m_scene.getMeshes().size() > 0) {
+            // Heuristic: register some common models if they were loaded
+            // (The individual loading blocks already registered "hero" and "minion")
+            m_impostorSystem.generateAtlas();
+        }
     }
 }
 
@@ -2826,6 +2877,7 @@ void Renderer::createGridPipeline() {
 
     VkPipelineColorBlendAttachmentState blend{};
     blend.blendEnable         = VK_TRUE;
+    blend.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
     blend.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
     blend.colorBlendOp        = VK_BLEND_OP_ADD;
     blend.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;

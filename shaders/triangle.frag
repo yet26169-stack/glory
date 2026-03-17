@@ -294,35 +294,39 @@ void main() {
     float microAO = 1.0 - clamp(curvature * 1.5, 0.0, 0.2);
     result *= microAO;
 
-    // ── Fog of War (LoL/SC2 style) ──────────────────────────────────────────
+    // ── Fog of War (LoL-style) ──────────────────────────────────────────────
+    // Three-state system: unexplored (black), explored/shroud (dark desaturated),
+    // and visible (full colour).  Smooth borders between zones with wide
+    // smoothstep ranges to match League's soft circular vision edges.
     vec2 fowUV = (fragWorldPos.xz - lightData.fowMapMin) / (lightData.fowMapMax - lightData.fowMapMin);
     fowUV = clamp(fowUV, 0.0, 1.0);
     float visibility = texture(fowTexture, fowUV).r;
 
-    // Smooth transition factors
-    float fowEdge = smoothstep(0.05, 0.15, visibility);  // 0→1 as unexplored→seen
-    float fowMid  = smoothstep(0.45, 0.65, visibility);  // 0→1 as seen→visible
+    // Wide smoothstep bands for soft, gradual transitions (LoL-style)
+    float fowEdge = smoothstep(0.0, 0.25, visibility);   // 0→1 as unexplored→explored
+    float fowMid  = smoothstep(0.35, 0.75, visibility);  // 0→1 as explored→visible
 
-    // Unexplored: near-black with slight blue tint
-    vec3 unexploredColor = vec3(0.02, 0.02, 0.05);
+    // Unexplored: deep dark with subtle blue tint (LoL's "black" fog)
+    vec3 unexploredColor = vec3(0.01, 0.01, 0.03);
 
-    // Previously explored: desaturate 70%, darken 50%, blue-gray tint
+    // Previously explored (shroud): desaturate, darken significantly,
+    // and tint toward blue-grey.  LoL's shroud is recognisable terrain
+    // but clearly "in the dark".
     float lum = dot(result, vec3(0.2126, 0.7152, 0.0722));
-    vec3 desatResult = mix(result, vec3(lum), 0.7) * 0.5;
-    vec3 prevSeenColor = mix(desatResult, vec3(0.08, 0.09, 0.14), 0.3);
+    vec3 desatResult = mix(result, vec3(lum), 0.75) * 0.35;
+    vec3 prevSeenColor = mix(desatResult, vec3(0.06, 0.07, 0.12), 0.4);
 
     // Blend: unexplored → previously seen → fully visible
     result = mix(unexploredColor, mix(prevSeenColor, result, fowMid), fowEdge);
 
-    // Exponential distance fog — only apply in non-visible areas to avoid washing
-    // out the LoL-style clear vision area.  Attenuate fog by FoW visibility so
-    // fully-visible regions get no distance fog, while unexplored areas can still
-    // have atmospheric depth.
+    // Subtle atmospheric depth fog — stronger in shroud, absent in vision.
+    // LoL uses minimal distance fog; this just adds slight depth cuing in
+    // explored-but-not-visible areas.
     float fogDist   = length(lightData.viewPos - fragWorldPos);
     float fogFactor = exp(-lightData.fogDensity * max(fogDist - lightData.fogStart, 0.0));
     fogFactor = clamp(fogFactor, 0.0, 1.0);
-    float fogStrength = 1.0 - visibility;  // 0 in clear areas, 1 in unexplored
-    result = mix(result, mix(lightData.fogColor, result, fogFactor), fogStrength);
+    float fogStrength = (1.0 - fowMid) * 0.5;  // half-strength, only outside vision
+    result = mix(result, lightData.fogColor * 0.3, fogStrength * (1.0 - fogFactor));
 
     outColor = vec4(result, 1.0);
     outCharDepth = gl_FragCoord.z;

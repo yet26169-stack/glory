@@ -2,6 +2,7 @@
 #include "scene/Components.h"
 #include "ability/AbilityComponents.h"
 #include "combat/CombatComponents.h"
+#include "combat/StructureSystem.h"
 
 namespace glory {
 
@@ -17,8 +18,14 @@ void HealthBar::render(const entt::registry& reg,
         float maxHP     = stats.total().maxHP;
         if (maxHP <= 0.0f || currentHP <= 0.0f) continue;
 
+        // Determine Y offset based on entity type — structures are taller
+        float yOff = m_config.yOffset;
+        if (auto* sc = reg.try_get<StructureComponent>(entity)) {
+            yOff = m_config.structureYOffset;
+        }
+
         // Project world position above head
-        glm::vec3 worldPos = tc.position + glm::vec3(0.0f, m_config.yOffset, 0.0f);
+        glm::vec3 worldPos = tc.position + glm::vec3(0.0f, yOff, 0.0f);
         glm::vec4 clip = vp * glm::vec4(worldPos, 1.0f);
         if (clip.w <= 0.001f) continue;
         glm::vec3 ndc = glm::vec3(clip) / clip.w;
