@@ -5,6 +5,7 @@
 #include "combat/CombatSystem.h"
 #include "combat/EconomySystem.h"
 #include "combat/StructureSystem.h"
+#include "combat/MinionWaveSystem.h"
 #include "physics/PhysicsSystem.h"
 #include "vfx/VFXRenderer.h"
 #include "vfx/VFXEventQueue.h"
@@ -126,6 +127,14 @@ void EconomyUpdateSystem::execute(entt::registry& registry, float dt) {
 // ═══════════════════════════════════════════════════════════════════════════════
 void StructureUpdateSystem::execute(entt::registry& registry, float dt) {
     if (m_structures) m_structures->update(registry, dt);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MinionWaveUpdateSystem
+// ═══════════════════════════════════════════════════════════════════════════════
+void MinionWaveUpdateSystem::execute(entt::registry& registry, float dt) {
+    if (m_waves && m_gameTime)
+        m_waves->update(registry, dt, *m_gameTime);
 }
 
 } // namespace glory

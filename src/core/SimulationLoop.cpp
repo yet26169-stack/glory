@@ -5,6 +5,7 @@
 #include "combat/CombatSystem.h"
 #include "combat/EconomySystem.h"
 #include "combat/StructureSystem.h"
+#include "combat/MinionWaveSystem.h"
 #include "physics/PhysicsSystem.h"
 #include "vfx/VFXRenderer.h"
 #include "vfx/VFXEventQueue.h"
@@ -48,6 +49,8 @@ void SimulationLoop::init(const SimulationContext& ctx) {
     m_scheduler.add<EconomyUpdateSystem>(ctx.economy, ctx.gameTime);
 
     m_scheduler.add<StructureUpdateSystem>(ctx.structures);
+
+    m_scheduler.add<MinionWaveUpdateSystem>(ctx.minionWaves, ctx.gameTime);
 
     m_scheduler.add<PhysicsUpdateSystem>();
 

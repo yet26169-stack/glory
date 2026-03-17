@@ -28,6 +28,7 @@ class ConeAbilityRenderer;
 class SpriteEffectRenderer;
 class EconomySystem;
 class StructureSystem;
+class MinionWaveSystem;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // VFXFlushSystem — flushes VFX event queues and updates VFX subsystems
@@ -250,6 +251,26 @@ public:
 
 private:
     StructureSystem* m_structures;
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MinionWaveUpdateSystem — spawns lane minion waves, handles wave AI + movement
+// Runs early so fresh minions participate in combat the same tick.
+// ═══════════════════════════════════════════════════════════════════════════════
+class MinionWaveUpdateSystem : public ISystem {
+public:
+    MinionWaveUpdateSystem(MinionWaveSystem* waves, float* gameTime)
+        : m_waves(waves), m_gameTime(gameTime) {}
+
+    void execute(entt::registry& registry, float dt) override;
+    std::vector<std::type_index> dependsOn() const override {
+        return {}; // runs early — no dependencies
+    }
+    std::string_view name() const override { return "MinionWaveUpdate"; }
+
+private:
+    MinionWaveSystem* m_waves;
+    float*            m_gameTime;
 };
 
 } // namespace glory

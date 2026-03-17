@@ -60,6 +60,7 @@
 #include "combat/EconomySystem.h"
 #include "combat/EconomySystem.h"
 #include "combat/StructureSystem.h"
+#include "combat/MinionWaveSystem.h"
 #include "combat/HeroRegistry.h"
 #include "combat/GpuCollisionSystem.h"
 #include "core/SimulationLoop.h"
@@ -202,6 +203,7 @@ private:
     std::unique_ptr<CombatSystem>  m_combatSystem;    // auto-attack / shield / trick
     std::unique_ptr<EconomySystem> m_economySystem;   // gold, xp, leveling
     std::unique_ptr<StructureSystem> m_structureSystem; // towers, inhibitors, nexus
+    std::unique_ptr<MinionWaveSystem> m_minionWaveSystem; // lane minion waves
     std::function<void(uint8_t)> m_onVictory;           // nexus death callback
     GpuCollisionSystem             m_gpuCollision;    // GPU spatial hash + broadphase
     SimulationLoop                 m_simLoop;         // parallel ECS system scheduler

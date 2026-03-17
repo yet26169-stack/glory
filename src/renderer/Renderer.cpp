@@ -10,6 +10,7 @@
 #include "scene/Components.h"
 #include "combat/CombatComponents.h"
 #include "combat/HeroDefinition.h"
+#include "combat/MinionWaveSystem.h"
 #include "ability/AbilityComponents.h"
 #include "scripting/LuaBindings.h"
 #include "map/MapLoader.h"
@@ -194,6 +195,7 @@ Renderer::Renderer(Window& window) : m_window(window) {
     m_combatSystem  = std::make_unique<CombatSystem>(*m_combatVfxQueue);
     m_economySystem = std::make_unique<EconomySystem>();
     m_structureSystem = std::make_unique<StructureSystem>();
+    m_minionWaveSystem = std::make_unique<MinionWaveSystem>();
 
     // Wire economy system into combat and projectile systems
     m_combatSystem->setEconomySystem(m_economySystem.get());
@@ -480,6 +482,7 @@ void Renderer::simulateStep(float dt) {
             .combat         = m_combatSystem.get(),
             .economy        = m_economySystem.get(),
             .structures     = m_structureSystem.get(),
+            .minionWaves    = m_minionWaveSystem.get(),
             .gpuCollision   = &m_gpuCollision,
             .vfxRenderer    = m_vfxRenderer.get(),
             .vfxQueue       = m_vfxQueue.get(),
@@ -1155,6 +1158,7 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
 
             glm::vec4 tint(1.0f);
             if (e == m_hoveredEntity) tint = glm::vec4(1.0f, 0.4f, 0.4f, 1.0f);
+            else if (auto* tc = m_scene.getRegistry().try_get<TintComponent>(e)) tint = tc->color;
 
             // Beyond impostor distance → render as billboard, skip mesh
             if (m_lodSystem.shouldBeImpostor(dist)) {
@@ -1221,6 +1225,8 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
             glm::vec4 tint(1.0f);
             if (e == m_hoveredEntity) {
                 tint = glm::vec4(1.0f, 0.6f, 0.6f, 1.0f);
+            } else if (auto* tc = m_scene.getRegistry().try_get<TintComponent>(e)) {
+                tint = tc->color;
             }
             instances[instanceIndex].tint = tint;
             instances[instanceIndex].params = glm::vec4(mat.shininess, mat.metallic, mat.roughness, mat.emissive);
@@ -1785,6 +1791,11 @@ void Renderer::buildScene() {
                      totalTowers, totalInhibitors);
     }
 
+    // ── Init minion wave system with map data + pathfinding ─────────────
+    m_minionWaveSystem->init(m_mapData);
+    m_minionWaveSystem->setPathfinding(&m_pathfinding);
+    m_minionWaveSystem->setScene(&m_scene);
+
     // Default textures
     uint32_t defaultTex  = m_scene.addTexture(Texture::createDefault(*m_device));
     uint32_t checkerTex  = m_scene.addTexture(Texture::createCheckerboard(*m_device));
@@ -2257,6 +2268,21 @@ void Renderer::buildScene() {
             spawnCfg.bindPoseVertices = std::move(minionBindPoseVertices);
             spawnCfg.clips            = std::move(minionClips);
             m_gameplaySystem.setSpawnConfig(std::move(spawnCfg));
+
+            // Copy spawn config to MinionWaveSystem for lane wave spawning
+            {
+                const auto& src = m_gameplaySystem.getSpawnConfig();
+                WaveSpawnConfig wsc;
+                wsc.meshIndex     = src.meshIndex;
+                wsc.texIndex      = src.texIndex;
+                wsc.flatNormIndex = src.flatNormIndex;
+                wsc.skeleton      = src.skeleton;
+                wsc.skinVertices  = src.skinVertices;
+                wsc.bindPoseVertices = src.bindPoseVertices;
+                wsc.clips         = src.clips;
+                wsc.ready         = true;
+                m_minionWaveSystem->setSpawnConfig(std::move(wsc));
+            }
         }    } catch (const std::exception& e) {
         spdlog::warn("Could not load minion model: {}", e.what());
     }
