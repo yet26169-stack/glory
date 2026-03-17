@@ -52,6 +52,8 @@ void SimulationLoop::init(const SimulationContext& ctx) {
 
     m_scheduler.add<MinionWaveUpdateSystem>(ctx.minionWaves, ctx.gameTime);
 
+    m_scheduler.add<RespawnUpdateSystem>(ctx.respawn);
+
     m_scheduler.add<PhysicsUpdateSystem>();
 
     m_scheduler.add<AnimationUpdateSystem>();

@@ -9,6 +9,7 @@ layout(push_constant) uniform ToneMapPC {
     uint  enableVignette;
     uint  enableColorGrade;
     float chromaticAberration; // UV offset strength (default 0.003)
+    float desaturation;        // 0=normal, 1=full grayscale (death screen)
 } pc;
 
 layout(location = 0) in vec2 uv;
@@ -66,6 +67,13 @@ void main() {
         float vignetteDist = length(vignetteUV);
         float vignette     = 1.0 - smoothstep(0.4, 1.1, vignetteDist) * 0.25;
         mapped *= vignette;
+    }
+
+    // ── Death desaturation — grayscale tint when player is dead ──────────────
+    if (pc.desaturation > 0.0) {
+        float lum = dot(mapped, vec3(0.2126, 0.7152, 0.0722));
+        vec3 grayColor = vec3(lum) * vec3(0.85, 0.85, 0.92); // slight cool tint
+        mapped = mix(mapped, grayColor, pc.desaturation);
     }
 
     // ── Gamma correction LAST (swapchain is UNORM) ────────────────────────────

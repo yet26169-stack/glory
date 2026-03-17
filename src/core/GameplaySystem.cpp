@@ -4,6 +4,7 @@
 #include "combat/CombatComponents.h"
 #include "combat/CombatSystem.h"
 #include "combat/EconomySystem.h"
+#include "combat/RespawnSystem.h"
 #include "combat/GpuCollisionSystem.h"
 #include "ability/AbilitySystem.h"
 #include "ability/AbilityComponents.h"
@@ -32,12 +33,23 @@ void GameplaySystem::init(Scene& scene, AbilitySystem* abilities, CombatSystem* 
 // ── Per-tick entry point ────────────────────────────────────────────────────
 
 void GameplaySystem::update(float dt, const GameplayInput& input, GameplayOutput& output) {
-    processRightClick(dt, input, output);
-    processTargetingMode(input);
-    processAbilityKeys(input);
-    processCombatKeys(input);
-    processSpawning(dt, input);
-    processSelection(input, output);
+    // Block gameplay input when the player is dead
+    bool playerDead = false;
+    if (m_playerEntity != entt::null && m_scene) {
+        auto* rc = m_scene->getRegistry().try_get<RespawnComponent>(m_playerEntity);
+        playerDead = rc && rc->state != LifeState::ALIVE;
+    }
+
+    if (!playerDead) {
+        processRightClick(dt, input, output);
+        processTargetingMode(input);
+        processAbilityKeys(input);
+        processCombatKeys(input);
+        processSpawning(dt, input);
+        processSelection(input, output);
+    }
+
+    // These still run (minions keep moving, animations keep playing)
     updateMinionMovement(dt);
     updatePlayerMovement(dt, output);
     updateAnimations(dt);

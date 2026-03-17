@@ -15,7 +15,8 @@ public:
 
     void render(VkCommandBuffer cmd, float exposure, float bloomStrength,
                 uint32_t enableVignette = 1, uint32_t enableColorGrade = 1,
-                float chromaticAberration = 0.003f);
+                float chromaticAberration = 0.003f,
+                float desaturation = 0.0f);
 
     void updateDescriptorSets(VkImageView hdrView, VkImageView bloomView);
     void destroy();
@@ -40,6 +41,7 @@ private:
         uint32_t enableVignette;    // 1=on, 0=off
         uint32_t enableColorGrade;  // 1=on, 0=off
         float    chromaticAberration; // UV offset strength (default 0.003)
+        float    desaturation;       // 0=normal, 1=full grayscale (death screen)
     };
 
     void createDescriptorSetLayout();

@@ -29,6 +29,7 @@ class SpriteEffectRenderer;
 class EconomySystem;
 class StructureSystem;
 class MinionWaveSystem;
+class RespawnSystem;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // VFXFlushSystem — flushes VFX event queues and updates VFX subsystems
@@ -271,6 +272,26 @@ public:
 private:
     MinionWaveSystem* m_waves;
     float*            m_gameTime;
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RespawnUpdateSystem — detects unit death, runs respawn timers, destroys minions
+// Depends on CombatUpdate + StructureUpdate (needs final HP after all damage).
+// ═══════════════════════════════════════════════════════════════════════════════
+class RespawnUpdateSystem : public ISystem {
+public:
+    explicit RespawnUpdateSystem(RespawnSystem* respawn)
+        : m_respawn(respawn) {}
+
+    void execute(entt::registry& registry, float dt) override;
+    std::vector<std::type_index> dependsOn() const override {
+        return { std::type_index(typeid(CombatUpdateSystem)),
+                 std::type_index(typeid(StructureUpdateSystem)) };
+    }
+    std::string_view name() const override { return "RespawnUpdate"; }
+
+private:
+    RespawnSystem* m_respawn;
 };
 
 } // namespace glory

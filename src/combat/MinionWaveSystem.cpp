@@ -1,6 +1,7 @@
 #include "combat/MinionWaveSystem.h"
 #include "combat/CombatComponents.h"
 #include "combat/EconomySystem.h"
+#include "combat/RespawnSystem.h"
 #include "ability/AbilityComponents.h"
 #include "nav/PathfindingSystem.h"
 #include "scene/Scene.h"
@@ -195,6 +196,11 @@ entt::entity MinionWaveSystem::spawnMinion(entt::registry& reg,
     wmc.laneIndex = lane;
     wmc.type      = stats.type;
     reg.emplace<WaveMinionComponent>(e, wmc);
+
+    // Minions die permanently (no respawn, entity destroyed)
+    reg.emplace<RespawnComponent>(e, RespawnComponent{
+        LifeState::ALIVE, 0.f, 0.f, glm::vec3(0.f), false /*isHero=false*/
+    });
 
     // Mesh + material + animation (from shared spawn config)
     reg.emplace<GPUSkinnedMeshComponent>(e, GPUSkinnedMeshComponent{m_spawnCfg.meshIndex});

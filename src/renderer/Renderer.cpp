@@ -11,6 +11,7 @@
 #include "combat/CombatComponents.h"
 #include "combat/HeroDefinition.h"
 #include "combat/MinionWaveSystem.h"
+#include "combat/RespawnSystem.h"
 #include "ability/AbilityComponents.h"
 #include "scripting/LuaBindings.h"
 #include "map/MapLoader.h"
@@ -221,6 +222,7 @@ Renderer::Renderer(Window& window) : m_window(window) {
     m_economySystem = std::make_unique<EconomySystem>();
     m_structureSystem = std::make_unique<StructureSystem>();
     m_minionWaveSystem = std::make_unique<MinionWaveSystem>();
+    m_respawnSystem = std::make_unique<RespawnSystem>();
 
     // Wire economy system into combat and projectile systems
     m_combatSystem->setEconomySystem(m_economySystem.get());
@@ -508,6 +510,7 @@ void Renderer::simulateStep(float dt) {
             .economy        = m_economySystem.get(),
             .structures     = m_structureSystem.get(),
             .minionWaves    = m_minionWaveSystem.get(),
+            .respawn        = m_respawnSystem.get(),
             .gpuCollision   = &m_gpuCollision,
             .vfxRenderer    = m_vfxRenderer.get(),
             .vfxQueue       = m_vfxQueue.get(),
@@ -654,7 +657,12 @@ void Renderer::simulateStep(float dt) {
         m_gameplaySystem.update(dt, gi, go);
 
         if (go.clickAnim) m_clickAnim = *go.clickAnim;
-        if (go.cameraFollowTarget) m_isoCam.setFollowTarget(*go.cameraFollowTarget);
+        if (go.cameraFollowTarget) {
+            // Don't follow player when dead — camera stays at death location
+            bool isDead = RespawnSystem::isDead(m_scene.getRegistry(), m_playerEntity);
+            if (!isDead)
+                m_isoCam.setFollowTarget(*go.cameraFollowTarget);
+        }
     }
 }
 
@@ -1752,7 +1760,12 @@ void Renderer::recordTonemapPass(VkCommandBuffer cmd, const FrameContext& ctx) {
         vkCmdSetViewport(cmd, 0, 1, &vp);
         vkCmdSetScissor(cmd, 0, 1, &sc);
     }
-    m_toneMap->render(cmd, /*exposure=*/1.0f, /*bloomStrength=*/0.3f);
+    float deathDesat = 0.0f;
+    if (RespawnSystem::isDead(m_scene.getRegistry(), m_playerEntity))
+        deathDesat = 0.7f; // heavy desaturation for death screen
+    m_toneMap->render(cmd, /*exposure=*/1.0f, /*bloomStrength=*/0.3f,
+                      /*vignette=*/1, /*colorGrade=*/1, /*chromatic=*/0.003f,
+                      deathDesat);
 
     if (m_gpuTimer) m_gpuTimer->endZone(cmd, m_currentFrame, "Tonemap");
 
@@ -1824,6 +1837,15 @@ void Renderer::buildScene() {
     m_minionWaveSystem->init(m_mapData);
     m_minionWaveSystem->setPathfinding(&m_pathfinding);
     m_minionWaveSystem->setScene(&m_scene);
+
+    // ── Init respawn system ──────────────────────────────────────────────
+    m_respawnSystem->init(m_mapData, m_economySystem.get(), m_audioEvents.get());
+    m_respawnSystem->onRespawn = [this](entt::entity e, glm::vec3 fountain) {
+        if (e == m_playerEntity) {
+            m_isoCam.setFollowTarget(fountain);
+            m_isoCam.setAttached(true);
+        }
+    };
 
     // Default textures
     uint32_t defaultTex  = m_scene.addTexture(Texture::createDefault(*m_device));
@@ -2163,6 +2185,11 @@ void Renderer::buildScene() {
 
     // Economy: starting gold + XP tracking
     m_scene.getRegistry().emplace<EconomyComponent>(character, EconomyComponent{500, 0, 1});
+
+    // Respawn: hero can die and respawn
+    m_scene.getRegistry().emplace<RespawnComponent>(character, RespawnComponent{
+        LifeState::ALIVE, 0.f, 0.f, glm::vec3(0.f), true /*isHero*/
+    });
     if (m_abilitySystem) {
         std::array<std::string, 4> abilityIds;
         if (heroDef) {
@@ -2450,7 +2477,10 @@ void Renderer::spawnTestEnemy() {
     stats.base.armor      = 30.0f;
     reg.emplace<StatsComponent>(enemy, stats);
 
-    // Reuse cached minion visuals
+    // Respawn: test enemies are non-hero (destroyed on death)
+    reg.emplace<RespawnComponent>(enemy, RespawnComponent{
+        .state = LifeState::ALIVE, .isHero = false
+    });
     const auto& spawnCfg = m_gameplaySystem.getSpawnConfig();
     reg.emplace<GPUSkinnedMeshComponent>(enemy, GPUSkinnedMeshComponent{ spawnCfg.meshIndex });
     uint32_t flatNorm = 0;

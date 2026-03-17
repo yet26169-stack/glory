@@ -6,6 +6,7 @@
 #include "combat/EconomySystem.h"
 #include "combat/StructureSystem.h"
 #include "combat/MinionWaveSystem.h"
+#include "combat/RespawnSystem.h"
 #include "physics/PhysicsSystem.h"
 #include "vfx/VFXRenderer.h"
 #include "vfx/VFXEventQueue.h"
@@ -135,6 +136,13 @@ void StructureUpdateSystem::execute(entt::registry& registry, float dt) {
 void MinionWaveUpdateSystem::execute(entt::registry& registry, float dt) {
     if (m_waves && m_gameTime)
         m_waves->update(registry, dt, *m_gameTime);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RespawnUpdateSystem
+// ═══════════════════════════════════════════════════════════════════════════════
+void RespawnUpdateSystem::execute(entt::registry& registry, float dt) {
+    if (m_respawn) m_respawn->update(registry, dt);
 }
 
 } // namespace glory

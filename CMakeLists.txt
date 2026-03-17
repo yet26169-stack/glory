@@ -283,6 +283,7 @@ set(SOURCES
     src/hud/AbilityBar.cpp
     src/hud/Scoreboard.cpp
     src/hud/KillFeed.cpp
+    src/hud/RespawnOverlay.cpp
     src/animation/AnimationPlayer.cpp
     src/animation/CPUSkinning.cpp
     src/vfx/ParticleSystem.cpp
@@ -298,6 +299,7 @@ set(SOURCES
     src/combat/EconomySystem.cpp
     src/combat/StructureSystem.cpp
     src/combat/MinionWaveSystem.cpp
+    src/combat/RespawnSystem.cpp
     src/combat/HeroRegistry.cpp
     src/combat/GpuCollisionSystem.cpp
     src/audio/AudioEngine.cpp

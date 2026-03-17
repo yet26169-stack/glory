@@ -20,6 +20,7 @@ class CombatSystem;
 class EconomySystem;
 class StructureSystem;
 class MinionWaveSystem;
+class RespawnSystem;
 class VFXRenderer;
 class TrailRenderer;
 class GroundDecalRenderer;
@@ -50,6 +51,7 @@ struct SimulationContext {
     EconomySystem*        economy         = nullptr;
     StructureSystem*      structures      = nullptr;
     MinionWaveSystem*     minionWaves     = nullptr;
+    RespawnSystem*        respawn         = nullptr;
     const GpuCollisionSystem* gpuCollision = nullptr;
 
     // VFX subsystems (non-owning references)
