@@ -214,20 +214,6 @@ Renderer::Renderer(Window& window) : m_window(window) {
     m_toneMap = std::make_unique<ToneMapPass>();
     m_toneMap->init(*m_device, swapFmts, m_hdrFB->colorView(), m_bloom->bloomResultView(), m_hdrFB->sampler());
 
-    // ── Post-processing: SSAO / SSR ──────────────────────────────────────
-    {
-        auto ext = m_window.getExtent();
-        m_ssaoPass.init(*m_device, ext.width, ext.height,
-                        m_hdrFB->depthView(), m_hdrFB->sampler());
-        m_ssrPass.init(*m_device, ext.width, ext.height,
-                       m_hdrFB->depthView(), m_hdrFB->sampler(),
-                       m_hdrFB->colorView(), m_hdrFB->sampler(),
-                       m_hizPass.getPyramidView(), m_hizPass.getSampler());
-    }
-
-    m_isoCam.setBounds(glm::vec3(0, 0, 0), glm::vec3(200, 0, 200));
-    m_isoCam.setTarget(glm::vec3(100, 0, 100));
-
     // ── GPU-driven indirect rendering infrastructure ──
     {
         m_megaBuffer = std::make_unique<MegaBuffer>();
@@ -252,6 +238,20 @@ Renderer::Renderer(Window& window) : m_window(window) {
         }
         spdlog::info("GPU-driven rendering infrastructure initialized");
     }
+
+    // ── Post-processing: SSAO / SSR (must be after HiZ init for pyramid view) ─
+    {
+        auto ext = m_window.getExtent();
+        m_ssaoPass.init(*m_device, ext.width, ext.height,
+                        m_hdrFB->depthView(), m_hdrFB->sampler());
+        m_ssrPass.init(*m_device, ext.width, ext.height,
+                       m_hdrFB->depthView(), m_hdrFB->sampler(),
+                       m_hdrFB->colorView(), m_hdrFB->sampler(),
+                       m_hizPass.getPyramidView(), m_hizPass.getSampler());
+    }
+
+    m_isoCam.setBounds(glm::vec3(0, 0, 0), glm::vec3(200, 0, 200));
+    m_isoCam.setTarget(glm::vec3(100, 0, 100));
 
     buildScene();
 
@@ -1919,7 +1919,7 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
         barriers[2].dstStageMask  = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
         barriers[2].dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
         barriers[2].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        barriers[2].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        barriers[2].newLayout = VK_IMAGE_LAYOUT_GENERAL;
         barriers[2].image = m_hdrFB->charDepthImage();
         barriers[2].subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
@@ -1936,15 +1936,18 @@ void Renderer::recordTransparentVFXPass(VkCommandBuffer cmd, const FrameContext&
     float aspect = ctx.aspect;
 
     // Copy scene color for distortion effects before rendering transparents over it
+    bool copiedColor = false;
     if (m_distortionRenderer) {
         m_hdrFB->copyColor(cmd);
+        copiedColor = true;
     }
 
     // Transition color back to attachment for load pass writing
-    {
+    // (copyColor already leaves color in COLOR_ATTACHMENT_OPTIMAL — skip if done)
+    if (!copiedColor) {
         VkImageMemoryBarrier2 colorToAttach{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
-        colorToAttach.srcStageMask  = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-        colorToAttach.srcAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_TRANSFER_READ_BIT;
+        colorToAttach.srcStageMask  = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+        colorToAttach.srcAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
         colorToAttach.dstStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
         colorToAttach.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT;
         colorToAttach.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -1968,7 +1971,7 @@ void Renderer::recordTransparentVFXPass(VkCommandBuffer cmd, const FrameContext&
 
     VkRenderingAttachmentInfo loadCharDepthAttach{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
     loadCharDepthAttach.imageView   = m_hdrFB->characterDepthView();
-    loadCharDepthAttach.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    loadCharDepthAttach.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
     loadCharDepthAttach.loadOp      = VK_ATTACHMENT_LOAD_OP_LOAD;
     loadCharDepthAttach.storeOp     = VK_ATTACHMENT_STORE_OP_NONE;
 
@@ -2135,6 +2138,12 @@ void Renderer::recordTonemapPass(VkCommandBuffer cmd, const FrameContext& ctx) {
     vkCmdBeginRendering(cmd, &swapRenderInfo);
     if (m_gpuTimer) m_gpuTimer->beginZone(cmd, m_currentFrame, "Tonemap");
 
+    {
+        VkViewport vp{0, 0, static_cast<float>(ext.width), static_cast<float>(ext.height), 0, 1};
+        VkRect2D   sc{{0, 0}, ext};
+        vkCmdSetViewport(cmd, 0, 1, &vp);
+        vkCmdSetScissor(cmd, 0, 1, &sc);
+    }
     m_toneMap->render(cmd, /*exposure=*/1.0f, /*bloomStrength=*/0.3f);
 
     if (m_gpuTimer) m_gpuTimer->endZone(cmd, m_currentFrame, "Tonemap");

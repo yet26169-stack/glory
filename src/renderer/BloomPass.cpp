@@ -69,6 +69,14 @@ void BloomPass::destroy() {
 void BloomPass::dispatch(VkCommandBuffer cmd) {
     VkImageSubresourceRange fullRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
+    // Helper: set viewport/scissor for bloom half-res render targets
+    auto setViewportScissor = [&]() {
+        VkViewport vp{0, 0, static_cast<float>(m_width), static_cast<float>(m_height), 0, 1};
+        VkRect2D   sc{{0, 0}, {m_width, m_height}};
+        vkCmdSetViewport(cmd, 0, 1, &vp);
+        vkCmdSetScissor(cmd, 0, 1, &sc);
+    };
+
     // 1. Extract bright areas (HDR -> Blur0)
     {
         // Transition Blur0 from UNDEFINED to COLOR_ATTACHMENT_OPTIMAL
@@ -109,6 +117,7 @@ void BloomPass::dispatch(VkCommandBuffer cmd) {
         BloomPushConstants pc{0, 1.0f};
         vkCmdPushConstants(cmd, m_pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(BloomPushConstants), &pc);
 
+        setViewportScissor();
         vkCmdDraw(cmd, 3, 1, 0, 0);
         vkCmdEndRendering(cmd);
 
@@ -181,6 +190,7 @@ void BloomPass::dispatch(VkCommandBuffer cmd) {
             BloomPushConstants pc{1, 1.0f};
             vkCmdPushConstants(cmd, m_pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(BloomPushConstants), &pc);
 
+            setViewportScissor();
             vkCmdDraw(cmd, 3, 1, 0, 0);
             vkCmdEndRendering(cmd);
 
@@ -243,6 +253,7 @@ void BloomPass::dispatch(VkCommandBuffer cmd) {
             BloomPushConstants pc{0, 1.0f};
             vkCmdPushConstants(cmd, m_pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(BloomPushConstants), &pc);
 
+            setViewportScissor();
             vkCmdDraw(cmd, 3, 1, 0, 0);
             vkCmdEndRendering(cmd);
 

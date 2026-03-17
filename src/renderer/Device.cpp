@@ -264,6 +264,7 @@ void Device::createLogicalDevice() {
     vk13Features.dynamicRendering   = VK_TRUE;
     vk13Features.synchronization2   = VK_TRUE;
     vk13Features.maintenance4       = VK_TRUE;
+    vk13Features.shaderDemoteToHelperInvocation = VK_TRUE;
 
     VkDeviceCreateInfo ci{};
     ci.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;

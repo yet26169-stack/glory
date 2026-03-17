@@ -282,10 +282,14 @@ void ImpostorSystem::createPipeline(const RenderFormats& formats) {
     blendAtt.colorWriteMask      = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
                                    VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
+    VkPipelineColorBlendAttachmentState noWrite{};
+    noWrite.colorWriteMask = 0;
+    VkPipelineColorBlendAttachmentState impostorBlends[2] = {blendAtt, noWrite};
+
     VkPipelineColorBlendStateCreateInfo blend{};
     blend.sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    blend.attachmentCount = 1;
-    blend.pAttachments    = &blendAtt;
+    blend.attachmentCount = 2;
+    blend.pAttachments    = impostorBlends;
 
     VkDynamicState dynStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
     VkPipelineDynamicStateCreateInfo dynState{};
