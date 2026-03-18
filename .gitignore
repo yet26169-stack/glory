@@ -71,6 +71,9 @@ textured models/
 first_try_clicking_animation/
 MOBA_Click_Indicator_Animation.mp4
 
+# Shaders
+*.spv
+
 # C++ binaries/libraries
 *.exe
 *.out

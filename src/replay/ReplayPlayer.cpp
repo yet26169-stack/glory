@@ -28,26 +28,20 @@ bool ReplayPlayer::load(const std::string& filePath) {
     // Read frames until we hit the footer (totalTicks + checksum)
     while (file.peek() != EOF) {
         auto pos = file.tellg();
+        
+        // Peek if we have at least sizeof(ReplayTickRecord) + 8 (footer) left
+        file.seekg(0, std::ios::end);
+        auto endPos = file.tellg();
+        file.seekg(pos);
+        
+        if (static_cast<size_t>(endPos - pos) <= 8) {
+            break; // reached footer
+        }
+
         ReplayTickRecord rec{};
         file.read(reinterpret_cast<char*>(&rec), sizeof(rec));
         if (!file) break;
 
-        // Check if this might be the footer (next 4 bytes = finalChecksum)
-        // We detect the footer by checking if we can read one more uint32_t
-        auto pos2 = file.tellg();
-        uint32_t maybeChecksum = 0;
-        file.read(reinterpret_cast<char*>(&maybeChecksum), sizeof(maybeChecksum));
-
-        if (!file || file.peek() == EOF) {
-            // This was the footer: rec.tick = totalTicks, rec.inputCount bytes = checksum
-            // Actually, the footer is written as: uint32_t totalTicks, uint32_t checksum
-            // which means the last 8 bytes are the footer
-            file.seekg(pos);
-            break;
-        }
-
-        // Not at footer — rewind the checksum peek and keep the frame
-        file.seekg(pos2);
         m_frames.push_back(rec);
     }
 

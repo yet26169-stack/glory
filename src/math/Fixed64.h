@@ -52,15 +52,38 @@ struct Fixed64 {
         __int128 result = static_cast<__int128>(raw) * o.raw;
         return fromRaw(static_cast<int64_t>(result >> FRAC_BITS));
         #else
-        // Portable fallback: split into high and low parts
-        int64_t ah = raw >> 32;
-        uint64_t al = static_cast<uint64_t>(raw) & 0xFFFFFFFFULL;
-        int64_t bh = o.raw >> 32;
-        uint64_t bl = static_cast<uint64_t>(o.raw) & 0xFFFFFFFFULL;
-        int64_t result = (ah * bh) << (64 - FRAC_BITS);
-        result += (ah * static_cast<int64_t>(bl) + static_cast<int64_t>(al) * bh) << (32 - FRAC_BITS);
-        result += static_cast<int64_t>((al * bl) >> FRAC_BITS);
-        return fromRaw(result);
+        // Portable fallback: split into high and low parts (32.32)
+        // a = (ah << 32) + al
+        // b = (bh << 32) + bl
+        // a*b = (ah*bh << 64) + (ah*bl << 32) + (al*bh << 32) + (al*bl)
+        
+        bool negative = (raw < 0) != (o.raw < 0);
+        uint64_t a = (raw < 0) ? -raw : raw;
+        uint64_t b = (o.raw < 0) ? -o.raw : o.raw;
+
+        uint64_t ah = a >> 32;
+        uint64_t al = a & 0xFFFFFFFFULL;
+        uint64_t bh = b >> 32;
+        uint64_t bl = b & 0xFFFFFFFFULL;
+
+        uint64_t p0 = al * bl;
+        uint64_t p1 = al * bh;
+        uint64_t p2 = ah * bl;
+        uint64_t p3 = ah * bh;
+
+        // Reconstruct result >> FRAC_BITS
+        // p0 >> 16
+        // p1 << (32 - 16)
+        // p2 << (32 - 16)
+        // p3 << (64 - 16)
+        
+        uint64_t res = (p0 >> FRAC_BITS);
+        res += (p1 << (32 - FRAC_BITS));
+        res += (p2 << (32 - FRAC_BITS));
+        res += (p3 << (64 - FRAC_BITS));
+
+        int64_t finalRes = static_cast<int64_t>(res);
+        return fromRaw(negative ? -finalRes : finalRes);
         #endif
     }
 
@@ -70,8 +93,28 @@ struct Fixed64 {
         __int128 dividend = static_cast<__int128>(raw) << FRAC_BITS;
         return fromRaw(static_cast<int64_t>(dividend / o.raw));
         #else
-        // Portable fallback — works for values that fit after the shift
-        return fromRaw((raw << FRAC_BITS) / o.raw);
+        // Portable fallback: manual 128-bit shift-and-divide
+        bool negative = (raw < 0) != (o.raw < 0);
+        uint64_t a = (raw < 0) ? -raw : raw;
+        uint64_t b = (o.raw < 0) ? -o.raw : o.raw;
+
+        // Dividend is a << 16. Represent as (hi << 64) | lo
+        uint64_t hi = a >> (64 - FRAC_BITS);
+        uint64_t lo = a << FRAC_BITS;
+
+        uint64_t quot = 0;
+        uint64_t rem = hi;
+
+        for (int i = 63; i >= 0; --i) {
+            rem = (rem << 1) | ((lo >> i) & 1);
+            if (rem >= b) {
+                rem -= b;
+                quot |= (1ULL << i);
+            }
+        }
+
+        int64_t finalRes = static_cast<int64_t>(quot);
+        return fromRaw(negative ? -finalRes : finalRes);
         #endif
     }
 
@@ -187,6 +230,14 @@ inline constexpr int64_t SIN_TABLE[257] = {
     65536
 };
 
+// CORDIC atan lookup table: atan(2^-i) * 65536
+inline constexpr int64_t ATAN_TABLE[32] = {
+    51472, 30386, 16055, 8150, 4091, 2047, 1024, 512,
+    256, 128, 64, 32, 16, 8, 4, 2,
+    1, 1, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0
+};
+
 } // namespace detail
 
 // Deterministic sin using lookup table with linear interpolation
@@ -216,11 +267,51 @@ inline Fixed64 cos(Fixed64 angle) {
     return sin(angle + Fixed64::halfPi());
 }
 
-// atan2 — uses float internally as a temporary measure
-// TODO: Replace with CORDIC implementation for full cross-platform determinism
+// atan2 — deterministic CORDIC implementation
 inline Fixed64 atan2(Fixed64 y, Fixed64 x) {
-    float result = std::atan2(y.toFloat(), x.toFloat());
-    return Fixed64::fromFloat(result);
+    if (x.raw == 0 && y.raw == 0) return Fixed64::zero();
+
+    int64_t angle = 0;
+    int64_t xi = x.raw;
+    int64_t yi = y.raw;
+
+    // Initial rotation to put vector in right half-plane (-PI/2 to PI/2)
+    if (xi < 0) {
+        xi = -xi;
+        yi = -yi;
+    }
+
+    // CORDIC iterations
+    for (int i = 0; i < 32; ++i) {
+        int64_t next_xi;
+        if (yi > 0) {
+            next_xi = xi + (yi >> i);
+            yi = yi - (xi >> i);
+            angle += detail::ATAN_TABLE[i];
+        } else if (yi < 0) {
+            next_xi = xi - (yi >> i);
+            yi = yi + (xi >> i);
+            angle -= detail::ATAN_TABLE[i];
+        } else {
+            break;
+        }
+        xi = next_xi;
+    }
+
+    // Adjust angle based on original quadrant
+    if (x.raw < 0) {
+        if (y.raw >= 0) angle += Fixed64::pi().raw;
+        else           angle -= Fixed64::pi().raw;
+    }
+
+    return Fixed64::fromRaw(angle);
+}
+
+// acos — deterministic using atan2(sqrt(1-x*x), x)
+inline Fixed64 acos(Fixed64 x) {
+    Fixed64 one = Fixed64::one();
+    Fixed64 x_clamped = clamp(x, -one, one);
+    return atan2(sqrt(one - x_clamped * x_clamped), x_clamped);
 }
 
 // Stream output

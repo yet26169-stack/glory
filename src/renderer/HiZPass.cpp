@@ -325,6 +325,7 @@ void HiZPass::destroyResources() {
         if (view) vkDestroyImageView(dev, view, nullptr);
     }
     m_mipViews.clear();
+    m_descSets.clear();
 
     if (m_pyramidView)  vkDestroyImageView(dev, m_pyramidView, nullptr);
     if (m_pyramidImage) vmaDestroyImage(m_device->getAllocator(), m_pyramidImage, m_pyramidAlloc);
@@ -391,6 +392,7 @@ void GpuCuller::destroy() {
     m_pipeLayout = VK_NULL_HANDLE;
     m_descPool   = VK_NULL_HANDLE;
     m_descLayout = VK_NULL_HANDLE;
+    m_descSets.clear();
     m_frames.clear();
     m_device = nullptr;
 }

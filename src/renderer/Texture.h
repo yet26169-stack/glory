@@ -15,6 +15,7 @@ class Texture {
 public:
   Texture() = default;
   Texture(const Device &device, const std::string &filepath);
+  Texture(Image &&image);
   ~Texture();
 
   Texture(const Texture &) = delete;
@@ -23,10 +24,15 @@ public:
   Texture &operator=(Texture &&other) noexcept;
 
   VkImageView getImageView() const { return m_image.getImageView(); }
+  VkImage     getImage()     const { return m_image.getImage(); }
   VkSampler getSampler() const { return m_sampler; }
 
   // 1x1 white fallback texture
   static Texture createDefault(const Device &device);
+  
+  /// Create a texture that can be used as a color attachment and sampled.
+  static Texture createRenderable(const Device &device, uint32_t width, uint32_t height,
+                                  VkFormat format = VK_FORMAT_R8G8B8A8_UNORM);
   // Procedural checkerboard (tileSize in pixels, total = tileSize*tiles*2)
   static Texture createCheckerboard(const Device &device, uint32_t tiles = 8,
                                     uint32_t tileSize = 16,

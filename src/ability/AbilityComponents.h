@@ -124,13 +124,12 @@ struct StatsComponent {
     Stats bonus;   // from items / buffs
 
     Stats total() const {
-        Stats t;
-        t.attackDamage      = base.attackDamage      + bonus.attackDamage;
-        t.abilityPower       = base.abilityPower       + bonus.abilityPower;
-        t.armor              = base.armor              + bonus.armor;
-        t.magicResist        = base.magicResist        + bonus.magicResist;
-        t.maxHP              = base.maxHP              + bonus.maxHP;
-        t.currentHP          = base.currentHP;         // don't add bonus
+        Stats t = base;
+        t.attackDamage      += bonus.attackDamage;
+        t.abilityPower       += bonus.abilityPower;
+        t.armor              += bonus.armor;
+        t.magicResist        += bonus.magicResist;
+        t.maxHP              += bonus.maxHP;
         t.cooldownReduction  = std::min(0.45f,
                                base.cooldownReduction + bonus.cooldownReduction);
         return t;

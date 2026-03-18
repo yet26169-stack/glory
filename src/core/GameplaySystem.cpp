@@ -93,6 +93,7 @@ void GameplaySystem::processRightClick(float /*dt*/, const GameplayInput& input,
     glm::vec3 worldPos = screenToWorld(input.lastClickPos.x, input.lastClickPos.y, input);
 
     auto& reg    = m_scene->getRegistry();
+    if (!reg.all_of<CharacterComponent, CombatComponent>(m_playerEntity)) return;
     auto& c      = reg.get<CharacterComponent>(m_playerEntity);
     auto& combat = reg.get<CombatComponent>(m_playerEntity);
 
@@ -633,9 +634,7 @@ void GameplaySystem::updatePlayerMovement(float dt, GameplayOutput& output) {
                 // IN RANGE: Start attack cycle if possible
                 if (combat.state == CombatState::IDLE && combat.attackCooldown <= 0.0f) {
                     c.hasTarget = false; // Stop moving to attack
-                    combat.state = CombatState::ATTACK_WINDUP;
-                    // Windup duration scaled by Attack Speed
-                    combat.stateTimer = (1.0f / combat.attackSpeed) * combat.windupPercent;
+                    m_combatSystem->requestAutoAttack(m_playerEntity, combat.targetEntity, reg);
                 } else if (combat.state == CombatState::ATTACK_WINDUP || combat.state == CombatState::ATTACK_WINDDOWN) {
                     c.hasTarget = false; // Stay still during attack
                 }
@@ -742,7 +741,8 @@ void GameplaySystem::updateAnimations(float dt) {
                 auto& combat = reg.get<CombatComponent>(e);
                 const auto& attackClip = anim.clips[anim.activeClipIndex];
                 float clipDuration = (attackClip.duration > 0.0f) ? attackClip.duration : 1.0f;
-                anim.player.setTimeScale(clipDuration * combat.attackSpeed);
+                if (combat.attackSpeed > 0.0f)
+                    anim.player.setTimeScale(clipDuration * combat.attackSpeed);
             } else if (anim.activeClipIndex == 1 && anim.activeClipIndex < (int)anim.clips.size()) {
                 // Walk: scale to match movement speed
                 const auto& walkClip = anim.clips[anim.activeClipIndex];

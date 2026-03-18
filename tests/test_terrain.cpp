@@ -12,6 +12,8 @@
 
 using namespace glory;
 
+static int g_testsPassed = 0;
+
 // ── Isometric Camera Tests ──────────────────────────────────────────────────
 
 void test_iso_camera_initial_position() {
@@ -27,6 +29,7 @@ void test_iso_camera_initial_position() {
   assert(pos.y > target.y);
 
   std::printf("  PASS: IsometricCamera initial position correct\n");
+  g_testsPassed++;
 }
 
 void test_iso_camera_view_matrix() {
@@ -38,6 +41,7 @@ void test_iso_camera_view_matrix() {
   assert(view != glm::mat4(0.0f));
 
   std::printf("  PASS: IsometricCamera produces valid view matrix\n");
+  g_testsPassed++;
 }
 
 void test_iso_camera_projection() {
@@ -48,6 +52,7 @@ void test_iso_camera_projection() {
   assert(proj[1][1] < 0.0f); // Y is flipped for Vulkan
 
   std::printf("  PASS: IsometricCamera produces Vulkan Y-flipped projection\n");
+  g_testsPassed++;
 }
 
 void test_iso_camera_bounds_clamping() {
@@ -65,6 +70,7 @@ void test_iso_camera_bounds_clamping() {
   assert(target.z >= 10.0f);
 
   std::printf("  PASS: IsometricCamera bounds clamping works\n");
+  g_testsPassed++;
 }
 
 // ── Frustum / AABB Tests (for terrain chunk culling) ────────────────────────
@@ -84,6 +90,7 @@ void test_frustum_visible_aabb() {
 
   assert(frustum.isVisible(centerBox));
   std::printf("  PASS: Center AABB visible from isometric camera\n");
+  g_testsPassed++;
 }
 
 void test_frustum_culled_aabb() {
@@ -104,6 +111,7 @@ void test_frustum_culled_aabb() {
   bool visible = frustum.isVisible(farBox);
   if (!visible) {
     std::printf("  PASS: Far-behind AABB correctly culled\n");
+  g_testsPassed++;
   } else {
     std::printf(
         "  WARN: Far-behind AABB not culled (frustum test approximate)\n");
@@ -141,6 +149,7 @@ void test_height_interpolation() {
   assert(std::abs(h - 1.0f) < 0.001f);
 
   std::printf("  PASS: Bilinear height interpolation correct\n");
+  g_testsPassed++;
 }
 
 int main() {
@@ -154,6 +163,6 @@ int main() {
   test_frustum_culled_aabb();
   test_height_interpolation();
 
-  std::printf("\nAll %d tests passed!\n", 7);
+  std::printf("\nAll %d tests passed!\n", g_testsPassed);
   return 0;
 }

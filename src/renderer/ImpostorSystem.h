@@ -14,10 +14,12 @@
 namespace glory {
 
 class Device;
+class Model;
 struct RenderFormats;
 
 /// Descriptor for a single impostor unit type in the atlas.
 struct ImpostorEntry {
+    const Model* model   = nullptr;
     uint32_t atlasIndex  = 0;  // which atlas page
     uint32_t startCol    = 0;  // first column in atlas grid
     uint32_t startRow    = 0;  // first row
@@ -52,16 +54,12 @@ public:
 
     /// Register a unit type for impostor rendering.
     /// modelName is the asset key; worldWidth/Height determine billboard sizing.
-    void registerUnitType(const std::string& modelName, float worldWidth,
-                          float worldHeight, uint32_t angleCount = 8);
+    void registerUnitType(const std::string& modelName, const Model* model,
+                          float worldWidth, float worldHeight, uint32_t angleCount = 8);
 
     /// Generate the impostor atlas by rendering each registered type from
     /// `angleCount` evenly spaced angles.  Call once after all types registered
     /// and scene meshes are loaded.
-    ///
-    /// For now this creates a placeholder solid-color atlas.  Full off-screen
-    /// rendering of unit meshes will be added when the off-screen render-target
-    /// infrastructure is in place.
     void generateAtlas();
 
     /// Look up impostor entry for a model name.
@@ -110,7 +108,12 @@ private:
     VkDescriptorPool m_descPool       = VK_NULL_HANDLE;
     VkDescriptorSet  m_descSet        = VK_NULL_HANDLE;
 
+    // ── Capture ──────────────────────────────────────────────────────────
+    VkPipeline       m_capturePipeline = VK_NULL_HANDLE;
+    VkPipelineLayout m_captureLayout   = VK_NULL_HANDLE;
+
     void createPipeline(const RenderFormats& formats);
+    void createCapturePipeline();
     void ensureInstanceCapacity(size_t needed);
 
     float angleFromDirection(glm::vec2 dir) const;

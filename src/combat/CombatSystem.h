@@ -21,7 +21,7 @@ public:
     void setEconomySystem(EconomySystem* econ) { m_economy = econ; }
 
     // ── Input requests (called from Renderer in response to player keys) ──
-    void requestAutoAttack(entt::entity attacker, entt::entity target);
+    void requestAutoAttack(entt::entity attacker, entt::entity target, entt::registry& reg);
     void requestShield(entt::entity entity, entt::registry& reg);
     void releaseShield(entt::entity entity, entt::registry& reg);
     void requestTrick(entt::entity attacker, entt::entity target, entt::registry& reg);

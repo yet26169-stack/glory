@@ -184,8 +184,8 @@ struct AbilityDefinition {
 struct Stats {
     float attackDamage  = 60.0f;
     float abilityPower  = 0.0f;
-    float armor         = 40.0f;
-    float magicResist   = 32.0f;
+    float armor         = 0.0f;
+    float magicResist   = 0.0f;
     float maxHP         = 600.0f;
     float currentHP     = 600.0f;
     float flatArmorPen  = 0.0f;

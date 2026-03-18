@@ -9,6 +9,10 @@
 #include <cstdint>
 #include <unordered_map>
 
+#include <DetourNavMesh.h>
+#include <DetourNavMeshQuery.h>
+#include <DetourCrowd.h>
+
 namespace glory {
 
 struct NavMeshData;
@@ -101,10 +105,10 @@ private:
     std::array<FlowField, FLOW_FIELD_COUNT> m_flowFields;
     std::array<glm::vec2, FLOW_FIELD_COUNT> m_flowFieldGoals;
 
-    // Recast/Detour handles (activate when library is linked):
-    // dtNavMesh*      m_navMesh = nullptr;
-    // dtNavMeshQuery* m_query   = nullptr;
-    // dtCrowd*        m_crowd   = nullptr;
+    // Recast/Detour handles
+    dtNavMesh*      m_navMesh = nullptr;
+    dtNavMeshQuery* m_query   = nullptr;
+    dtCrowd*        m_crowd   = nullptr;
 };
 
 } // namespace glory

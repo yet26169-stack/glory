@@ -1,5 +1,7 @@
 # Glory Engine
 
+![CI Status](https://github.com/donkey-ux/glory/actions/workflows/ci.yml/badge.svg)
+
 A custom Vulkan 1.3 MOBA game engine written in C++20, inspired by League of Legends and StarCraft II. Features a stylized toon-shading pipeline, GPU-driven rendering, ECS architecture, deterministic lockstep netcode, and Lua scripting.
 
 ## Features
@@ -80,6 +82,33 @@ cd build && ctest --output-on-failure
 
 ## Project Structure
 
-`src/` — engine code (core, renderer, hud, audio, network, scripting, nav, ability, assets)
-`docs/` — design documents & deep dives · `shaders/` — GLSL (compiled by CMake)
-`assets/` — game assets · `extern/` — third-party libs · `tools/` — asset cooker
+- **`src/`** — Core engine source code
+  - `ability/` — Ability system, cooldowns, effects, projectiles, status effects
+  - `animation/` — Skeletal animation, retargeting, blend trees
+  - `assets/` — Asset loading and management utilities
+  - `audio/` — 3D spatial audio engine (miniaudio integration)
+  - `camera/` — Isometric camera and frustum math
+  - `combat/` — Combat system, economy, structures, hero registry, minion waves
+  - `core/` — App loop, simulation loop, threading, RNG, logging, profiler, allocators
+  - `fog/` — Fog of War gameplay and visibility logic
+  - `hud/` — UI components: health bars, floating text, minimap, scoreboard
+  - `input/` — Input handling, mouse targeting, keyboard mapping
+  - `map/` — Map loading (JSON), lane waypoints, symmetry logic
+  - `math/` — Deterministic fixed-point math (`Fixed64`, `FixedVec3`, CORDIC trig)
+  - `nav/` — Navigation: pathfinding (Recast/Detour), flow fields, splines, lane following
+  - `network/` — Lockstep networking (ENet), rollback, input synchronization
+  - `physics/` — Simple collision detection and rigid body physics
+  - `renderer/` — Vulkan 1.3 pipeline, GPU culling, shadows, post-processing (Bloom, SSAO, SSR)
+  - `replay/` — Replay recording, serialization, and playback
+  - `scene/` — ECS component definitions and scene management
+  - `scripting/` — Lua scripting integration (sol2 bindings)
+  - `terrain/` — Terrain rendering and heightmap queries
+  - `vfx/` — Visual effects: GPU particles, trails, mesh effects, composite sequencer
+  - `window/` — GLFW window management and Vulkan surface integration
+
+- **`tests/`** — Unit test suite (15+ test files for core simulation and math)
+- **`assets/`** — JSON data, textures, and models
+- **`shaders/`** — GLSL shader source (compiled to SPIR-V during build)
+- **`extern/`** — Third-party libraries (EnTT, GLFW, GLM, spdlog, etc.)
+- **`docs/`** — Architecture deep dives and design specifications
+- **`tools/`** — Asset cooking and development tools

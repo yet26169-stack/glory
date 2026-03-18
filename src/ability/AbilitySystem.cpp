@@ -144,12 +144,45 @@ void AbilitySystem::update(entt::registry& registry, float dt, TrailRenderer* tr
                 it->tickAccumulator += dt;
                 while (it->tickAccumulator >= it->def->tickRate) {
                     it->tickAccumulator -= it->def->tickRate;
-                    // TODO: call applyTickEffect when HealthComponent is available
+                    
+                    if (registry.all_of<StatsComponent>(entity)) {
+                        auto& stats = registry.get<StatsComponent>(entity);
+                        if (it->def->type == EffectType::DOT) {
+                            float dmg = calculateDamage(it->totalValue, it->def->damageType, stats.total());
+                            stats.base.currentHP = std::max(0.0f, stats.base.currentHP - dmg);
+                            
+                            if (!it->def->applyVFX.empty()) {
+                                glm::vec3 pos{0.f};
+                                if (registry.all_of<TransformComponent>(entity))
+                                    pos = registry.get<TransformComponent>(entity).position;
+                                emitVFX(it->def->applyVFX, pos);
+                            }
+                        } else if (it->def->type == EffectType::HOT) {
+                            stats.base.currentHP = std::min(stats.base.maxHP, stats.base.currentHP + it->totalValue);
+                            if (!it->def->applyVFX.empty()) {
+                                glm::vec3 pos{0.f};
+                                if (registry.all_of<TransformComponent>(entity))
+                                    pos = registry.get<TransformComponent>(entity).position;
+                                emitVFX(it->def->applyVFX, pos);
+                            }
+                        }
+                    }
                 }
             }
 
-            if (it->remainingDuration <= 0.0f) {
-                it = statusComp.activeEffects.erase(it);
+            bool dead = false;
+            if (registry.all_of<StatsComponent>(entity) && registry.get<StatsComponent>(entity).base.currentHP <= 0.0f) {
+                dead = true;
+            }
+
+            if (it->remainingDuration <= 0.0f || dead) {
+                if (dead) {
+                    statusComp.activeEffects.clear();
+                    it = statusComp.activeEffects.end();
+                    break;
+                } else {
+                    it = statusComp.activeEffects.erase(it);
+                }
             } else {
                 ++it;
             }
@@ -520,12 +553,21 @@ void AbilitySystem::applyEffectToEntity(entt::registry& reg, entt::entity caster
         case EffectType::DOT:
         case EffectType::HOT: {
             if (effect.duration > 0.0f) {
+                Stats casterStats;
+                if (reg.all_of<StatsComponent>(caster))
+                    casterStats = reg.get<StatsComponent>(caster).total();
+
+                const float rawValue = effect.scaling.evaluate(level,
+                                       casterStats.attackDamage, casterStats.abilityPower,
+                                       casterStats.currentHP, casterStats.armor,
+                                       casterStats.magicResist);
+
                 auto& sc  = reg.get_or_emplace<StatusEffectsComponent>(target);
                 ActiveStatusEffect ase;
                 ase.def               = &effect;
                 ase.sourceEntity      = static_cast<EntityID>(entt::to_integral(caster));
                 ase.remainingDuration = effect.duration;
-                ase.totalValue        = effect.value;
+                ase.totalValue        = (rawValue != 0.0f) ? rawValue : effect.value;
                 if (!effect.applyVFX.empty()) {
                     glm::vec3 pos{0.f};
                     if (reg.all_of<TransformComponent>(target))
@@ -586,6 +628,7 @@ uint32_t AbilitySystem::emitVFX(const std::string& effectID,
     ev.scale    = scale;
     ev.lifetime = lifetime;
     std::strncpy(ev.effectID, effectID.c_str(), sizeof(ev.effectID) - 1);
+    ev.effectID[sizeof(ev.effectID) - 1] = '\0';
 
     if (!m_vfxQueue.push(ev)) {
         spdlog::warn("AbilitySystem: VFX queue full, dropping '{}'", effectID);

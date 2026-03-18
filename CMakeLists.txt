@@ -18,19 +18,32 @@ endif()
 
 add_library(glory_sanitizers INTERFACE)
 if(GLORY_ASAN)
-    target_compile_options(glory_sanitizers INTERFACE -fsanitize=address -fno-omit-frame-pointer -g)
-    target_link_options   (glory_sanitizers INTERFACE -fsanitize=address)
+    if(MSVC)
+        target_compile_options(glory_sanitizers INTERFACE /fsanitize=address /Zi)
+        target_link_options(glory_sanitizers INTERFACE /fsanitize=address /DEBUG)
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(glory_sanitizers INTERFACE -fsanitize=address -fno-omit-frame-pointer -g)
+        target_link_options   (glory_sanitizers INTERFACE -fsanitize=address)
+    endif()
     message(STATUS "Glory: AddressSanitizer ENABLED")
 endif()
 if(GLORY_TSAN)
-    target_compile_options(glory_sanitizers INTERFACE -fsanitize=thread -fno-omit-frame-pointer -g)
-    target_link_options   (glory_sanitizers INTERFACE -fsanitize=thread)
-    message(STATUS "Glory: ThreadSanitizer ENABLED")
+    if(MSVC)
+        message(WARNING "ThreadSanitizer (TSAN) is not supported on MSVC — disabling.")
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(glory_sanitizers INTERFACE -fsanitize=thread -fno-omit-frame-pointer -g)
+        target_link_options   (glory_sanitizers INTERFACE -fsanitize=thread)
+        message(STATUS "Glory: ThreadSanitizer ENABLED")
+    endif()
 endif()
 if(GLORY_UBSAN)
-    target_compile_options(glory_sanitizers INTERFACE -fsanitize=undefined -fno-omit-frame-pointer -g)
-    target_link_options   (glory_sanitizers INTERFACE -fsanitize=undefined)
-    message(STATUS "Glory: UndefinedBehaviorSanitizer ENABLED")
+    if(MSVC)
+        message(WARNING "UndefinedBehaviorSanitizer (UBSAN) is not supported on MSVC — disabling.")
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(glory_sanitizers INTERFACE -fsanitize=undefined -fno-omit-frame-pointer -g)
+        target_link_options   (glory_sanitizers INTERFACE -fsanitize=undefined)
+        message(STATUS "Glory: UndefinedBehaviorSanitizer ENABLED")
+    endif()
 endif()
 
 enable_testing()
@@ -111,6 +124,8 @@ set(SHADER_SOURCES
     ${CMAKE_SOURCE_DIR}/shaders/flow_field.comp
     ${CMAKE_SOURCE_DIR}/shaders/impostor_billboard.vert
     ${CMAKE_SOURCE_DIR}/shaders/impostor_billboard.frag
+    ${CMAKE_SOURCE_DIR}/shaders/impostor_capture.vert
+    ${CMAKE_SOURCE_DIR}/shaders/impostor_capture.frag
 )
 
 foreach(SHADER ${SHADER_SOURCES})
@@ -190,6 +205,22 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(sol2)
 message(STATUS "Glory: sol2 v3.3.1 ENABLED")
+# ── RecastNavigation ──────────────────────────────────────────────────────────
+set(CMAKE_POLICY_DEFAULT_CMP0000 NEW)
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+include(FetchContent)
+FetchContent_Declare(
+    recastnavigation
+    GIT_REPOSITORY https://github.com/recastnavigation/recastnavigation.git
+    GIT_TAG        v1.6.0
+    GIT_SHALLOW    TRUE
+)
+set(RECASTNAVIGATION_DEMO OFF CACHE BOOL "" FORCE)
+set(RECASTNAVIGATION_TESTS OFF CACHE BOOL "" FORCE)
+set(RECASTNAVIGATION_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(RECASTNAVIGATION_STATIC ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(recastnavigation)
+message(STATUS "Glory: RecastNavigation ENABLED (v1.6.0)")
 
 # ── miniaudio (single-header audio library) ────────────────────────────────────
 FetchContent_Declare(
@@ -343,6 +374,10 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/extern/tinygltf
     ${CMAKE_SOURCE_DIR}/extern
     ${miniaudio_SOURCE_DIR}
+    ${recastnavigation_SOURCE_DIR}/Recast/Include
+    ${recastnavigation_SOURCE_DIR}/Detour/Include
+    ${recastnavigation_SOURCE_DIR}/DetourCrowd/Include
+    ${recastnavigation_SOURCE_DIR}/DetourTileCache/Include
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
@@ -355,6 +390,10 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     lua_static
     sol2
     glory_sanitizers
+    Recast
+    Detour
+    DetourCrowd
+    DetourTileCache
 )
 
 # Platform-specific libs for FramePacer
@@ -422,9 +461,184 @@ target_include_directories(test_terrain PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(test_terrain PRIVATE glm::glm glory_sanitizers)
 target_compile_definitions(test_terrain PRIVATE GLM_FORCE_RADIANS GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
+add_executable(test_fixedpoint tests/test_fixedpoint.cpp)
+target_include_directories(test_fixedpoint PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(test_fixedpoint PRIVATE glory_sanitizers)
+
+add_executable(test_nav tests/test_nav.cpp
+    src/nav/NavMeshBuilder.cpp
+    src/nav/PathfindingSystem.cpp
+    src/nav/FlowField.cpp
+    src/map/MapLoader.cpp
+    src/renderer/GLBLoader.cpp
+    src/renderer/Model.cpp
+    src/renderer/Mesh.cpp
+    src/renderer/Buffer.cpp
+    src/renderer/Texture.cpp
+    src/renderer/Device.cpp
+    src/renderer/Image.cpp
+    extern/vma/vma_impl.cpp
+)
+target_include_directories(test_nav PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/extern
+    ${CMAKE_SOURCE_DIR}/extern/tinygltf
+    ${CMAKE_SOURCE_DIR}/extern/stb
+    ${CMAKE_SOURCE_DIR}/extern/vma
+    ${CMAKE_SOURCE_DIR}/extern/tinyobj
+    ${CMAKE_SOURCE_DIR}/extern/nlohmann
+    ${CMAKE_SOURCE_DIR}/extern/entt
+)
+target_link_libraries(test_nav PRIVATE
+    glm::glm
+    spdlog::spdlog
+    meshoptimizer
+    glory_sanitizers
+    Recast
+    Detour
+    DetourCrowd
+    Vulkan::Vulkan
+    glfw
+)
+target_compile_definitions(test_nav PRIVATE
+    GLM_FORCE_RADIANS
+    GLM_FORCE_DEPTH_ZERO_TO_ONE
+    MAP_DATA_DIR="${CMAKE_SOURCE_DIR}/assets/maps/"
+)
+
+add_test(NAME fixedpoint COMMAND test_fixedpoint)
 add_test(NAME mirror    COMMAND test_mirror)
 add_test(NAME maploader COMMAND test_maploader)
 add_test(NAME terrain   COMMAND test_terrain)
+add_test(NAME nav       COMMAND test_nav)
+
+add_executable(test_ability tests/test_ability.cpp
+    src/ability/AbilitySystem.cpp
+    src/vfx/CompositeVFXSequencer.cpp
+    src/scripting/ScriptEngine.cpp
+    src/renderer/GLBLoader.cpp
+    src/renderer/Model.cpp
+    src/renderer/Mesh.cpp
+    src/renderer/Buffer.cpp
+    src/renderer/Texture.cpp
+    src/renderer/Device.cpp
+    src/renderer/Image.cpp
+    extern/vma/vma_impl.cpp
+)
+target_include_directories(test_ability PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/extern
+    ${CMAKE_SOURCE_DIR}/extern/tinygltf
+    ${CMAKE_SOURCE_DIR}/extern/stb
+    ${CMAKE_SOURCE_DIR}/extern/vma
+    ${CMAKE_SOURCE_DIR}/extern/tinyobj
+    ${CMAKE_SOURCE_DIR}/extern/nlohmann
+    ${CMAKE_SOURCE_DIR}/extern/entt
+    ${CMAKE_SOURCE_DIR}/extern/glm
+)
+target_link_libraries(test_ability PRIVATE
+    glm::glm
+    spdlog::spdlog
+    meshoptimizer
+    glory_sanitizers
+    lua_static
+    sol2
+    Vulkan::Vulkan
+    glfw
+)
+add_test(NAME ability COMMAND test_ability)
+
+add_executable(test_combat tests/test_combat.cpp
+    src/combat/CombatSystem.cpp
+    src/combat/EconomySystem.cpp
+    src/audio/GameAudioEvents.cpp
+    src/audio/AudioResourceManager.cpp
+    src/audio/AudioEngine.cpp
+    src/audio/SoundHandle.cpp
+    src/audio/miniaudio_impl.cpp
+    src/renderer/GLBLoader.cpp
+    src/renderer/Model.cpp
+    src/renderer/Mesh.cpp
+    src/renderer/Buffer.cpp
+    src/renderer/Texture.cpp
+    src/renderer/Device.cpp
+    src/renderer/Image.cpp
+    extern/vma/vma_impl.cpp
+)
+target_include_directories(test_combat PRIVATE 
+    ${CMAKE_SOURCE_DIR}/src 
+    ${CMAKE_SOURCE_DIR}/extern/entt
+    ${CMAKE_SOURCE_DIR}/extern/glm
+    ${CMAKE_SOURCE_DIR}/extern/stb
+    ${CMAKE_SOURCE_DIR}/extern/tinygltf
+    ${CMAKE_SOURCE_DIR}/extern/vma
+    ${CMAKE_SOURCE_DIR}/extern/nlohmann
+    ${CMAKE_SOURCE_DIR}/extern/tinyobj
+    ${CMAKE_SOURCE_DIR}/extern
+    ${miniaudio_SOURCE_DIR}
+)
+target_link_libraries(test_combat PRIVATE 
+    glory_sanitizers 
+    spdlog::spdlog
+    meshoptimizer
+    Vulkan::Vulkan
+    glfw
+)
+add_test(NAME combat COMMAND test_combat)
+
+add_executable(test_animation tests/test_animation.cpp
+    src/animation/AnimationPlayer.cpp
+)
+target_include_directories(test_animation PRIVATE 
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/extern/glm
+    ${CMAKE_SOURCE_DIR}/extern
+    ${CMAKE_SOURCE_DIR}/extern/stb
+    ${CMAKE_SOURCE_DIR}/extern/tinygltf
+)
+target_link_libraries(test_animation PRIVATE glory_sanitizers spdlog::spdlog)
+add_test(NAME animation COMMAND test_animation)
+
+add_executable(test_physics tests/test_physics.cpp
+    src/physics/PhysicsSystem.cpp
+)
+target_include_directories(test_physics PRIVATE 
+    ${CMAKE_SOURCE_DIR}/src 
+    ${CMAKE_SOURCE_DIR}/extern/entt
+    ${CMAKE_SOURCE_DIR}/extern/glm
+    ${CMAKE_SOURCE_DIR}/extern/vma
+    ${CMAKE_SOURCE_DIR}/extern
+)
+target_link_libraries(test_physics PRIVATE glory_sanitizers spdlog::spdlog)
+add_test(NAME physics COMMAND test_physics)
+
+add_executable(test_audio tests/test_audio.cpp
+    src/audio/AudioResourceManager.cpp
+    src/audio/AudioEngine.cpp
+    src/audio/SoundHandle.cpp
+    src/audio/miniaudio_impl.cpp
+)
+target_include_directories(test_audio PRIVATE 
+    ${CMAKE_SOURCE_DIR}/src 
+    ${miniaudio_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/extern/glm
+    ${CMAKE_SOURCE_DIR}/extern
+)
+target_link_libraries(test_audio PRIVATE glory_sanitizers spdlog::spdlog)
+add_test(NAME audio COMMAND test_audio)
+
+add_executable(test_replay tests/test_replay.cpp
+    src/replay/ReplayRecorder.cpp
+    src/replay/ReplayPlayer.cpp
+)
+target_include_directories(test_replay PRIVATE 
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/extern/glm
+    ${CMAKE_SOURCE_DIR}/extern/entt
+    ${CMAKE_SOURCE_DIR}/extern
+)
+target_link_libraries(test_replay PRIVATE glory_sanitizers spdlog::spdlog)
+add_test(NAME replay COMMAND test_replay)
 
 # ── Asset cook tool ───────────────────────────────────────────────────────────
 add_executable(asset_cook tools/asset_cook.cpp)

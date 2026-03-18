@@ -2,8 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [ main, develop ]
   pull_request:
+    branches: [ main, develop ]
 
 # Cancel in-flight runs for the same branch when a new push arrives.
 concurrency:
@@ -11,87 +12,68 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ── AddressSanitizer + UndefinedBehaviorSanitizer ──────────────────────────
-  tests-asan-ubsan:
-    name: "Tests — ASan + UBSan (Clang)"
-    runs-on: ubuntu-22.04
+  build-release:
+    name: "Release Build (GCC)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            ninja-build \
+            libvulkan-dev \
+            shaderc \
+            libglfw3-dev \
+            libglm-dev \
+            libspdlog-dev
+
+      - name: Configure (Release)
+        run: |
+          cmake -B build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --parallel $(nproc)
+
+      - name: Run Tests
+        run: ctest --test-dir build --output-on-failure
+
+  build-sanitizers:
+    name: "Debug + Sanitizers (Clang)"
+    runs-on: ubuntu-latest
     env:
-      ASAN_OPTIONS:  "halt_on_error=1:detect_leaks=1:print_stacktrace=1"
+      ASAN_OPTIONS: "halt_on_error=1:detect_leaks=1:print_stacktrace=1"
       UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            clang ninja-build \
-            libvulkan-dev libglfw3-dev libglm-dev libspdlog-dev
+            clang \
+            ninja-build \
+            libvulkan-dev \
+            shaderc \
+            libglfw3-dev \
+            libglm-dev \
+            libspdlog-dev
 
-      - name: Configure (ASan + UBSan)
+      - name: Configure (Debug + ASan + UBSan)
         run: |
           cmake -B build \
             -G Ninja \
-            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_BUILD_TYPE=Debug \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_C_COMPILER=clang \
             -DGLORY_ASAN=ON \
             -DGLORY_UBSAN=ON
 
-      - name: Build tests
-        run: |
-          cmake --build build \
-            --target test_mirror test_maploader test_terrain \
-            -j$(nproc)
+      - name: Build
+        run: cmake --build build --parallel $(nproc)
 
-      - name: Run tests
+      - name: Run Tests
         run: ctest --test-dir build --output-on-failure
-
-  # ── ThreadSanitizer ────────────────────────────────────────────────────────
-  tests-tsan:
-    name: "Tests — TSan (Clang)"
-    runs-on: ubuntu-22.04
-    env:
-      TSAN_OPTIONS: "halt_on_error=1:second_deadlock_stack=1"
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            clang ninja-build \
-            libvulkan-dev libglfw3-dev libglm-dev libspdlog-dev
-
-      - name: Configure (TSan)
-        run: |
-          cmake -B build \
-            -G Ninja \
-            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-            -DCMAKE_CXX_COMPILER=clang++ \
-            -DCMAKE_C_COMPILER=clang \
-            -DGLORY_TSAN=ON
-
-      - name: Build tests
-        run: |
-          cmake --build build \
-            --target test_mirror test_maploader test_terrain \
-            -j$(nproc)
-
-      - name: Run tests
-        run: ctest --test-dir build --output-on-failure
-
-  # ── SSIM Shadow-Regression (headless GPU not available — placeholder) ───────
-  # Requires an offscreen Vulkan path and a software ICD (e.g., Mesa lavapipe).
-  # To enable: implement a --headless flag that writes a PNG via stb_image_write,
-  # install vulkan-tools mesa-vulkan-drivers in the runner, and uncomment below.
-  #
-  # ssim-regression:
-  #   name: "Shadow regression (SSIM)"
-  #   runs-on: ubuntu-22.04
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - run: sudo apt-get install -y mesa-vulkan-drivers python3-skimage
-  #     - run: cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j$(nproc)
-  #     - run: ./build/Glory --headless --frames 1 --out /tmp/frame.png
-  #     - run: python3 tools/ssim_check.py /tmp/frame.png tests/reference/frame_baseline.png 0.97

@@ -89,11 +89,7 @@ void SimulationLoop::tick(SimulationContext& ctx) {
         m_scheduler.tick(ctx.registry, ctx.dt, *ctx.threadPool);
     } else {
         // Fallback: execute systems sequentially if no thread pool
-        for (size_t i = 0; i < m_scheduler.systemCount(); ++i) {
-            // This path shouldn't be hit in normal operation
-        }
-        spdlog::warn("SimulationLoop: no thread pool, skipping tick");
-        return;
+        m_scheduler.tickSequential(ctx.registry, ctx.dt);
     }
 
     // Sync cone effect timer back to the context (Renderer reads it)

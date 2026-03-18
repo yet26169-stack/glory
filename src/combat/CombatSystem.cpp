@@ -19,11 +19,23 @@ CombatSystem::CombatSystem(VFXEventQueue& vfxQueue) : m_vfxQueue(vfxQueue) {}
 
 // ── Input entry-points ──────────────────────────────────────────────────────
 
-void CombatSystem::requestAutoAttack(entt::entity attacker, entt::entity target) {
-    // Caller is responsible for range/cooldown/state checks
-    // We just set state and windup timer
-    // (CombatComponent must already exist on attacker)
-    // NOTE: registry access is deferred — we only store the target entity
+void CombatSystem::requestAutoAttack(entt::entity attacker, entt::entity target, entt::registry& reg) {
+    if (!reg.all_of<CombatComponent>(attacker)) return;
+    auto& combat = reg.get<CombatComponent>(attacker);
+    
+    // Simple checks: must be IDLE or WINDDOWN, and target must be valid
+    if (combat.state != CombatState::IDLE && combat.state != CombatState::ATTACK_WINDDOWN) return;
+    if (combat.attackCooldown > 0.0f) return;
+    if (!reg.valid(target)) return;
+
+    combat.state = CombatState::ATTACK_WINDUP;
+    
+    Fixed32 fAttackSpeed(combat.attackSpeed);
+    Fixed32 fCycleTime = Fixed32::one() / fAttackSpeed;
+    Fixed32 fWindupPercent(combat.windupPercent);
+    combat.stateTimer = (fCycleTime * fWindupPercent).toFloat();
+    
+    combat.targetEntity = target;
 }
 
 void CombatSystem::requestShield(entt::entity entity, entt::registry& reg) {
@@ -254,7 +266,8 @@ void CombatSystem::applyAutoAttackHit(entt::registry& reg, entt::entity attacker
             auto& stats = reg.get<StatsComponent>(target);
             auto& attackerCombat = reg.get<CombatComponent>(attacker);
             Fixed32 fDamage(attackerCombat.attackDamage);
-            Fixed32 fArmor(stats.total().armor);
+            Stats tStats = stats.total();
+            Fixed32 fArmor(tStats.armor);
             Fixed32 fFinal = fDamage * (Fixed32(100) / (Fixed32(100) + fArmor));
             float finalDamage = fFinal.toFloat();
             stats.base.currentHP = std::max(0.0f, stats.base.currentHP - finalDamage);
@@ -331,6 +344,7 @@ void CombatSystem::emitVFX(const std::string& effectId, const glm::vec3& pos,
     VFXEvent ev{};
     ev.type = VFXEventType::Spawn;
     std::strncpy(ev.effectID, effectId.c_str(), sizeof(ev.effectID) - 1);
+    ev.effectID[sizeof(ev.effectID) - 1] = '\0';
     ev.position  = pos;
     ev.direction = dir;
     ev.scale     = scale;

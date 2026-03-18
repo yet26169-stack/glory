@@ -100,4 +100,14 @@ void SystemScheduler::tick(entt::registry& registry, float dt, ThreadPool& pool)
     }
 }
 
+void SystemScheduler::tickSequential(entt::registry& registry, float dt) {
+    if (m_dirty) build();
+
+    for (const auto& level : m_levels) {
+        for (uint32_t idx : level) {
+            m_systems[idx]->execute(registry, dt);
+        }
+    }
+}
+
 } // namespace glory

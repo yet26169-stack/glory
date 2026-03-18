@@ -56,6 +56,9 @@ public:
     // Systems at the same level run in parallel via the ThreadPool.
     void tick(entt::registry& registry, float dt, ThreadPool& pool);
 
+    // Execute all systems in dependency order on the calling thread.
+    void tickSequential(entt::registry& registry, float dt);
+
     // Number of registered systems.
     size_t systemCount() const { return m_systems.size(); }
 

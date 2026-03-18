@@ -178,6 +178,10 @@ Texture::Texture(const Device &device, const std::string &filepath)
   spdlog::info("Texture loaded: {} ({}x{})", filepath, texWidth, texHeight);
 }
 
+Texture::Texture(Image &&image)
+    : m_image(std::move(image)) {
+}
+
 Texture::~Texture() { destroy(); }
 
 Texture::Texture(Texture &&other) noexcept
@@ -236,6 +240,20 @@ Texture Texture::createDefault(const Device &device) {
 
   tex.createSampler(device);
   spdlog::info("Default 1x1 white texture created");
+  return tex;
+}
+
+Texture Texture::createRenderable(const Device &device, uint32_t width, uint32_t height,
+                                  VkFormat format) {
+  Texture tex;
+  tex.m_vkDevice = device.getDevice();
+  tex.m_image = Image(device, width, height, format,
+                      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                      VK_IMAGE_USAGE_SAMPLED_BIT |
+                      VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                      VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+                      VK_IMAGE_ASPECT_COLOR_BIT);
+  tex.createSampler(device);
   return tex;
 }
 

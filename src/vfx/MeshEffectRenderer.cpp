@@ -207,8 +207,8 @@ MeshEffectRenderer::MeshData* MeshEffectRenderer::getOrLoadMesh(const std::strin
         auto model = std::make_unique<Model>(Model::loadFromGLB(m_device, m_device.getAllocator(), path));
         m_meshes[path] = { std::move(model) };
         return &m_meshes[path];
-    } catch (...) {
-        spdlog::error("Failed to load VFX mesh: {}", path);
+    } catch (const std::exception& e) {
+        spdlog::error("Failed to load VFX mesh: {} - {}", path, e.what());
         return nullptr;
     }
 }

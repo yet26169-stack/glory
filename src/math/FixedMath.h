@@ -46,11 +46,9 @@ inline Fixed64 moveToward(Fixed64 current, Fixed64 target, Fixed64 maxDelta) {
 inline Fixed64 angleBetween(const FixedVec3& a, const FixedVec3& b) {
     Fixed64 lenProduct = a.length() * b.length();
     if (lenProduct == Fixed64::zero()) return Fixed64::zero();
-    Fixed64 cosAngle = clamp(a.dot(b) / lenProduct,
+    Fixed64 cosValue = clamp(a.dot(b) / lenProduct,
                              Fixed64::fromInt(-1), Fixed64::one());
-    // TODO: Replace with deterministic acos when CORDIC atan2 is implemented
-    float result = std::acos(cosAngle.toFloat());
-    return Fixed64::fromFloat(result);
+    return acos(cosValue);
 }
 
 // Project vector a onto vector b

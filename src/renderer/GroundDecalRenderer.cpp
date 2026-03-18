@@ -210,6 +210,7 @@ void GroundDecalRenderer::createPipelines() {
     blend.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
     blend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
     blend.alphaBlendOp = VK_BLEND_OP_ADD;
+    // Second attachment intentionally write-masked (brightness attachment unused by decals)
     VkPipelineColorBlendAttachmentState decalBlends[2] = {blend, {}};
     VkPipelineColorBlendStateCreateInfo cbCI{ VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
     cbCI.attachmentCount = 2;
@@ -266,8 +267,8 @@ Texture* GroundDecalRenderer::getOrLoadTexture(const std::string& path) {
         Texture* ptr = tex.get();
         m_textureCache[path] = std::move(tex);
         return ptr;
-    } catch (...) {
-        spdlog::warn("Failed to load decal texture: {}", path);
+    } catch (const std::exception& e) {
+        spdlog::warn("Failed to load decal texture: {} - {}", path, e.what());
         return m_defaultTexture.get();
     }
 }

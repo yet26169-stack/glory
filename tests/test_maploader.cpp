@@ -16,6 +16,8 @@ using namespace glory;
 #define MAP_DATA_DIR "assets/maps/"
 #endif
 
+static int g_testsPassed = 0;
+
 static bool vec3Near(const glm::vec3 &a, const glm::vec3 &b,
                      float eps = 0.001f) {
   return glm::length(a - b) < eps;
@@ -31,6 +33,7 @@ void test_load_json() {
   assert(g_mapData.mapName == "Summoner's Rift");
   assert(g_mapData.version == "1.0.0");
   std::printf("  PASS: JSON loads successfully\n");
+  g_testsPassed++;
 }
 
 // ── Team 1 tests ────────────────────────────────────────────────────────────
@@ -42,16 +45,19 @@ void test_team1_base() {
   assert(std::abs(base.spawnPlatformRadius - 8.0f) < 0.01f);
   assert(vec3Near(base.shopPosition, {12, 0, 12}));
   std::printf("  PASS: Team 1 base positions correct\n");
+  g_testsPassed++;
 }
 
 void test_team1_tower_count() {
   assert(g_mapData.teams[0].towers.size() == 11);
   std::printf("  PASS: Team 1 has 11 towers\n");
+  g_testsPassed++;
 }
 
 void test_team1_inhibitor_count() {
   assert(g_mapData.teams[0].inhibitors.size() == 3);
   std::printf("  PASS: Team 1 has 3 inhibitors\n");
+  g_testsPassed++;
 }
 
 void test_team1_lane_waypoints() {
@@ -61,6 +67,7 @@ void test_team1_lane_waypoints() {
   assert(vec3Near(midLane.waypoints.front(), {22, 0, 22}));
   assert(vec3Near(midLane.waypoints.back(), {178, 0, 178}));
   std::printf("  PASS: Team 1 Mid lane has correct waypoint endpoints\n");
+  g_testsPassed++;
 }
 
 // ── Team 2 (generated via mirror) tests ─────────────────────────────────────
@@ -69,6 +76,7 @@ void test_team2_generated() {
   assert(g_mapData.teams[1].towers.size() == 11);
   assert(g_mapData.teams[1].inhibitors.size() == 3);
   std::printf("  PASS: Team 2 generated with correct entity counts\n");
+  g_testsPassed++;
 }
 
 void test_team2_base_mirrored() {
@@ -77,6 +85,7 @@ void test_team2_base_mirrored() {
   assert(vec3Near(base.spawnPlatformCenter, {185, 0, 185}));
   assert(vec3Near(base.shopPosition, {188, 0, 188}));
   std::printf("  PASS: Team 2 base correctly mirrored\n");
+  g_testsPassed++;
 }
 
 void test_team2_tower_positions() {
@@ -85,6 +94,7 @@ void test_team2_tower_positions() {
   const auto &towers = g_mapData.teams[1].towers;
   assert(vec3Near(towers[0].position, {174, 0, 98}));
   std::printf("  PASS: Team 2 tower positions correctly mirrored\n");
+  g_testsPassed++;
 }
 
 void test_team2_lane_mirrored() {
@@ -97,6 +107,7 @@ void test_team2_lane_mirrored() {
   assert(vec3Near(midLane.waypoints.front(), {178, 0, 178}));
   assert(vec3Near(midLane.waypoints.back(), {22, 0, 22}));
   std::printf("  PASS: Team 2 lane waypoints correctly mirrored\n");
+  g_testsPassed++;
 }
 
 // ── Neutral camps tests ─────────────────────────────────────────────────────
@@ -104,6 +115,7 @@ void test_team2_lane_mirrored() {
 void test_neutral_camps() {
   assert(g_mapData.neutralCamps.size() == 11);
   std::printf("  PASS: All 11 neutral camps loaded\n");
+  g_testsPassed++;
 }
 
 // ── Brush & Wall tests ──────────────────────────────────────────────────────
@@ -111,11 +123,13 @@ void test_neutral_camps() {
 void test_brush_zones() {
   assert(g_mapData.brushZones.size() == 8);
   std::printf("  PASS: 8 brush zones loaded\n");
+  g_testsPassed++;
 }
 
 void test_walls() {
   assert(g_mapData.walls.size() == 4);
   std::printf("  PASS: 4 wall segments loaded\n");
+  g_testsPassed++;
 }
 
 // ── Validation test ─────────────────────────────────────────────────────────
@@ -128,6 +142,7 @@ void test_validation_passes() {
   }
   assert(valid);
   std::printf("  PASS: MapLoader::Validate passes\n");
+  g_testsPassed++;
 }
 
 int main() {
@@ -147,6 +162,6 @@ int main() {
   test_walls();
   test_validation_passes();
 
-  std::printf("\nAll %d tests passed!\n", 13);
+  std::printf("\nAll %d tests passed!\n", g_testsPassed);
   return 0;
 }
