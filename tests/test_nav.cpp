@@ -60,8 +60,8 @@ void test_spline_arc_length() {
   // Straight line from 0 to 20: should be close to 20
   assert(std::abs(len - 20.0f) < 1.0f);
   std::printf("  PASS: Arc length ~20 for straight 20-unit line (got %.2f)\n",
-  g_testsPassed++;
               len);
+  g_testsPassed++;
 }
 
 void test_spline_single_point() {

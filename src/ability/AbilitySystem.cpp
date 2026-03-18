@@ -78,6 +78,7 @@ void AbilitySystem::initEntity(entt::registry& registry, entt::entity entity,
     };
 
     for (size_t i = 0; i < 4; ++i) {
+        if (abilityIDs[i].empty()) continue;  // skip unassigned slots
         const auto* def = findDefinition(abilityIDs[i]);
         if (!def) {
             spdlog::warn("AbilitySystem: definition '{}' not found", abilityIDs[i]);

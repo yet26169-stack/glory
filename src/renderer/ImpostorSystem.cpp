@@ -440,9 +440,16 @@ void ImpostorSystem::createPipeline(const RenderFormats& formats) {
     cbAtt.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
     cbAtt.colorBlendOp        = VK_BLEND_OP_ADD;
 
+    // charDepth attachment (slot 1): impostors don't write to it
+    VkPipelineColorBlendAttachmentState cbNoWrite{};
+    cbNoWrite.colorWriteMask = 0;
+    cbNoWrite.blendEnable    = VK_FALSE;
+
+    VkPipelineColorBlendAttachmentState cbAtts[2] = { cbAtt, cbNoWrite };
+
     VkPipelineColorBlendStateCreateInfo cb{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
-    cb.attachmentCount = 1;
-    cb.pAttachments    = &cbAtt;
+    cb.attachmentCount = formats.colorCount > 1 ? 2 : 1;
+    cb.pAttachments    = cbAtts;
 
     VkDynamicState dynStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
     VkPipelineDynamicStateCreateInfo dyn{VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};

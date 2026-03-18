@@ -75,7 +75,9 @@ void Descriptors::flushBones(uint32_t frameIndex) {
 }
 
 void Descriptors::updateShadowMap(VkImageView depthView, VkSampler shadowSampler) {
+    if (m_sets.empty()) return;
     for (uint32_t i = 0; i < m_frameCount; ++i) {
+        if (m_sets[i] == VK_NULL_HANDLE) continue;
         VkDescriptorImageInfo imgInfo{};
         imgInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         imgInfo.imageView   = depthView;
@@ -95,7 +97,9 @@ void Descriptors::updateShadowMap(VkImageView depthView, VkSampler shadowSampler
 }
 
 void Descriptors::writeToonRamp(VkImageView rampView, VkSampler rampSampler) {
+    if (m_sets.empty()) return;
     for (uint32_t i = 0; i < m_frameCount; ++i) {
+        if (m_sets[i] == VK_NULL_HANDLE) continue;
         VkDescriptorImageInfo imgInfo{};
         imgInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         imgInfo.imageView   = rampView;
@@ -115,12 +119,14 @@ void Descriptors::writeToonRamp(VkImageView rampView, VkSampler rampSampler) {
 }
 
 void Descriptors::writeFogOfWar(VkImageView view, VkSampler sampler) {
+    if (m_sets.empty()) return;
     VkDescriptorImageInfo imgInfo{};
     imgInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     imgInfo.imageView   = view;
     imgInfo.sampler     = sampler;
 
     for (auto& set : m_sets) {
+        if (set == VK_NULL_HANDLE) continue;
         VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
         write.dstSet          = set;
         write.dstBinding      = 6;
@@ -322,6 +328,7 @@ void Descriptors::createSets(uint32_t frameCount) {
 }
 
 void Descriptors::writeSceneBuffer(uint32_t frameIndex, VkBuffer buffer, VkDeviceSize range) {
+    if (m_sets.empty() || frameIndex >= m_sets.size() || m_sets[frameIndex] == VK_NULL_HANDLE) return;
     VkDescriptorBufferInfo bufInfo{};
     bufInfo.buffer = buffer;
     bufInfo.offset = 0;
