@@ -30,6 +30,7 @@ class EconomySystem;
 class StructureSystem;
 class MinionWaveSystem;
 class RespawnSystem;
+class NPCBehaviorSystem;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // VFXFlushSystem — flushes VFX event queues and updates VFX subsystems
@@ -294,4 +295,25 @@ private:
     RespawnSystem* m_respawn;
 };
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// NPCBehaviorUpdateSystem — drives ability casting for wave minions.
+// Must run AFTER MinionWaveUpdateSystem (aggroTarget already resolved).
+// ═══════════════════════════════════════════════════════════════════════════════
+class NPCBehaviorUpdateSystem : public ISystem {
+public:
+    NPCBehaviorUpdateSystem(NPCBehaviorSystem* npc, AbilitySystem* abilities)
+        : m_npc(npc), m_abilities(abilities) {}
+
+    void execute(entt::registry& registry, float dt) override;
+    std::vector<std::type_index> dependsOn() const override {
+        return { std::type_index(typeid(MinionWaveUpdateSystem)) };
+    }
+    std::string_view name() const override { return "NPCBehaviorUpdate"; }
+
+private:
+    NPCBehaviorSystem* m_npc;
+    AbilitySystem*     m_abilities;
+};
+
 } // namespace glory
+

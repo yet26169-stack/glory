@@ -21,6 +21,7 @@ class EconomySystem;
 class StructureSystem;
 class MinionWaveSystem;
 class RespawnSystem;
+class NPCBehaviorSystem;
 class VFXRenderer;
 class TrailRenderer;
 class GroundDecalRenderer;
@@ -52,6 +53,7 @@ struct SimulationContext {
     StructureSystem*      structures      = nullptr;
     MinionWaveSystem*     minionWaves     = nullptr;
     RespawnSystem*        respawn         = nullptr;
+    NPCBehaviorSystem*    npcBehavior     = nullptr;
     const GpuCollisionSystem* gpuCollision = nullptr;
 
     // VFX subsystems (non-owning references)

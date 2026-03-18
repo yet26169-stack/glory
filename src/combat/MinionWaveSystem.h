@@ -45,6 +45,10 @@ struct WaveMinionComponent {
     float heroAggroTimer  = 0.0f;   // seconds remaining on hero aggro
     float heroAggroLeash  = 10.0f;  // max distance before dropping hero aggro
     static constexpr float HERO_AGGRO_DURATION = 6.0f;
+
+    // NPC ability decision
+    float   decisionCooldown = 0.0f; // seconds until next ability decision
+    uint8_t abilitySetId     = 0;    // 0 = melee, 1 = caster (reserved)
 };
 
 // ── Spawn configuration (mesh, textures, animation) ─────────────────────────

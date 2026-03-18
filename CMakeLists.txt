@@ -332,6 +332,7 @@ set(SOURCES
     src/combat/EconomySystem.cpp
     src/combat/StructureSystem.cpp
     src/combat/MinionWaveSystem.cpp
+    src/combat/NPCBehaviorSystem.cpp
     src/combat/RespawnSystem.cpp
     src/combat/HeroRegistry.cpp
     src/combat/GpuCollisionSystem.cpp

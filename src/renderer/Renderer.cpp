@@ -230,6 +230,7 @@ Renderer::Renderer(Window& window) : m_window(window) {
     m_economySystem = std::make_unique<EconomySystem>();
     m_structureSystem = std::make_unique<StructureSystem>();
     m_minionWaveSystem = std::make_unique<MinionWaveSystem>();
+    m_npcBehaviorSystem = std::make_unique<NPCBehaviorSystem>();
     m_respawnSystem = std::make_unique<RespawnSystem>();
 
     // Wire economy system into combat and projectile systems
@@ -521,6 +522,7 @@ void Renderer::simulateStep(float dt) {
             .structures     = m_structureSystem.get(),
             .minionWaves    = m_minionWaveSystem.get(),
             .respawn        = m_respawnSystem.get(),
+            .npcBehavior    = m_npcBehaviorSystem.get(),
             .gpuCollision   = &m_gpuCollision,
             .vfxRenderer    = m_vfxRenderer.get(),
             .vfxQueue       = m_vfxQueue.get(),

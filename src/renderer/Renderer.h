@@ -62,6 +62,7 @@
 #include "combat/EconomySystem.h"
 #include "combat/StructureSystem.h"
 #include "combat/MinionWaveSystem.h"
+#include "combat/NPCBehaviorSystem.h"
 #include "combat/RespawnSystem.h"
 #include "combat/HeroRegistry.h"
 #include "combat/GpuCollisionSystem.h"
@@ -206,8 +207,9 @@ private:
     std::unique_ptr<CombatSystem>  m_combatSystem;    // auto-attack / shield / trick
     std::unique_ptr<EconomySystem> m_economySystem;   // gold, xp, leveling
     std::unique_ptr<StructureSystem> m_structureSystem; // towers, inhibitors, nexus
-    std::unique_ptr<MinionWaveSystem> m_minionWaveSystem; // lane minion waves
-    std::unique_ptr<RespawnSystem> m_respawnSystem;       // hero death/respawn lifecycle
+    std::unique_ptr<MinionWaveSystem>   m_minionWaveSystem;   // lane minion waves
+    std::unique_ptr<NPCBehaviorSystem>  m_npcBehaviorSystem;  // NPC ability AI
+    std::unique_ptr<RespawnSystem>      m_respawnSystem;      // hero death/respawn lifecycle
     std::function<void(uint8_t)> m_onVictory;           // nexus death callback
     GpuCollisionSystem             m_gpuCollision;    // GPU spatial hash + broadphase
     SimulationLoop                 m_simLoop;         // parallel ECS system scheduler

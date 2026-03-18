@@ -6,6 +6,7 @@
 #include "combat/EconomySystem.h"
 #include "combat/StructureSystem.h"
 #include "combat/MinionWaveSystem.h"
+#include "combat/NPCBehaviorSystem.h"
 #include "combat/RespawnSystem.h"
 #include "physics/PhysicsSystem.h"
 #include "vfx/VFXRenderer.h"
@@ -143,6 +144,14 @@ void MinionWaveUpdateSystem::execute(entt::registry& registry, float dt) {
 // ═══════════════════════════════════════════════════════════════════════════════
 void RespawnUpdateSystem::execute(entt::registry& registry, float dt) {
     if (m_respawn) m_respawn->update(registry, dt);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NPCBehaviorUpdateSystem
+// ═══════════════════════════════════════════════════════════════════════════════
+void NPCBehaviorUpdateSystem::execute(entt::registry& registry, float dt) {
+    if (m_npc && m_abilities)
+        m_npc->update(registry, dt, *m_abilities);
 }
 
 } // namespace glory
