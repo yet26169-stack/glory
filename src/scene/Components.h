@@ -59,12 +59,15 @@ struct MeshComponent {
 };
 
 struct MaterialComponent {
-  uint32_t materialIndex = 0;  // diffuse texture index
+  uint32_t materialIndex = 0;  // diffuse texture index (sub-mesh 0 / default)
   uint32_t normalMapIndex = 0; // normal map texture index (0 = flat)
   float shininess = 0.0f;      // 0 = use global default
   float metallic = 0.0f;       // 0 = dielectric, 1 = metal
   float roughness = 0.5f;      // 0.04-1.0
   float emissive = 0.0f;       // 0 = no glow, >0 = self-illumination strength
+  // Per-sub-mesh diffuse texture overrides for multi-material GLBs.
+  // subMeshAlbedo[i] replaces materialIndex when rendering sub-mesh i.
+  std::vector<uint32_t> subMeshAlbedo;
 };
 
 struct LightComponent {

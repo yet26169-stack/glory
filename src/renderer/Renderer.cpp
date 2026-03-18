@@ -1224,40 +1224,55 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
                 continue;
             }
 
-            instances[objectCount].model        = model;
-            instances[objectCount].normalMatrix = glm::transpose(glm::inverse(model));
-            instances[objectCount].tint         = tint;
-            instances[objectCount].params       = glm::vec4(mat.shininess, mat.metallic, mat.roughness, mat.emissive);
-            instances[objectCount].texIndices   = glm::vec4(
-                static_cast<float>(mat.materialIndex), static_cast<float>(mat.normalMapIndex), 0.0f, 0.0f);
-
             uint32_t mi = mc.meshIndex;
-            int32_t  si = mc.subMeshIndex < 0 ? 0 : mc.subMeshIndex;
-            if (mi < m_meshHandles.size() && si < static_cast<int32_t>(m_meshHandles[mi].size())) {
-                const auto& mh = m_meshHandles[mi][si];
+            if (mi >= m_meshHandles.size()) continue;
 
-                // CPU-side LOD selection by distance
-                LODLevel lod = m_lodSystem.getLODLevel(mi, static_cast<uint32_t>(si), dist);
-                uint32_t vOff  = (lod.indexCount > 0) ? lod.vertexOffset : mh.vertexOffset;
-                uint32_t iOff  = (lod.indexCount > 0) ? lod.indexOffset  : mh.indexOffset;
-                uint32_t iCnt  = (lod.indexCount > 0) ? lod.indexCount   : mh.indexCount;
+            // Determine sub-mesh range: -1 means draw all sub-meshes
+            uint32_t subCount = static_cast<uint32_t>(m_meshHandles[mi].size());
+            uint32_t siStart  = (mc.subMeshIndex < 0) ? 0 : static_cast<uint32_t>(mc.subMeshIndex);
+            uint32_t siEnd    = (mc.subMeshIndex < 0) ? subCount : siStart + 1;
+
+            glm::mat4 normalMat = glm::transpose(glm::inverse(model));
+            AABB worldAABB = mc.localAABB.transformed(model);
+            glm::vec4 params(mat.shininess, mat.metallic, mat.roughness, mat.emissive);
+
+            for (uint32_t si = siStart; si < siEnd && objectCount < MAX_INSTANCES; ++si) {
+                // Per-sub-mesh texture: prefer subMeshAlbedo[si] when available
+                uint32_t diffuseTex = (si < mat.subMeshAlbedo.size())
+                    ? mat.subMeshAlbedo[si]
+                    : mat.materialIndex;
+
+                instances[objectCount].model        = model;
+                instances[objectCount].normalMatrix = normalMat;
+                instances[objectCount].tint         = tint;
+                instances[objectCount].params       = params;
+                instances[objectCount].texIndices   = glm::vec4(
+                    static_cast<float>(diffuseTex),
+                    static_cast<float>(mat.normalMapIndex), 0.0f, 0.0f);
+
+                const auto& mh = m_meshHandles[mi][si];
+                LODLevel lod = m_lodSystem.getLODLevel(mi, si, dist);
+                uint32_t vOff = (lod.indexCount > 0) ? lod.vertexOffset : mh.vertexOffset;
+                uint32_t iOff = (lod.indexCount > 0) ? lod.indexOffset  : mh.indexOffset;
+                uint32_t iCnt = (lod.indexCount > 0) ? lod.indexCount   : mh.indexCount;
 
                 auto& obj = sceneData[objectCount];
-                obj.model        = model;
-                obj.normalMatrix = glm::transpose(glm::inverse(model));
-                AABB worldAABB = mc.localAABB.transformed(model);
-                obj.aabbMin      = glm::vec4(worldAABB.min, 0.0f);
-                obj.aabbMax      = glm::vec4(worldAABB.max, 0.0f);
-                obj.tint         = tint;
-                obj.params       = glm::vec4(mat.shininess, mat.metallic, mat.roughness, mat.emissive);
-                obj.texIndices   = glm::vec4(
-                    static_cast<float>(mat.materialIndex), static_cast<float>(mat.normalMapIndex), 0.0f, 0.0f);
+                obj.model            = model;
+                obj.normalMatrix     = normalMat;
+                obj.aabbMin          = glm::vec4(worldAABB.min, 0.0f);
+                obj.aabbMax          = glm::vec4(worldAABB.max, 0.0f);
+                obj.tint             = tint;
+                obj.params           = params;
+                obj.texIndices       = glm::vec4(
+                    static_cast<float>(diffuseTex),
+                    static_cast<float>(mat.normalMapIndex), 0.0f, 0.0f);
                 obj.meshVertexOffset = vOff;
                 obj.meshIndexOffset  = iOff;
                 obj.meshIndexCount   = iCnt;
-                obj._pad = 0;
+                obj._pad             = 0;
+
+                ++objectCount;
             }
-            ++objectCount;
         }
         instanceIndex = objectCount;
 
@@ -1966,7 +1981,7 @@ void Renderer::buildScene() {
         reg.emplace<MeshComponent>(groundEnt, MeshComponent{ groundMeshIdx });
         // Matte green-brown terrain: no metallic, rough, slight warm tint
         reg.emplace<MaterialComponent>(groundEnt,
-            MaterialComponent{ defaultTex, flatNorm, 0.0f, 0.0f, 0.0f, 0.9f });
+            MaterialComponent{ defaultTex, flatNorm, /*shininess*/0.0f, /*metallic*/0.0f, /*roughness*/0.9f, /*emissive*/0.0f });
         reg.emplace<MapComponent>(groundEnt);
         auto& gt   = reg.get<TransformComponent>(groundEnt);
         gt.position = glm::vec3(100.0f, -0.01f, 100.0f); // centred, just under lane tiles
@@ -1976,7 +1991,8 @@ void Renderer::buildScene() {
     // ── Load map models from "map models/" ─────────────────────────────
     struct MapAsset {
         uint32_t mesh;
-        uint32_t texture;
+        uint32_t texture;                    // primary (sub-mesh 0) texture
+        std::vector<uint32_t> subMeshTextures; // per-sub-mesh textures (empty = all use 'texture')
     };
     std::unordered_map<std::string, MapAsset> mapAssets;
 
@@ -1984,18 +2000,38 @@ void Renderer::buildScene() {
         std::string path = std::string(MODEL_DIR) + "map models/" + filename;
         try {
             Model model = Model::loadFromGLB(*m_device, m_device->getAllocator(), path);
-            uint32_t meshIdx = m_scene.addMesh(std::move(model));
-            uint32_t texIdx = defaultTex; // fallback
 
+            // Read per-submesh glTF material indices BEFORE moving model into scene
+            uint32_t subCount = model.getMeshCount();
+            std::vector<int> subMatIndices;
+            subMatIndices.reserve(subCount);
+            for (uint32_t si = 0; si < subCount; ++si)
+                subMatIndices.push_back(model.getMeshMaterialIndex(si));
+
+            uint32_t meshIdx = m_scene.addMesh(std::move(model));
+
+            // Load ALL embedded textures and build glTF-materialIndex → scene-texIdx map
             auto glbTextures = Model::loadGLBTextures(*m_device, path);
-            if (!glbTextures.empty()) {
-                texIdx = m_scene.addTexture(std::move(glbTextures[0].texture));
+            std::unordered_map<int, uint32_t> matToTex;
+            uint32_t primaryTex = defaultTex;
+            for (auto& t : glbTextures) {
+                uint32_t tid = m_scene.addTexture(std::move(t.texture));
                 m_bindless->registerTexture(
-                    m_scene.getTexture(texIdx).getImageView(),
-                    m_scene.getTexture(texIdx).getSampler());
+                    m_scene.getTexture(tid).getImageView(),
+                    m_scene.getTexture(tid).getSampler());
+                matToTex[t.materialIndex] = tid;
+                if (primaryTex == defaultTex) primaryTex = tid;
             }
-            mapAssets[filename] = { meshIdx, texIdx };
-            spdlog::info("Loaded map asset: {} (mesh={}, tex={})", filename, meshIdx, texIdx);
+
+            // Map each sub-mesh to its correct texture
+            std::vector<uint32_t> subTextures;
+            subTextures.reserve(subCount);
+            for (int gltfMatIdx : subMatIndices)
+                subTextures.push_back(matToTex.count(gltfMatIdx) ? matToTex[gltfMatIdx] : primaryTex);
+
+            mapAssets[filename] = { meshIdx, primaryTex, subTextures };
+            spdlog::info("Loaded map asset: {} (mesh={}, {} textures, {} submeshes)",
+                         filename, meshIdx, glbTextures.size(), subCount);
         } catch (const std::exception& e) {
             spdlog::warn("Failed to load map asset '{}': {}", filename, e.what());
         }
@@ -2047,8 +2083,11 @@ void Renderer::buildScene() {
 
             if (mapAssets.count(modelFile)) {
                 reg.emplace<MeshComponent>(e, MeshComponent{ mapAssets[modelFile].mesh });
-                reg.emplace<MaterialComponent>(e,
-                    MaterialComponent{ mapAssets[modelFile].texture, flatNorm, 0.0f, 0.0f, 0.3f, 0.6f });
+                reg.emplace<MaterialComponent>(e, MaterialComponent{
+                    mapAssets[modelFile].texture, flatNorm,
+                    /*shininess=*/0.0f, /*metallic=*/0.0f,
+                    /*roughness=*/0.6f, /*emissive=*/0.0f,
+                    mapAssets[modelFile].subMeshTextures });
                 tc.scale = glm::vec3(1.0f); 
             } else {
                 // Fallback to cube if model failed to load
@@ -2131,7 +2170,8 @@ void Renderer::buildScene() {
                             tile, MeshComponent{ currentMesh });
                         m_scene.getRegistry().emplace<MaterialComponent>(
                             tile, MaterialComponent{ currentTex, flatNorm,
-                                                     0.0f, 0.0f, 0.0f, 0.8f });
+                                                     /*shininess*/0.0f, /*metallic*/0.0f,
+                                                     /*roughness*/0.8f, /*emissive*/0.0f });
                         m_scene.getRegistry().emplace<MapComponent>(tile);
 
                         auto& tt    = m_scene.getRegistry().get<TransformComponent>(tile);
@@ -2194,15 +2234,21 @@ void Renderer::buildScene() {
         auto skinnedData = Model::loadSkinnedFromGLB(
             *m_device, m_device->getAllocator(), charPath, 0.0f);
 
-        // Load textures
+        // Load ALL textures and build per-sub-mesh mapping
         uint32_t charTex = defaultTex;
+        std::vector<uint32_t> charSubMeshTextures;
         auto glbTextures = Model::loadGLBTextures(*m_device, charPath);
         if (!glbTextures.empty()) {
-            charTex = m_scene.addTexture(std::move(glbTextures[0].texture));
-            m_bindless->registerTexture(
-                m_scene.getTexture(charTex).getImageView(),
-                m_scene.getTexture(charTex).getSampler());
-            spdlog::info("Character texture loaded at slot {}", charTex);
+            std::unordered_map<int, uint32_t> matToTex;
+            for (auto& t : glbTextures) {
+                uint32_t tid = m_scene.addTexture(std::move(t.texture));
+                m_bindless->registerTexture(
+                    m_scene.getTexture(tid).getImageView(),
+                    m_scene.getTexture(tid).getSampler());
+                matToTex[t.materialIndex] = tid;
+                if (charTex == defaultTex) charTex = tid;
+            }
+            spdlog::info("Character: {} texture(s) loaded, primary slot {}", glbTextures.size(), charTex);
         } else {
             spdlog::warn("Character texture not found in GLB — using default white texture (slot {})", charTex);
         }
@@ -2416,11 +2462,14 @@ void Renderer::buildScene() {
         uint32_t minionTex = defaultTex;
         auto glbTextures = Model::loadGLBTextures(*m_device, minionPath);
         if (!glbTextures.empty()) {
-            minionTex = m_scene.addTexture(std::move(glbTextures[0].texture));
-            m_bindless->registerTexture(
-                m_scene.getTexture(minionTex).getImageView(),
-                m_scene.getTexture(minionTex).getSampler());
-            spdlog::info("Minion texture loaded at slot {}", minionTex);
+            for (auto& t : glbTextures) {
+                uint32_t tid = m_scene.addTexture(std::move(t.texture));
+                m_bindless->registerTexture(
+                    m_scene.getTexture(tid).getImageView(),
+                    m_scene.getTexture(tid).getSampler());
+                if (minionTex == defaultTex) minionTex = tid;
+            }
+            spdlog::info("Minion: {} texture(s) loaded, primary slot {}", glbTextures.size(), minionTex);
         } else {
             spdlog::warn("Minion texture not found in GLB — using default white texture (slot {})", minionTex);
         }
@@ -2536,14 +2585,17 @@ void Renderer::buildScene() {
             auto model = Model::loadFromGLB(*m_device, m_device->getAllocator(), qModelPath);
             uint32_t qMeshIdx = m_scene.addMesh(std::move(model));
 
-            // Try to load embedded texture; fall back to default
+            // Try to load embedded texture(s); fall back to default
             uint32_t qTexIdx = defaultTex;
             auto glbTextures = Model::loadGLBTextures(*m_device, qModelPath);
             if (!glbTextures.empty()) {
-                qTexIdx = m_scene.addTexture(std::move(glbTextures[0].texture));
-                m_bindless->registerTexture(
-                    m_scene.getTexture(qTexIdx).getImageView(),
-                    m_scene.getTexture(qTexIdx).getSampler());
+                for (auto& t : glbTextures) {
+                    uint32_t tid = m_scene.addTexture(std::move(t.texture));
+                    m_bindless->registerTexture(
+                        m_scene.getTexture(tid).getImageView(),
+                        m_scene.getTexture(tid).getSampler());
+                    if (qTexIdx == defaultTex) qTexIdx = tid;
+                }
             }
 
             // Register with the projectile system (scale = 1.0 — model is ~1 unit long)
