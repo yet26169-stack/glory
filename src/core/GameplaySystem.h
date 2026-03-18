@@ -64,9 +64,10 @@ struct MinionSpawnConfig {
     uint32_t texIndex     = 0;
     uint32_t flatNormIndex = 0;
     Skeleton skeleton;
-    std::vector<std::vector<SkinVertex>> skinVertices;
-    std::vector<std::vector<Vertex>>     bindPoseVertices;
-    std::vector<AnimationClip>           clips;
+    // skinVertices / bindPoseVertices removed — GPU skinning only needs the skeleton
+    // hierarchy (for AnimationPlayer) and bone matrices (written to bone SSBO each frame).
+    // Storing 28K-vertex arrays per spawn config caused ~53 MB/wave copy overhead.
+    std::vector<AnimationClip> clips;
 };
 
 class GameplaySystem {

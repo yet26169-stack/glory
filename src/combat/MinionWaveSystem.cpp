@@ -211,11 +211,10 @@ entt::entity MinionWaveSystem::spawnMinion(entt::registry& reg,
     reg.emplace<MaterialComponent>(e, MaterialComponent{
         m_spawnCfg.texIndex, m_spawnCfg.flatNormIndex, 0.0f, 0.0f, 0.5f, 0.2f});
 
-    // Skeleton + animation
+    // GPU skinning only needs the joint hierarchy (for matrix computation) — not raw vertex data.
+    // Copying skinVertices/bindPoseVertices per entity caused ~53 MB/wave allocation overhead.
     SkeletonComponent skelComp;
-    skelComp.skeleton         = m_spawnCfg.skeleton;
-    skelComp.skinVertices     = m_spawnCfg.skinVertices;
-    skelComp.bindPoseVertices = m_spawnCfg.bindPoseVertices;
+    skelComp.skeleton = m_spawnCfg.skeleton;
 
     AnimationComponent animComp;
     animComp.player.setSkeleton(&skelComp.skeleton);

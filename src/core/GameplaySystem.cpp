@@ -407,9 +407,7 @@ void GameplaySystem::processSpawning(float dt, const GameplayInput& input) {
         MaterialComponent{ m_spawnConfig.texIndex, m_spawnConfig.flatNormIndex, 0.0f, 0.0f, 0.5f, 0.2f });
     // Setup Animation (Melee minion)
     SkeletonComponent skelComp;
-    skelComp.skeleton         = m_spawnConfig.skeleton;
-    skelComp.skinVertices     = m_spawnConfig.skinVertices;
-    skelComp.bindPoseVertices = m_spawnConfig.bindPoseVertices;
+    skelComp.skeleton = m_spawnConfig.skeleton; // vertex arrays not needed for GPU skinning
 
     AnimationComponent animComp;
     animComp.player.setSkeleton(&skelComp.skeleton);

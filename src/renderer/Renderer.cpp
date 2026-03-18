@@ -2457,7 +2457,7 @@ void Renderer::buildScene() {
     // ── Load Minion assets for spawning ───────────────────────────────────
     try {
         std::string minionPath = std::string(MODEL_DIR) + "models/melee_minion/melee_minion_walking.glb";
-        auto skinnedData = Model::loadSkinnedFromGLB(*m_device, m_device->getAllocator(), minionPath, 0.0f);
+        auto skinnedData = Model::loadSkinnedFromGLB(*m_device, m_device->getAllocator(), minionPath, 0.6f);
 
         uint32_t minionTex = defaultTex;
         auto glbTextures = Model::loadGLBTextures(*m_device, minionPath);
@@ -2494,9 +2494,7 @@ void Renderer::buildScene() {
                 StaticSkinnedMesh(*m_device, m_device->getAllocator(),
                                   sverts, skinnedData.indices[0]));
 
-            Skeleton minionSkeleton          = std::move(skinnedData.skeleton);
-            auto     minionSkinVertices      = std::move(skinnedData.skinVertices);
-            auto     minionBindPoseVertices  = std::move(skinnedData.bindPoseVertices);
+            Skeleton minionSkeleton = std::move(skinnedData.skeleton);
             std::vector<AnimationClip> minionClips;
 
             // Load idle animation from melee_minion_idle.glb (clip[0])
@@ -2552,8 +2550,6 @@ void Renderer::buildScene() {
             spawnCfg.texIndex         = minionTex;
             spawnCfg.flatNormIndex    = flatNorm;
             spawnCfg.skeleton         = std::move(minionSkeleton);
-            spawnCfg.skinVertices     = std::move(minionSkinVertices);
-            spawnCfg.bindPoseVertices = std::move(minionBindPoseVertices);
             spawnCfg.clips            = std::move(minionClips);
             m_gameplaySystem.setSpawnConfig(std::move(spawnCfg));
 
@@ -2565,8 +2561,6 @@ void Renderer::buildScene() {
                 wsc.texIndex      = src.texIndex;
                 wsc.flatNormIndex = src.flatNormIndex;
                 wsc.skeleton      = src.skeleton;
-                wsc.skinVertices  = src.skinVertices;
-                wsc.bindPoseVertices = src.bindPoseVertices;
                 wsc.clips         = src.clips;
                 wsc.ready         = true;
                 m_minionWaveSystem->setSpawnConfig(std::move(wsc));
@@ -2730,9 +2724,7 @@ void Renderer::spawnTestEnemy() {
         MaterialComponent{ spawnCfg.texIndex, flatNorm, 0.0f, 0.0f, 0.5f, 0.2f });
 
     SkeletonComponent skelComp;
-    skelComp.skeleton         = spawnCfg.skeleton;
-    skelComp.skinVertices     = spawnCfg.skinVertices;
-    skelComp.bindPoseVertices = spawnCfg.bindPoseVertices;
+    skelComp.skeleton = spawnCfg.skeleton; // vertex arrays not needed for GPU skinning
 
     AnimationComponent animComp;
     animComp.player.setSkeleton(&skelComp.skeleton);

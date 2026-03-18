@@ -54,9 +54,8 @@ struct WaveSpawnConfig {
     uint32_t texIndex      = 0;
     uint32_t flatNormIndex = 0;
     Skeleton skeleton;
-    std::vector<std::vector<SkinVertex>> skinVertices;
-    std::vector<std::vector<Vertex>>     bindPoseVertices;
-    std::vector<AnimationClip>           clips;
+    // skinVertices / bindPoseVertices removed — not needed for GPU skinning.
+    std::vector<AnimationClip> clips;
     bool ready = false;
 };
 
