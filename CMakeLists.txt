@@ -5,6 +5,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+include(FetchContent)
+
 # ── Sanitizer support ─────────────────────────────────────────────────────────
 # Usage: cmake -B build -DGLORY_ASAN=ON -DGLORY_UBSAN=ON
 #         cmake -B build -DGLORY_TSAN=ON   (ASAN and TSAN are mutually exclusive)
@@ -48,13 +50,13 @@ endif()
 
 enable_testing()
 
-# ── Dependencies ─────────────────────────────────────────────────────────────
+# ── System dependencies ───────────────────────────────────────────────────────
 find_package(Vulkan REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(glm REQUIRED)
 find_package(spdlog REQUIRED)
 
-# ── Shader compilation ───────────────────────────────────────────────────────
+# ── Shader compilation ────────────────────────────────────────────────────────
 find_program(GLSLC glslc HINTS $ENV{VULKAN_SDK}/bin)
 if(NOT GLSLC)
     message(FATAL_ERROR "glslc not found – install the Vulkan SDK.")
@@ -62,70 +64,10 @@ endif()
 
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/shaders)
 
-set(SHADER_SOURCES
-    ${CMAKE_SOURCE_DIR}/shaders/triangle.vert
-    ${CMAKE_SOURCE_DIR}/shaders/triangle.frag
-    ${CMAKE_SOURCE_DIR}/shaders/grid.vert
-    ${CMAKE_SOURCE_DIR}/shaders/grid.frag
-    ${CMAKE_SOURCE_DIR}/shaders/debug.vert
-    ${CMAKE_SOURCE_DIR}/shaders/debug.frag
-    ${CMAKE_SOURCE_DIR}/shaders/skinned.vert
-    ${CMAKE_SOURCE_DIR}/shaders/click_indicator.vert
-    ${CMAKE_SOURCE_DIR}/shaders/click_indicator.frag
-    ${CMAKE_SOURCE_DIR}/shaders/particle_sim.comp
-    ${CMAKE_SOURCE_DIR}/shaders/particle.vert
-    ${CMAKE_SOURCE_DIR}/shaders/particle.frag
-    ${CMAKE_SOURCE_DIR}/shaders/shield_bubble.vert
-    ${CMAKE_SOURCE_DIR}/shaders/shield_bubble.frag
-    ${CMAKE_SOURCE_DIR}/shaders/cone_ability.vert
-    ${CMAKE_SOURCE_DIR}/shaders/cone_grid.frag
-    ${CMAKE_SOURCE_DIR}/shaders/cone_energy.frag
-    ${CMAKE_SOURCE_DIR}/shaders/cone_lightning.vert
-    ${CMAKE_SOURCE_DIR}/shaders/cone_lightning.frag
-    ${CMAKE_SOURCE_DIR}/shaders/explosion_disk.vert
-    ${CMAKE_SOURCE_DIR}/shaders/explosion_sphere.vert
-    ${CMAKE_SOURCE_DIR}/shaders/explosion_shockwave.frag
-    ${CMAKE_SOURCE_DIR}/shaders/explosion_fireball.frag
-    ${CMAKE_SOURCE_DIR}/shaders/sprite_effect_additive.frag
-    ${CMAKE_SOURCE_DIR}/shaders/sprite_effect_billboard.vert
-    ${CMAKE_SOURCE_DIR}/shaders/bloom_extract.frag
-    ${CMAKE_SOURCE_DIR}/shaders/bloom_blur.frag
-    ${CMAKE_SOURCE_DIR}/shaders/tonemap.vert
-    ${CMAKE_SOURCE_DIR}/shaders/tonemap.frag
-    ${CMAKE_SOURCE_DIR}/shaders/trail_ribbon.vert
-    ${CMAKE_SOURCE_DIR}/shaders/trail_ribbon.frag
-    ${CMAKE_SOURCE_DIR}/shaders/ground_decal.vert
-    ${CMAKE_SOURCE_DIR}/shaders/ground_decal.frag
-    ${CMAKE_SOURCE_DIR}/shaders/mesh_effect.vert
-    ${CMAKE_SOURCE_DIR}/shaders/mesh_effect_energy.frag
-    ${CMAKE_SOURCE_DIR}/shaders/mesh_effect_slash.frag
-    ${CMAKE_SOURCE_DIR}/shaders/distortion.frag
-    ${CMAKE_SOURCE_DIR}/shaders/inking.vert
-    ${CMAKE_SOURCE_DIR}/shaders/inking.frag
-    ${CMAKE_SOURCE_DIR}/shaders/fow_upsample.comp
-    ${CMAKE_SOURCE_DIR}/shaders/fow_blur.comp
-    ${CMAKE_SOURCE_DIR}/shaders/outline_stencil.frag
-    ${CMAKE_SOURCE_DIR}/shaders/outline.vert
-    ${CMAKE_SOURCE_DIR}/shaders/outline.frag
-    ${CMAKE_SOURCE_DIR}/shaders/water.vert
-    ${CMAKE_SOURCE_DIR}/shaders/water.frag
-    ${CMAKE_SOURCE_DIR}/shaders/particle_compact.comp
-    ${CMAKE_SOURCE_DIR}/shaders/particle_sort.comp
-    ${CMAKE_SOURCE_DIR}/shaders/shadow.vert
-    ${CMAKE_SOURCE_DIR}/shaders/shadow_skinned.vert
-    ${CMAKE_SOURCE_DIR}/shaders/depth_only.vert
-    ${CMAKE_SOURCE_DIR}/shaders/hiz_generate.comp
-    ${CMAKE_SOURCE_DIR}/shaders/occlusion_cull.comp
-    ${CMAKE_SOURCE_DIR}/shaders/spatial_hash.comp
-    ${CMAKE_SOURCE_DIR}/shaders/collision_broadphase.comp
-    ${CMAKE_SOURCE_DIR}/shaders/ssao.comp
-    ${CMAKE_SOURCE_DIR}/shaders/ssao_blur.comp
-    ${CMAKE_SOURCE_DIR}/shaders/ssr.comp
-    ${CMAKE_SOURCE_DIR}/shaders/flow_field.comp
-    ${CMAKE_SOURCE_DIR}/shaders/impostor_billboard.vert
-    ${CMAKE_SOURCE_DIR}/shaders/impostor_billboard.frag
-    ${CMAKE_SOURCE_DIR}/shaders/impostor_capture.vert
-    ${CMAKE_SOURCE_DIR}/shaders/impostor_capture.frag
+file(GLOB SHADER_SOURCES CONFIGURE_DEPENDS
+    ${CMAKE_SOURCE_DIR}/shaders/*.vert
+    ${CMAKE_SOURCE_DIR}/shaders/*.frag
+    ${CMAKE_SOURCE_DIR}/shaders/*.comp
 )
 
 foreach(SHADER ${SHADER_SOURCES})
@@ -144,17 +86,14 @@ add_custom_target(Shaders ALL DEPENDS ${SPV_SHADERS})
 
 # ── Tracy profiler (optional, default OFF) ────────────────────────────────────
 # Enable with:  cmake -DGLORY_TRACY=ON ..
-# Requires internet access on first configure to fetch the Tracy source.
 option(GLORY_TRACY "Enable Tracy real-time profiler instrumentation" OFF)
 if(GLORY_TRACY)
-    include(FetchContent)
     FetchContent_Declare(
         tracy
         GIT_REPOSITORY https://github.com/wolfpld/tracy.git
         GIT_TAG        v0.11.1
         GIT_SHALLOW    TRUE
     )
-    # Tell Tracy's own CMakeLists to compile the client with profiling on.
     set(TRACY_ENABLE ON CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(tracy)
     message(STATUS "Glory: Tracy profiler ENABLED (v0.11.1)")
@@ -162,8 +101,7 @@ else()
     message(STATUS "Glory: Tracy profiler disabled  (pass -DGLORY_TRACY=ON to enable)")
 endif()
 
-# ── ENet networking library ────────────────────────────────────────────────────
-include(FetchContent)
+# ── ENet networking library ───────────────────────────────────────────────────
 FetchContent_Declare(
     enet
     GIT_REPOSITORY https://github.com/lsalzman/enet.git
@@ -174,8 +112,7 @@ FetchContent_MakeAvailable(enet)
 target_include_directories(enet PUBLIC ${enet_SOURCE_DIR}/include)
 message(STATUS "Glory: ENet networking library ENABLED (v1.3.18)")
 
-# ── Lua 5.4 ───────────────────────────────────────────────────────────────────
-# Build Lua 5.4 from source as a static library
+# ── Lua 5.4 ──────────────────────────────────────────────────────────────────
 FetchContent_Declare(
     lua
     GIT_REPOSITORY https://github.com/lua/lua.git
@@ -185,7 +122,6 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(lua)
 
 file(GLOB LUA_CORE_SOURCES ${lua_SOURCE_DIR}/*.c)
-# Remove lua.c (standalone interpreter) and luac.c (compiler) from library sources
 list(FILTER LUA_CORE_SOURCES EXCLUDE REGEX "lua\\.c$")
 list(FILTER LUA_CORE_SOURCES EXCLUDE REGEX "luac\\.c$")
 add_library(lua_static STATIC ${LUA_CORE_SOURCES})
@@ -196,7 +132,7 @@ if(APPLE OR UNIX)
 endif()
 message(STATUS "Glory: Lua 5.4 ENABLED (built from source)")
 
-# ── sol2 (header-only Lua binding library) ─────────────────────────────────────
+# ── sol2 (header-only Lua binding) ───────────────────────────────────────────
 FetchContent_Declare(
     sol2
     GIT_REPOSITORY https://github.com/ThePhD/sol2.git
@@ -205,24 +141,24 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(sol2)
 message(STATUS "Glory: sol2 v3.3.1 ENABLED")
+
 # ── RecastNavigation ──────────────────────────────────────────────────────────
 set(CMAKE_POLICY_DEFAULT_CMP0000 NEW)
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
-include(FetchContent)
 FetchContent_Declare(
     recastnavigation
     GIT_REPOSITORY https://github.com/recastnavigation/recastnavigation.git
     GIT_TAG        v1.6.0
     GIT_SHALLOW    TRUE
 )
-set(RECASTNAVIGATION_DEMO OFF CACHE BOOL "" FORCE)
-set(RECASTNAVIGATION_TESTS OFF CACHE BOOL "" FORCE)
+set(RECASTNAVIGATION_DEMO     OFF CACHE BOOL "" FORCE)
+set(RECASTNAVIGATION_TESTS    OFF CACHE BOOL "" FORCE)
 set(RECASTNAVIGATION_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(RECASTNAVIGATION_STATIC ON CACHE BOOL "" FORCE)
+set(RECASTNAVIGATION_STATIC   ON  CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(recastnavigation)
 message(STATUS "Glory: RecastNavigation ENABLED (v1.6.0)")
 
-# ── miniaudio (single-header audio library) ────────────────────────────────────
+# ── miniaudio (single-header audio) ──────────────────────────────────────────
 FetchContent_Declare(
     miniaudio
     GIT_REPOSITORY https://github.com/mackron/miniaudio.git
@@ -237,121 +173,16 @@ file(GLOB MESHOPT_SOURCES ${CMAKE_SOURCE_DIR}/extern/meshoptimizer/src/*.cpp)
 add_library(meshoptimizer STATIC ${MESHOPT_SOURCES})
 target_include_directories(meshoptimizer PUBLIC ${CMAKE_SOURCE_DIR}/extern/meshoptimizer/src)
 
-# ── Main executable ───────────────────────────────────────────────────────────
-set(SOURCES
-    src/main.cpp
-    src/core/Log.cpp
-    src/core/Application.cpp
-    src/core/FramePacer.cpp
-    src/core/SimulationLoop.cpp
-    src/core/SystemScheduler.cpp
-    src/core/GameSystems.cpp
-    src/core/FrameAllocator.cpp
-    src/core/PoolAllocator.cpp
-    src/core/GameplaySystem.cpp
-    src/core/GameState.cpp
-    src/core/GameConfig.cpp
-    src/physics/PhysicsSystem.cpp
-    src/window/Window.cpp
-    src/camera/Camera.cpp
-    src/input/InputManager.cpp
-    src/scene/Scene.cpp
-    src/renderer/Context.cpp
-    src/renderer/Device.cpp
-    src/renderer/Swapchain.cpp
-    src/renderer/Buffer.cpp
-    src/renderer/Image.cpp
-    src/renderer/Mesh.cpp
-    src/renderer/Model.cpp
-    src/renderer/Material.cpp
-    src/renderer/Texture.cpp
-    src/renderer/Descriptors.cpp
-    src/renderer/BindlessDescriptors.cpp
-    src/renderer/Pipeline.cpp
-    src/renderer/Sync.cpp
-    src/renderer/ClickIndicatorRenderer.cpp
-    src/renderer/ShieldBubbleRenderer.cpp
-    src/renderer/ConeAbilityRenderer.cpp
-    src/renderer/ExplosionRenderer.cpp
-    src/renderer/SpriteEffectRenderer.cpp
-    src/renderer/Renderer.cpp
-    src/renderer/GpuTimer.cpp
-    src/renderer/GLBLoader.cpp
-    src/renderer/DynamicMesh.cpp
-    src/renderer/StaticSkinnedMesh.cpp
-    src/renderer/HDRFramebuffer.cpp
-    src/renderer/ShadowPass.cpp
-    src/renderer/HiZPass.cpp
-    src/renderer/MegaBuffer.cpp
-    src/renderer/LODSystem.cpp
-    src/renderer/ImpostorSystem.cpp
-    src/renderer/StagingPool.cpp
-    src/renderer/AsyncComputeManager.cpp
-    src/renderer/BloomPass.cpp
-    src/renderer/ToneMapPass.cpp
-    src/renderer/SSAOPass.cpp
-    src/renderer/SSRPass.cpp
-    src/renderer/GroundDecalRenderer.cpp
-    src/renderer/DistortionRenderer.cpp
-    src/renderer/InkingPass.cpp
-    src/renderer/OutlineRenderer.cpp
-    src/renderer/WaterRenderer.cpp
-    src/renderer/RenderGraph.cpp
-    src/renderer/passes/PassSetup.cpp
-    src/fog/FogSystem.cpp
-    src/fog/FogOfWarGameplay.cpp
-    src/renderer/FogOfWarRenderer.cpp
-    src/map/MapLoader.cpp
-    src/terrain/IsometricCamera.cpp
-    src/nav/DebugRenderer.cpp
-    src/nav/NavMeshBuilder.cpp
-    src/nav/PathfindingSystem.cpp
-    src/nav/DynamicObstacle.cpp
-    src/nav/FlowField.cpp
-    src/hud/HUD.cpp
-    src/hud/Minimap.cpp
-    src/hud/PerfOverlay.cpp
-    src/hud/FloatingText.cpp
-    src/hud/HealthBar.cpp
-    src/hud/AbilityBar.cpp
-    src/hud/Scoreboard.cpp
-    src/hud/KillFeed.cpp
-    src/hud/RespawnOverlay.cpp
-    src/animation/AnimationPlayer.cpp
-    src/animation/CPUSkinning.cpp
-    src/vfx/ParticleSystem.cpp
-    src/vfx/VFXRenderer.cpp
-    src/vfx/VFXDefinitionLoader.cpp
-    src/vfx/VFXFactory.cpp
-    src/vfx/TrailRenderer.cpp
-    src/vfx/MeshEffectRenderer.cpp
-    src/vfx/CompositeVFXSequencer.cpp
-    src/ability/AbilitySystem.cpp
-    src/ability/ProjectileSystem.cpp
-    src/combat/CombatSystem.cpp
-    src/combat/EconomySystem.cpp
-    src/combat/StructureSystem.cpp
-    src/combat/MinionWaveSystem.cpp
-    src/combat/NPCBehaviorSystem.cpp
-    src/combat/RespawnSystem.cpp
-    src/combat/HeroRegistry.cpp
-    src/combat/GpuCollisionSystem.cpp
-    src/audio/AudioEngine.cpp
-    src/audio/SoundHandle.cpp
-    src/audio/AudioResourceManager.cpp
-    src/audio/GameAudioEvents.cpp
-    src/audio/miniaudio_impl.cpp
-    src/assets/CookedLoader.cpp
-    src/assets/AssetRegistry.cpp
-    src/scripting/ScriptEngine.cpp
-    src/scripting/LuaBindings.cpp
-    src/network/Transport.cpp
-    src/network/InputSync.cpp
-    src/network/StateSnapshot.cpp
-    src/network/NetworkGameLoop.cpp
-    src/network/LobbySystem.cpp
-    src/replay/ReplayRecorder.cpp
-    src/replay/ReplayPlayer.cpp
+# ── Engine static library ─────────────────────────────────────────────────────
+# Collects every .cpp under src/ except main.cpp, plus the vendored extern
+# implementations.  Add or delete source files freely — no list to maintain.
+file(GLOB_RECURSE ENGINE_SRCS CONFIGURE_DEPENDS
+    ${CMAKE_SOURCE_DIR}/src/*.cpp
+)
+list(FILTER ENGINE_SRCS EXCLUDE REGEX ".*/main\\.cpp$")
+
+add_library(glory_engine STATIC
+    ${ENGINE_SRCS}
     extern/vma/vma_impl.cpp
     extern/imgui/imgui.cpp
     extern/imgui/imgui_draw.cpp
@@ -362,10 +193,7 @@ set(SOURCES
     extern/imgui/imgui_impl_vulkan.cpp
 )
 
-add_executable(${PROJECT_NAME} ${SOURCES})
-add_dependencies(${PROJECT_NAME} Shaders)
-
-target_include_directories(${PROJECT_NAME} PRIVATE
+target_include_directories(glory_engine PUBLIC
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/extern/vma
     ${CMAKE_SOURCE_DIR}/extern/stb
@@ -373,6 +201,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/extern/entt
     ${CMAKE_SOURCE_DIR}/extern/imgui
     ${CMAKE_SOURCE_DIR}/extern/tinygltf
+    ${CMAKE_SOURCE_DIR}/extern/nlohmann
     ${CMAKE_SOURCE_DIR}/extern
     ${miniaudio_SOURCE_DIR}
     ${recastnavigation_SOURCE_DIR}/Recast/Include
@@ -381,7 +210,20 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${recastnavigation_SOURCE_DIR}/DetourTileCache/Include
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE
+target_compile_definitions(glory_engine PUBLIC
+    GLFW_INCLUDE_VULKAN
+    GLM_FORCE_RADIANS
+    GLM_FORCE_DEPTH_ZERO_TO_ONE
+    MAP_DATA_DIR="${CMAKE_SOURCE_DIR}/assets/maps/"
+    SHADER_DIR="${CMAKE_BINARY_DIR}/shaders/"
+    ASSET_DIR="${CMAKE_BINARY_DIR}/assets/"
+    MODEL_DIR="${CMAKE_SOURCE_DIR}/"
+    SOL_ALL_SAFETIES_ON=1
+    SOL_USE_CXX_OPTIONAL=1
+    SOL_STD_VARIANT=1
+)
+
+target_link_libraries(glory_engine PUBLIC
     Vulkan::Vulkan
     glfw
     glm::glm
@@ -397,249 +239,82 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     DetourTileCache
 )
 
-# Platform-specific libs for FramePacer
 if(WIN32)
-    target_link_libraries(${PROJECT_NAME} PRIVATE winmm)
+    target_link_libraries(glory_engine PUBLIC winmm)
 endif()
 
-# Platform-specific libs for miniaudio
 if(APPLE)
-    find_library(COREAUDIO_LIB CoreAudio)
-    find_library(AUDIOTOOLBOX_LIB AudioToolbox)
+    find_library(COREAUDIO_LIB     CoreAudio)
+    find_library(AUDIOTOOLBOX_LIB  AudioToolbox)
     find_library(COREFOUNDATION_LIB CoreFoundation)
-    target_link_libraries(${PROJECT_NAME} PRIVATE
+    target_link_libraries(glory_engine PUBLIC
         ${COREAUDIO_LIB} ${AUDIOTOOLBOX_LIB} ${COREFOUNDATION_LIB})
 endif()
 
-# Tracy client (only when GLORY_TRACY=ON)
 if(GLORY_TRACY)
-    target_link_libraries(${PROJECT_NAME} PRIVATE TracyClient)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE TRACY_ENABLE)
+    target_link_libraries(glory_engine PUBLIC TracyClient)
+    target_compile_definitions(glory_engine PUBLIC TRACY_ENABLE)
 endif()
 
-target_compile_definitions(${PROJECT_NAME} PRIVATE
-    GLFW_INCLUDE_VULKAN
-    GLM_FORCE_RADIANS
-    GLM_FORCE_DEPTH_ZERO_TO_ONE
-    SHADER_DIR="${CMAKE_BINARY_DIR}/shaders/"
-    ASSET_DIR="${CMAKE_BINARY_DIR}/assets/"
-    MAP_DATA_DIR="${CMAKE_SOURCE_DIR}/assets/maps/"
-    MODEL_DIR="${CMAKE_SOURCE_DIR}/"
-    SOL_ALL_SAFETIES_ON=1
-    SOL_USE_CXX_OPTIONAL=1
-    SOL_STD_VARIANT=1
-)
-
 # ── Asset copy ────────────────────────────────────────────────────────────────
-# Configure-time copy (ensures assets exist on first build)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/assets)
 file(COPY ${CMAKE_SOURCE_DIR}/assets/ DESTINATION ${CMAKE_BINARY_DIR}/assets)
 
-# Build-time copy (keeps build/assets in sync with source/assets on every build)
 add_custom_target(copy_assets ALL
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_SOURCE_DIR}/assets
         ${CMAKE_BINARY_DIR}/assets
     COMMENT "Syncing assets to build directory"
 )
-add_dependencies(${PROJECT_NAME} copy_assets)
 
-# ── Map / terrain tests (lightweight, no Vulkan) ─────────────────────────────
-add_executable(test_mirror tests/test_mirror.cpp)
-target_include_directories(test_mirror PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(test_mirror PRIVATE glm::glm glory_sanitizers)
-target_compile_definitions(test_mirror PRIVATE GLM_FORCE_RADIANS GLM_FORCE_DEPTH_ZERO_TO_ONE)
+# ── Main executable ───────────────────────────────────────────────────────────
+set(COOKED_ASSET_DIR ${CMAKE_BINARY_DIR}/assets_cooked)
 
-add_executable(test_maploader tests/test_maploader.cpp src/map/MapLoader.cpp)
-target_include_directories(test_maploader PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/extern)
-target_link_libraries(test_maploader PRIVATE glm::glm glory_sanitizers)
-target_compile_definitions(test_maploader PRIVATE
-    GLM_FORCE_RADIANS GLM_FORCE_DEPTH_ZERO_TO_ONE
-    MAP_DATA_DIR="${CMAKE_SOURCE_DIR}/assets/maps/")
+add_executable(Glory src/main.cpp)
+add_dependencies(Glory Shaders copy_assets)
+target_link_libraries(Glory PRIVATE glory_engine)
+target_compile_definitions(Glory PRIVATE
+    COOKED_ASSET_DIR="${COOKED_ASSET_DIR}/"
+)
 
-add_executable(test_terrain tests/test_terrain.cpp src/terrain/IsometricCamera.cpp)
-target_include_directories(test_terrain PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(test_terrain PRIVATE glm::glm glory_sanitizers)
-target_compile_definitions(test_terrain PRIVATE GLM_FORCE_RADIANS GLM_FORCE_DEPTH_ZERO_TO_ONE)
+# ── Test infrastructure ───────────────────────────────────────────────────────
+# glory_test_common is a named interface through which all tests inherit the
+# engine's include paths, compile definitions, and link libraries.  Adding a
+# new engine-wide test dependency means touching only this one target.
+add_library(glory_test_common INTERFACE)
+target_link_libraries(glory_test_common INTERFACE glory_engine)
 
+# ── Test executables ──────────────────────────────────────────────────────────
+add_executable(test_mirror     tests/test_mirror.cpp)
+add_executable(test_maploader  tests/test_maploader.cpp)
+add_executable(test_terrain    tests/test_terrain.cpp)
 add_executable(test_fixedpoint tests/test_fixedpoint.cpp)
-target_include_directories(test_fixedpoint PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(test_fixedpoint PRIVATE glory_sanitizers)
+add_executable(test_nav        tests/test_nav.cpp)
+add_executable(test_ability    tests/test_ability.cpp)
+add_executable(test_combat     tests/test_combat.cpp)
+add_executable(test_animation  tests/test_animation.cpp)
+add_executable(test_physics    tests/test_physics.cpp)
+add_executable(test_audio      tests/test_audio.cpp)
+add_executable(test_replay     tests/test_replay.cpp)
 
-add_executable(test_nav tests/test_nav.cpp
-    src/nav/NavMeshBuilder.cpp
-    src/nav/PathfindingSystem.cpp
-    src/nav/FlowField.cpp
-    src/map/MapLoader.cpp
-    src/renderer/GLBLoader.cpp
-    src/renderer/Model.cpp
-    src/renderer/Mesh.cpp
-    src/renderer/Buffer.cpp
-    src/renderer/Texture.cpp
-    src/renderer/Device.cpp
-    src/renderer/Image.cpp
-    extern/vma/vma_impl.cpp
-)
-target_include_directories(test_nav PRIVATE
-    ${CMAKE_SOURCE_DIR}/src
-    ${CMAKE_SOURCE_DIR}/extern
-    ${CMAKE_SOURCE_DIR}/extern/tinygltf
-    ${CMAKE_SOURCE_DIR}/extern/stb
-    ${CMAKE_SOURCE_DIR}/extern/vma
-    ${CMAKE_SOURCE_DIR}/extern/tinyobj
-    ${CMAKE_SOURCE_DIR}/extern/nlohmann
-    ${CMAKE_SOURCE_DIR}/extern/entt
-)
-target_link_libraries(test_nav PRIVATE
-    glm::glm
-    spdlog::spdlog
-    meshoptimizer
-    glory_sanitizers
-    Recast
-    Detour
-    DetourCrowd
-    Vulkan::Vulkan
-    glfw
-)
-target_compile_definitions(test_nav PRIVATE
-    GLM_FORCE_RADIANS
-    GLM_FORCE_DEPTH_ZERO_TO_ONE
-    MAP_DATA_DIR="${CMAKE_SOURCE_DIR}/assets/maps/"
-)
+foreach(_test
+    test_mirror test_maploader test_terrain test_fixedpoint
+    test_nav test_ability test_combat test_animation
+    test_physics test_audio test_replay)
+    target_link_libraries(${_test} PRIVATE glory_test_common)
+endforeach()
 
 add_test(NAME fixedpoint COMMAND test_fixedpoint)
-add_test(NAME mirror    COMMAND test_mirror)
-add_test(NAME maploader COMMAND test_maploader)
-add_test(NAME terrain   COMMAND test_terrain)
-add_test(NAME nav       COMMAND test_nav)
-
-add_executable(test_ability tests/test_ability.cpp
-    src/ability/AbilitySystem.cpp
-    src/vfx/CompositeVFXSequencer.cpp
-    src/scripting/ScriptEngine.cpp
-    src/renderer/GLBLoader.cpp
-    src/renderer/Model.cpp
-    src/renderer/Mesh.cpp
-    src/renderer/Buffer.cpp
-    src/renderer/Texture.cpp
-    src/renderer/Device.cpp
-    src/renderer/Image.cpp
-    extern/vma/vma_impl.cpp
-)
-target_include_directories(test_ability PRIVATE
-    ${CMAKE_SOURCE_DIR}/src
-    ${CMAKE_SOURCE_DIR}/extern
-    ${CMAKE_SOURCE_DIR}/extern/tinygltf
-    ${CMAKE_SOURCE_DIR}/extern/stb
-    ${CMAKE_SOURCE_DIR}/extern/vma
-    ${CMAKE_SOURCE_DIR}/extern/tinyobj
-    ${CMAKE_SOURCE_DIR}/extern/nlohmann
-    ${CMAKE_SOURCE_DIR}/extern/entt
-    ${CMAKE_SOURCE_DIR}/extern/glm
-)
-target_link_libraries(test_ability PRIVATE
-    glm::glm
-    spdlog::spdlog
-    meshoptimizer
-    glory_sanitizers
-    lua_static
-    sol2
-    Vulkan::Vulkan
-    glfw
-)
-add_test(NAME ability COMMAND test_ability)
-
-add_executable(test_combat tests/test_combat.cpp
-    src/combat/CombatSystem.cpp
-    src/combat/EconomySystem.cpp
-    src/audio/GameAudioEvents.cpp
-    src/audio/AudioResourceManager.cpp
-    src/audio/AudioEngine.cpp
-    src/audio/SoundHandle.cpp
-    src/audio/miniaudio_impl.cpp
-    src/renderer/GLBLoader.cpp
-    src/renderer/Model.cpp
-    src/renderer/Mesh.cpp
-    src/renderer/Buffer.cpp
-    src/renderer/Texture.cpp
-    src/renderer/Device.cpp
-    src/renderer/Image.cpp
-    extern/vma/vma_impl.cpp
-)
-target_include_directories(test_combat PRIVATE 
-    ${CMAKE_SOURCE_DIR}/src 
-    ${CMAKE_SOURCE_DIR}/extern/entt
-    ${CMAKE_SOURCE_DIR}/extern/glm
-    ${CMAKE_SOURCE_DIR}/extern/stb
-    ${CMAKE_SOURCE_DIR}/extern/tinygltf
-    ${CMAKE_SOURCE_DIR}/extern/vma
-    ${CMAKE_SOURCE_DIR}/extern/nlohmann
-    ${CMAKE_SOURCE_DIR}/extern/tinyobj
-    ${CMAKE_SOURCE_DIR}/extern
-    ${miniaudio_SOURCE_DIR}
-)
-target_link_libraries(test_combat PRIVATE 
-    glory_sanitizers 
-    spdlog::spdlog
-    meshoptimizer
-    Vulkan::Vulkan
-    glfw
-)
-add_test(NAME combat COMMAND test_combat)
-
-add_executable(test_animation tests/test_animation.cpp
-    src/animation/AnimationPlayer.cpp
-)
-target_include_directories(test_animation PRIVATE 
-    ${CMAKE_SOURCE_DIR}/src
-    ${CMAKE_SOURCE_DIR}/extern/glm
-    ${CMAKE_SOURCE_DIR}/extern
-    ${CMAKE_SOURCE_DIR}/extern/stb
-    ${CMAKE_SOURCE_DIR}/extern/tinygltf
-)
-target_link_libraries(test_animation PRIVATE glory_sanitizers spdlog::spdlog)
-add_test(NAME animation COMMAND test_animation)
-
-add_executable(test_physics tests/test_physics.cpp
-    src/physics/PhysicsSystem.cpp
-)
-target_include_directories(test_physics PRIVATE 
-    ${CMAKE_SOURCE_DIR}/src 
-    ${CMAKE_SOURCE_DIR}/extern/entt
-    ${CMAKE_SOURCE_DIR}/extern/glm
-    ${CMAKE_SOURCE_DIR}/extern/vma
-    ${CMAKE_SOURCE_DIR}/extern
-)
-target_link_libraries(test_physics PRIVATE glory_sanitizers spdlog::spdlog)
-add_test(NAME physics COMMAND test_physics)
-
-add_executable(test_audio tests/test_audio.cpp
-    src/audio/AudioResourceManager.cpp
-    src/audio/AudioEngine.cpp
-    src/audio/SoundHandle.cpp
-    src/audio/miniaudio_impl.cpp
-)
-target_include_directories(test_audio PRIVATE 
-    ${CMAKE_SOURCE_DIR}/src 
-    ${miniaudio_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/extern/glm
-    ${CMAKE_SOURCE_DIR}/extern
-)
-target_link_libraries(test_audio PRIVATE glory_sanitizers spdlog::spdlog)
-add_test(NAME audio COMMAND test_audio)
-
-add_executable(test_replay tests/test_replay.cpp
-    src/replay/ReplayRecorder.cpp
-    src/replay/ReplayPlayer.cpp
-)
-target_include_directories(test_replay PRIVATE 
-    ${CMAKE_SOURCE_DIR}/src
-    ${CMAKE_SOURCE_DIR}/extern/glm
-    ${CMAKE_SOURCE_DIR}/extern/entt
-    ${CMAKE_SOURCE_DIR}/extern
-)
-target_link_libraries(test_replay PRIVATE glory_sanitizers spdlog::spdlog)
-add_test(NAME replay COMMAND test_replay)
+add_test(NAME mirror     COMMAND test_mirror)
+add_test(NAME maploader  COMMAND test_maploader)
+add_test(NAME terrain    COMMAND test_terrain)
+add_test(NAME nav        COMMAND test_nav)
+add_test(NAME ability    COMMAND test_ability)
+add_test(NAME combat     COMMAND test_combat)
+add_test(NAME animation  COMMAND test_animation)
+add_test(NAME physics    COMMAND test_physics)
+add_test(NAME audio      COMMAND test_audio)
+add_test(NAME replay     COMMAND test_replay)
 
 # ── Asset cook tool ───────────────────────────────────────────────────────────
 add_executable(asset_cook tools/asset_cook.cpp)
@@ -653,14 +328,10 @@ target_include_directories(asset_cook PRIVATE
 target_link_libraries(asset_cook PRIVATE meshoptimizer)
 target_compile_definitions(asset_cook PRIVATE GLM_FORCE_RADIANS GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
-# ── Cook assets target ───────────────────────────────────────────────────────
-set(COOKED_ASSET_DIR ${CMAKE_BINARY_DIR}/assets_cooked)
+# ── Cook assets target ────────────────────────────────────────────────────────
 add_custom_target(cook_assets
     COMMAND ${CMAKE_COMMAND} -E make_directory ${COOKED_ASSET_DIR}
     COMMAND asset_cook ${CMAKE_SOURCE_DIR}/assets ${COOKED_ASSET_DIR}
     DEPENDS asset_cook
     COMMENT "Cooking assets..."
-)
-target_compile_definitions(${PROJECT_NAME} PRIVATE
-    COOKED_ASSET_DIR="${COOKED_ASSET_DIR}/"
 )
