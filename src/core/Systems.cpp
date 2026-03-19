@@ -1,23 +1,42 @@
-#include "core/GameplaySystem.h"
-#include "scene/Scene.h"
-#include "scene/Components.h"
+#include "ability/AbilityComponents.h"
+#include "ability/AbilitySystem.h"
+#include "ability/ProjectileSystem.h"
 #include "combat/CombatComponents.h"
 #include "combat/CombatSystem.h"
 #include "combat/EconomySystem.h"
-#include "combat/RespawnSystem.h"
 #include "combat/GpuCollisionSystem.h"
-#include "ability/AbilitySystem.h"
-#include "ability/AbilityComponents.h"
-#include "renderer/GroundDecalRenderer.h"
+#include "combat/MinionWaveSystem.h"
+#include "combat/NPCBehaviorSystem.h"
+#include "combat/RespawnSystem.h"
+#include "combat/StructureSystem.h"
+#include "core/GameSystems.h"
+#include "core/GameplaySystem.h"
+#include "core/SystemScheduler.h"
 #include "nav/DebugRenderer.h"
-
-#include <glm/glm.hpp>
-#include <spdlog/spdlog.h>
+#include "physics/PhysicsSystem.h"
+#include "renderer/ConeAbilityRenderer.h"
+#include "renderer/DistortionRenderer.h"
+#include "renderer/ExplosionRenderer.h"
+#include "renderer/GroundDecalRenderer.h"
+#include "renderer/SpriteEffectRenderer.h"
+#include "scene/Components.h"
+#include "scene/Scene.h"
+#include "vfx/MeshEffectRenderer.h"
+#include "vfx/TrailRenderer.h"
+#include "vfx/VFXEventQueue.h"
+#include "vfx/VFXRenderer.h"
 
 #include <algorithm>
 #include <cmath>
+#include <glm/glm.hpp>
+#include <latch>
+#include <spdlog/spdlog.h>
+#include <stdexcept>
+#include <unordered_map>
 
 namespace glory {
+
+// ═══ GameplaySystem.cpp ═══
 
 // ── Initialisation ──────────────────────────────────────────────────────────
 
@@ -773,6 +792,243 @@ void GameplaySystem::updateAnimations(float dt) {
         // NOTE: anim.player.update(dt) is NOT called here — it is already
         // called once per tick by AnimationUpdateSystem in the SimulationLoop.
         // Calling it again would double the animation playback speed.
+    }
+}
+
+// ═══ GameSystems.cpp ═══
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VFXFlushSystem
+// ═══════════════════════════════════════════════════════════════════════════════
+void VFXFlushSystem::execute(entt::registry& /*registry*/, float dt) {
+    if (m_vfx) {
+        if (m_q1) m_vfx->processQueue(*m_q1);
+        if (m_q2) m_vfx->processQueue(*m_q2);
+        m_vfx->update(dt);
+    }
+    if (m_trail)      m_trail->update(dt);
+    if (m_decals)     m_decals->update(dt);
+    if (m_mesh)       m_mesh->update(dt);
+    if (m_distortion) m_distortion->update(dt);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AbilityUpdateSystem
+// ═══════════════════════════════════════════════════════════════════════════════
+void AbilityUpdateSystem::execute(entt::registry& registry, float dt) {
+    if (!m_abilities) return;
+
+    m_abilities->update(registry, dt, m_trail);
+
+    if (m_q && m_trail && m_decals && m_mesh &&
+        m_explosions && m_cone && m_sprites && m_distortion)
+    {
+        m_abilities->getSequencer().update(dt,
+            *m_q, *m_trail, *m_decals, *m_mesh,
+            *m_explosions, *m_cone, *m_sprites, *m_distortion);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ProjectileUpdateSystem
+// ═══════════════════════════════════════════════════════════════════════════════
+void ProjectileUpdateSystem::execute(entt::registry& registry, float dt) {
+    if (!m_proj || !m_abilities || !m_q) return;
+
+    m_proj->update(registry, dt, *m_q, *m_abilities, m_trail, m_gpuCollision);
+
+    if (m_explosions) {
+        for (const auto& pos : m_proj->getLandedPositions()) {
+            m_explosions->addExplosion(pos);
+        }
+        m_proj->clearLandedPositions();
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EffectsUpdateSystem
+// ═══════════════════════════════════════════════════════════════════════════════
+void EffectsUpdateSystem::execute(entt::registry& /*registry*/, float dt) {
+    if (m_explosions) m_explosions->update(dt);
+    if (m_sprites)    m_sprites->update(dt);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ConeEffectSystem
+// ═══════════════════════════════════════════════════════════════════════════════
+void ConeEffectSystem::execute(entt::registry& /*registry*/, float dt) {
+    if (!m_state || m_state->timer <= 0.0f || !m_cone) return;
+
+    m_state->timer -= dt;
+    float coneElapsed = m_state->duration - m_state->timer;
+    m_cone->update(dt, m_state->apex, m_state->direction,
+                   m_state->halfAngle, m_state->range, coneElapsed);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CombatUpdateSystem
+// ═══════════════════════════════════════════════════════════════════════════════
+void CombatUpdateSystem::execute(entt::registry& registry, float dt) {
+    if (m_combat) m_combat->update(registry, dt);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PhysicsUpdateSystem
+// ═══════════════════════════════════════════════════════════════════════════════
+void PhysicsUpdateSystem::execute(entt::registry& registry, float dt) {
+    PhysicsSystem::integrate(registry, dt);
+    PhysicsSystem::resolveCollisionsAndWake(registry);
+    PhysicsSystem::updateSleep(registry, dt);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AnimationUpdateSystem
+// ═══════════════════════════════════════════════════════════════════════════════
+void AnimationUpdateSystem::execute(entt::registry& registry, float dt) {
+    auto view = registry.view<AnimationComponent>();
+    for (auto [entity, anim] : view.each()) {
+        anim.player.update(dt);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EconomyUpdateSystem
+// ═══════════════════════════════════════════════════════════════════════════════
+void EconomyUpdateSystem::execute(entt::registry& registry, float dt) {
+    if (m_econ && m_gameTime)
+        m_econ->update(registry, *m_gameTime, dt);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// StructureUpdateSystem
+// ═══════════════════════════════════════════════════════════════════════════════
+void StructureUpdateSystem::execute(entt::registry& registry, float dt) {
+    if (m_structures) m_structures->update(registry, dt);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MinionWaveUpdateSystem
+// ═══════════════════════════════════════════════════════════════════════════════
+void MinionWaveUpdateSystem::execute(entt::registry& registry, float dt) {
+    if (m_waves && m_gameTime)
+        m_waves->update(registry, dt, *m_gameTime);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RespawnUpdateSystem
+// ═══════════════════════════════════════════════════════════════════════════════
+void RespawnUpdateSystem::execute(entt::registry& registry, float dt) {
+    if (m_respawn) m_respawn->update(registry, dt);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NPCBehaviorUpdateSystem
+// ═══════════════════════════════════════════════════════════════════════════════
+void NPCBehaviorUpdateSystem::execute(entt::registry& registry, float dt) {
+    if (m_npc && m_abilities)
+        m_npc->update(registry, dt, *m_abilities);
+}
+
+// ═══ SystemScheduler.cpp ═══
+
+void SystemScheduler::build() {
+    const uint32_t N = static_cast<uint32_t>(m_systems.size());
+    if (N == 0) { m_levels.clear(); m_dirty = false; return; }
+
+    // Map type_index → system index for dependency lookup
+    std::unordered_map<std::type_index, uint32_t> typeToIdx;
+    for (uint32_t i = 0; i < N; ++i) {
+        // Use the concrete type behind the ISystem pointer
+        typeToIdx[std::type_index(typeid(*m_systems[i]))] = i;
+    }
+
+    // Build adjacency list + in-degree from declared dependencies
+    std::vector<std::vector<uint32_t>> successors(N);
+    std::vector<uint32_t> inDegree(N, 0);
+
+    for (uint32_t i = 0; i < N; ++i) {
+        for (const auto& dep : m_systems[i]->dependsOn()) {
+            auto it = typeToIdx.find(dep);
+            if (it == typeToIdx.end()) {
+                spdlog::warn("SystemScheduler: {} depends on unregistered type, ignoring",
+                             m_systems[i]->name());
+                continue;
+            }
+            uint32_t depIdx = it->second;
+            successors[depIdx].push_back(i);
+            ++inDegree[i];
+        }
+    }
+
+    // Kahn's algorithm: compute levels (BFS layers)
+    m_levels.clear();
+    std::vector<uint32_t> currentLevel;
+    for (uint32_t i = 0; i < N; ++i) {
+        if (inDegree[i] == 0) currentLevel.push_back(i);
+    }
+
+    uint32_t processed = 0;
+    while (!currentLevel.empty()) {
+        m_levels.push_back(currentLevel);
+        processed += static_cast<uint32_t>(currentLevel.size());
+
+        std::vector<uint32_t> nextLevel;
+        for (uint32_t idx : currentLevel) {
+            for (uint32_t succ : successors[idx]) {
+                if (--inDegree[succ] == 0) {
+                    nextLevel.push_back(succ);
+                }
+            }
+        }
+        currentLevel = std::move(nextLevel);
+    }
+
+    if (processed != N) {
+        spdlog::error("SystemScheduler: dependency cycle detected! {} of {} systems scheduled.",
+                      processed, N);
+    }
+
+    m_dirty = false;
+
+    // Log the schedule
+    for (size_t lvl = 0; lvl < m_levels.size(); ++lvl) {
+        std::string names;
+        for (uint32_t idx : m_levels[lvl]) {
+            if (!names.empty()) names += ", ";
+            names += m_systems[idx]->name();
+        }
+        spdlog::info("SystemScheduler level {}: [{}]", lvl, names);
+    }
+}
+
+void SystemScheduler::tick(entt::registry& registry, float dt, ThreadPool& pool) {
+    if (m_dirty) build();
+
+    for (const auto& level : m_levels) {
+        if (level.size() == 1) {
+            // Single system — run directly, no threading overhead
+            m_systems[level[0]]->execute(registry, dt);
+        } else {
+            // Multiple systems at this level — run in parallel
+            std::latch done(static_cast<std::ptrdiff_t>(level.size()));
+            for (uint32_t idx : level) {
+                pool.submit([this, idx, &registry, dt, &done]() {
+                    m_systems[idx]->execute(registry, dt);
+                    done.count_down();
+                });
+            }
+            done.wait();
+        }
+    }
+}
+
+void SystemScheduler::tickSequential(entt::registry& registry, float dt) {
+    if (m_dirty) build();
+
+    for (const auto& level : m_levels) {
+        for (uint32_t idx : level) {
+            m_systems[idx]->execute(registry, dt);
+        }
     }
 }
 
