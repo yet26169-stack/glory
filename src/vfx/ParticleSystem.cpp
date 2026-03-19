@@ -3,6 +3,7 @@
 #include "renderer/VkCheck.h"
 
 #include <glm/gtc/constants.hpp>
+#include <spdlog/spdlog.h>
 
 #include <cstring>
 #include <algorithm>
@@ -83,7 +84,13 @@ ParticleSystem::ParticleSystem(const Device&          device,
     allocInfo.descriptorPool     = sharedPool;
     allocInfo.descriptorSetCount = 1;
     allocInfo.pSetLayouts        = &descLayout;
-    vkAllocateDescriptorSets(device.getDevice(), &allocInfo, &m_descSet);
+    VkResult allocResult = vkAllocateDescriptorSets(device.getDevice(), &allocInfo, &m_descSet);
+    if (allocResult != VK_SUCCESS) {
+        spdlog::warn("[VFX] Descriptor set allocation failed (VkResult {}), "
+                     "effect handle {} will be skipped", static_cast<int>(allocResult), handle);
+        m_descSet = VK_NULL_HANDLE;
+        return;
+    }
 
     writeToDescriptorSet(descLayout, atlas, depthView, depthSampler);
 }
@@ -276,6 +283,8 @@ void ParticleSystem::writeToDescriptorSet(VkDescriptorSetLayout /*layout*/,
                                           Texture* atlas,
                                           VkImageView depthView,
                                           VkSampler depthSampler) {
+    if (m_descSet == VK_NULL_HANDLE) return;
+
     VkDevice dev = m_device->getDevice();
 
     // Binding 0 — storage buffer (SSBO)

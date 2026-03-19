@@ -50,7 +50,13 @@ VFXRenderer::VFXRenderer(const Device& device, const RenderFormats& formats)
 VFXRenderer::~VFXRenderer() {
     VkDevice dev = m_device.getDevice();
 
-    m_effects.clear();   // destroy ParticleSystems before releasing the pool
+    // Release descriptor sets before destroying ParticleSystems (and their buffers)
+    for (auto& ps : m_effects)
+        ps->releaseDescriptorSet(dev, m_descPool);
+    for (auto& g : m_graveyard)
+        g.ps->releaseDescriptorSet(dev, m_descPool);
+
+    m_effects.clear();
     m_graveyard.clear();
 
     m_atlasCache.clear();
@@ -390,10 +396,17 @@ void VFXRenderer::update(float dt) {
         }
     }
 
-    // Flush graveyard: only destroy entries whose GPU-safe frame has passed
+    // Flush graveyard: free descriptor sets and destroy entries whose GPU-safe frame has passed
+    VkDevice dev = m_device.getDevice();
     m_graveyard.erase(
         std::remove_if(m_graveyard.begin(), m_graveyard.end(),
-                       [this](const GraveyardEntry& g){ return g.killFrame <= m_frameCount; }),
+                       [this, dev](GraveyardEntry& g){
+                           if (g.killFrame <= m_frameCount) {
+                               g.ps->releaseDescriptorSet(dev, m_descPool);
+                               return true; // erase triggers ~ParticleSystem → buffer destroy
+                           }
+                           return false;
+                       }),
         m_graveyard.end());
 }
 
@@ -402,6 +415,8 @@ void VFXRenderer::dispatchCompute(VkCommandBuffer cmd) {
     if (m_effects.empty()) return;
 
     for (auto& ps : m_effects) {
+        if (!ps->hasDescriptorSet()) continue;
+
         // 1. Clear indirect buffer (vertexCount = 0, instanceCount = 1, others 0)
         VkDrawIndirectCommand clearCmd{};
         clearCmd.instanceCount = 1;
@@ -423,6 +438,8 @@ void VFXRenderer::dispatchCompute(VkCommandBuffer cmd) {
     // 2. Simulation pass (with LOD: skip distant emitters on some frames)
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_computePipeline);
     for (auto& ps : m_effects) {
+        if (!ps->hasDescriptorSet()) continue;
+
         // LOD: compute distance-based skip mask
         float dist = glm::length(ps->worldPosition() - m_cameraPos);
         uint32_t lodMask = 0; // every frame
@@ -456,6 +473,7 @@ void VFXRenderer::dispatchCompute(VkCommandBuffer cmd) {
 
     // 3. Bitonic sort pass (back-to-front for correct alpha blending)
     for (auto& ps : m_effects) {
+        if (!ps->hasDescriptorSet()) continue;
         if (ps->blendMode() == EmitterDef::BlendMode::Additive) continue; // additive doesn't need sorting
         VkDescriptorSet ds = ps->descSet();
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
@@ -469,6 +487,8 @@ void VFXRenderer::dispatchCompute(VkCommandBuffer cmd) {
     // 4. Compaction pass
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_compactPipeline);
     for (auto& ps : m_effects) {
+        if (!ps->hasDescriptorSet()) continue;
+
         VkDescriptorSet ds = ps->descSet();
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
                                 m_compactLayout, 0, 1, &ds, 0, nullptr);
@@ -551,6 +571,8 @@ void VFXRenderer::dispatchComputeAsync(VkCommandBuffer computeCmd,
         releases.reserve(m_effects.size() * 2);
 
         for (auto& ps : m_effects) {
+            if (!ps->hasDescriptorSet()) continue;
+
             VkBufferMemoryBarrier2 bar{VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2};
             bar.srcStageMask       = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
             bar.srcAccessMask      = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
@@ -593,12 +615,14 @@ void VFXRenderer::acquireFromCompute(VkCommandBuffer graphicsCmd,
     acquires.reserve(m_effects.size() * 2);
 
     for (auto& ps : m_effects) {
+        if (!ps->hasDescriptorSet()) continue;
+
         VkBufferMemoryBarrier2 bar{VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2};
         bar.srcStageMask       = VK_PIPELINE_STAGE_2_NONE;
         bar.srcAccessMask      = VK_ACCESS_2_NONE;
-        bar.dstStageMask       = VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT |
+        bar.dstStageMask       = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT |
                                  VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT;
-        bar.dstAccessMask      = VK_ACCESS_2_SHADER_STORAGE_READ_BIT |
+        bar.dstAccessMask      = VK_ACCESS_2_SHADER_READ_BIT |
                                  VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT;
         bar.srcQueueFamilyIndex = srcQueueFamily;
         bar.dstQueueFamilyIndex = dstQueueFamily;
@@ -625,12 +649,12 @@ void VFXRenderer::barrierComputeToGraphics(VkCommandBuffer cmd) {
     if (m_effects.empty()) return;
 
     // One global memory barrier: wait for all compute SSBO writes to complete
-    // before the vertex stage reads the SSBOs as vertex attributes.
+    // before the vertex shader reads the SSBOs.
     VkMemoryBarrier2 barrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER_2 };
     barrier.srcStageMask  = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
     barrier.srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
-    barrier.dstStageMask  = VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT;
-    barrier.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT;
+    barrier.dstStageMask  = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT;
+    barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
 
     VkDependencyInfo depInfo{ VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
     depInfo.memoryBarrierCount = 1;
@@ -663,6 +687,7 @@ void VFXRenderer::render(VkCommandBuffer cmd,
     // Pass 1: Alpha-blended particles
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_alphaPipeline);
     for (const auto& ps : m_effects) {
+        if (!ps->hasDescriptorSet()) continue;
         if (ps->blendMode() != EmitterDef::BlendMode::Alpha) continue;
         
         VkDescriptorSet ds = ps->descSet();
@@ -674,6 +699,7 @@ void VFXRenderer::render(VkCommandBuffer cmd,
     // Pass 2: Additive particles
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_additivePipeline);
     for (const auto& ps : m_effects) {
+        if (!ps->hasDescriptorSet()) continue;
         if (ps->blendMode() != EmitterDef::BlendMode::Additive) continue;
         
         VkDescriptorSet ds = ps->descSet();

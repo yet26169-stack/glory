@@ -65,8 +65,8 @@ RenderPassNode createVFXAcquirePass() {
     RenderPassNode node;
     node.name = "VFXAcquire";
     node.writes(res::ParticleBuffer,
-                VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT,
-                VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT,
+                VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT,
+                VK_ACCESS_2_SHADER_READ_BIT,
                 VK_IMAGE_LAYOUT_UNDEFINED);
     node.execute = [](VkCommandBuffer cmd, const FrameContext& ctx) {
         if (!ctx.vfxRenderer || ctx.isLauncher || !ctx.asyncCompute) return;
@@ -197,8 +197,8 @@ RenderPassNode createTransparentVFXPass() {
                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     node.reads(res::ParticleBuffer,
-               VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT,
-               VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT);
+               VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT,
+               VK_ACCESS_2_SHADER_READ_BIT);
     node.writes(res::HdrColor,
                 VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
                 VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,

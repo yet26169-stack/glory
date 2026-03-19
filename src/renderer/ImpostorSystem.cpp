@@ -2,6 +2,7 @@
 #include "renderer/Device.h"
 #include "renderer/RenderFormats.h"
 #include "renderer/Model.h"
+#include "scene/Scene.h"
 
 #include <spdlog/spdlog.h>
 #include <glm/geometric.hpp>
@@ -64,13 +65,13 @@ void ImpostorSystem::cleanup() {
 // ── Registration ───────────────────────────────────────────────────────────
 
 void ImpostorSystem::registerUnitType(const std::string& modelName,
-                                       const Model* model,
+                                       uint32_t meshIndex,
                                        float worldWidth, float worldHeight,
                                        uint32_t angleCount) {
     if (m_entries.count(modelName)) return; // already registered
 
     ImpostorEntry entry;
-    entry.model       = model;
+    entry.meshIndex   = meshIndex;
     entry.angleCount  = angleCount;
     entry.worldWidth  = worldWidth;
     entry.worldHeight = worldHeight;
@@ -87,7 +88,7 @@ void ImpostorSystem::registerUnitType(const std::string& modelName,
                   modelName, angleCount, entry.startCol, entry.startRow);
 }
 
-void ImpostorSystem::generateAtlas() {
+void ImpostorSystem::generateAtlas(const Scene& scene) {
     if (!m_device || m_entries.empty()) return;
 
     VkDevice dev = m_device->getDevice();
@@ -172,7 +173,8 @@ void ImpostorSystem::generateAtlas() {
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_capturePipeline);
 
     for (auto& [name, entry] : m_entries) {
-        if (!entry.model) continue;
+        if (entry.meshIndex >= scene.getMeshes().size()) continue;
+        const Model& model = scene.getMesh(entry.meshIndex);
 
         // Orthographic projection for capturing quads
         float h = entry.worldHeight * 0.6f;
@@ -202,7 +204,7 @@ void ImpostorSystem::generateAtlas() {
             vkCmdSetScissor(cmd, 0, 1, &sc);
 
             vkCmdPushConstants(cmd, m_captureLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(CapturePC), &pc);
-            entry.model->draw(cmd);
+            model.draw(cmd);
         }
     }
 

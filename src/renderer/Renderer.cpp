@@ -2255,7 +2255,7 @@ void Renderer::buildScene() {
             spdlog::warn("Character texture not found in GLB — using default white texture (slot {})", charTex);
         }
 
-        m_impostorSystem.registerUnitType("hero", &m_scene.getMesh(m_scene.addMesh(std::move(skinnedData.model))), 1.5f, 2.0f, 16);
+        m_impostorSystem.registerUnitType("hero", m_scene.addMesh(std::move(skinnedData.model)), 1.5f, 2.0f, 16);
 
         // Build StaticSkinnedMesh from first mesh in GLB
         if (!skinnedData.bindPoseVertices.empty() && !skinnedData.skinVertices.empty()) {
@@ -2476,8 +2476,9 @@ void Renderer::buildScene() {
             spdlog::warn("Minion texture not found in GLB — using default white texture (slot {})", minionTex);
         }
 
-        m_impostorSystem.registerUnitType("minion", &m_scene.getMesh(m_scene.addMesh(std::move(skinnedData.model))), 1.0f, 1.2f, 16);
-        m_impostorSystem.registerUnitType("default", &m_scene.getMesh(m_scene.getMeshes().size() - 1), 1.0f, 1.2f, 16);
+        uint32_t minionMeshIdx = m_scene.addMesh(std::move(skinnedData.model));
+        m_impostorSystem.registerUnitType("minion", minionMeshIdx, 1.0f, 1.2f, 16);
+        m_impostorSystem.registerUnitType("default", minionMeshIdx, 1.0f, 1.2f, 16);
 
         if (!skinnedData.bindPoseVertices.empty() && !skinnedData.skinVertices.empty()) {
             std::vector<SkinnedVertex> sverts;
@@ -2682,7 +2683,7 @@ void Renderer::buildScene() {
         if (m_scene.getMeshes().size() > 0) {
             // Heuristic: register some common models if they were loaded
             // (The individual loading blocks already registered "hero" and "minion")
-            m_impostorSystem.generateAtlas();
+            m_impostorSystem.generateAtlas(m_scene);
         }
     }
 }

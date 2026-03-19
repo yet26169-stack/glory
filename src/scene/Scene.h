@@ -29,7 +29,8 @@ public:
     uint32_t addTexture(Texture texture);
     uint32_t addMaterial(Material material);
 
-    Model&    getMesh(uint32_t index)     { return m_meshes[index]; }
+    Model&    getMesh(uint32_t index)           { return m_meshes[index]; }
+    const Model& getMesh(uint32_t index) const { return m_meshes[index]; }
     Texture&  getTexture(uint32_t index)  { return m_textures[index]; }
     Material& getMaterial(uint32_t index) { return m_materials[index]; }
 

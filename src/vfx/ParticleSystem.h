@@ -67,6 +67,16 @@ public:
     VkBuffer        emitterUbo()  const { return m_emitterBuffer.getBuffer(); }
     VkBuffer        indirectBuffer() const { return m_indirectBuffer.getBuffer(); }
     VkDescriptorSet descSet()     const { return m_descSet; }
+    bool            hasDescriptorSet() const { return m_descSet != VK_NULL_HANDLE; }
+
+    // Release the descriptor set back to the pool (must be called before
+    // buffer destruction to avoid use-after-free validation errors).
+    void releaseDescriptorSet(VkDevice device, VkDescriptorPool pool) {
+        if (m_descSet != VK_NULL_HANDLE) {
+            vkFreeDescriptorSets(device, pool, 1, &m_descSet);
+            m_descSet = VK_NULL_HANDLE;
+        }
+    }
     uint32_t        maxParticles()const { return m_maxParticles; }
     glm::vec3       worldPosition() const { return m_position; }
 

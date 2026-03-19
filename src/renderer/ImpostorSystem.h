@@ -19,7 +19,7 @@ struct RenderFormats;
 
 /// Descriptor for a single impostor unit type in the atlas.
 struct ImpostorEntry {
-    const Model* model   = nullptr;
+    uint32_t meshIndex   = UINT32_MAX; // index into Scene mesh vector (resolved at atlas gen)
     uint32_t atlasIndex  = 0;  // which atlas page
     uint32_t startCol    = 0;  // first column in atlas grid
     uint32_t startRow    = 0;  // first row
@@ -53,14 +53,16 @@ public:
     void cleanup();
 
     /// Register a unit type for impostor rendering.
-    /// modelName is the asset key; worldWidth/Height determine billboard sizing.
-    void registerUnitType(const std::string& modelName, const Model* model,
+    /// modelName is the asset key; meshIndex is the index into Scene::getMeshes();
+    /// worldWidth/Height determine billboard sizing.
+    void registerUnitType(const std::string& modelName, uint32_t meshIndex,
                           float worldWidth, float worldHeight, uint32_t angleCount = 8);
 
     /// Generate the impostor atlas by rendering each registered type from
     /// `angleCount` evenly spaced angles.  Call once after all types registered
-    /// and scene meshes are loaded.
-    void generateAtlas();
+    /// and scene meshes are loaded.  The Scene reference is used to resolve
+    /// mesh indices to Model objects (avoids dangling pointers from vector realloc).
+    void generateAtlas(const class Scene& scene);
 
     /// Look up impostor entry for a model name.
     const ImpostorEntry* getEntry(const std::string& modelName) const;
