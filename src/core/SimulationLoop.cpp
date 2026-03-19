@@ -1,23 +1,6 @@
 #include "core/SimulationLoop.h"
-
-#include "ability/AbilitySystem.h"
-#include "ability/ProjectileSystem.h"
-#include "combat/CombatSystem.h"
-#include "combat/EconomySystem.h"
-#include "combat/StructureSystem.h"
-#include "combat/MinionWaveSystem.h"
-#include "combat/NPCBehaviorSystem.h"
-#include "physics/PhysicsSystem.h"
-#include "vfx/VFXRenderer.h"
-#include "vfx/VFXEventQueue.h"
-#include "vfx/TrailRenderer.h"
-#include "vfx/MeshEffectRenderer.h"
-#include "renderer/GroundDecalRenderer.h"
-#include "renderer/DistortionRenderer.h"
-#include "renderer/ExplosionRenderer.h"
-#include "renderer/ConeAbilityRenderer.h"
-#include "renderer/SpriteEffectRenderer.h"
-
+// All system types are forward-declared in GameSystems.h (via SimulationLoop.h).
+// Only concrete includes needed here are for spdlog.
 #include <spdlog/spdlog.h>
 
 namespace glory {

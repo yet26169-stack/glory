@@ -82,33 +82,39 @@ cd build && ctest --output-on-failure
 
 ## Project Structure
 
-- **`src/`** — Core engine source code
-  - `ability/` — Ability system, cooldowns, effects, projectiles, status effects
-  - `animation/` — Skeletal animation, retargeting, blend trees
-  - `assets/` — Asset loading and management utilities
-  - `audio/` — 3D spatial audio engine (miniaudio integration)
-  - `camera/` — Isometric camera and frustum math
-  - `combat/` — Combat system, economy, structures, hero registry, minion waves
-  - `core/` — App loop, simulation loop, threading, RNG, logging, profiler, allocators
-  - `fog/` — Fog of War gameplay and visibility logic
-  - `hud/` — UI components: health bars, floating text, minimap, scoreboard
-  - `input/` — Input handling, mouse targeting, keyboard mapping
-  - `map/` — Map loading (JSON), lane waypoints, symmetry logic
-  - `math/` — Deterministic fixed-point math (`Fixed64`, `FixedVec3`, CORDIC trig)
-  - `nav/` — Navigation: pathfinding (Recast/Detour), flow fields, splines, lane following
-  - `network/` — Lockstep networking (ENet), rollback, input synchronization
-  - `physics/` — Simple collision detection and rigid body physics
-  - `renderer/` — Vulkan 1.3 pipeline, GPU culling, shadows, post-processing (Bloom, SSAO, SSR)
-  - `replay/` — Replay recording, serialization, and playback
-  - `scene/` — ECS component definitions and scene management
-  - `scripting/` — Lua scripting integration (sol2 bindings)
-  - `terrain/` — Terrain rendering and heightmap queries
-  - `vfx/` — Visual effects: GPU particles, trails, mesh effects, composite sequencer
-  - `window/` — GLFW window management and Vulkan surface integration
+```
+src/
+  ability/       AbilitySystem, ProjectileSystem
+  animation/     AnimationPlayer, CPUSkinning
+  assets/        AssetRegistry, CookedLoader
+  audio/         AudioEngine (engine+handle+resource mgr), GameAudioEvents, miniaudio_impl
+  camera/        Camera
+  combat/        CombatSystem (combat+structures+respawn), NPCSystem (waves+behavior), EconomySystem, HeroRegistry, GpuCollisionSystem
+  core/          Application, SimulationLoop, FramePacer, Systems (scheduler+gameplay), GameState, Log, Allocators
+  fog/           FogSystem, FogOfWarGameplay
+  hud/           HUD, HUDWidgets (floatingtext+healthbar+abilitybar+feed+respawn), Minimap, Scoreboard, PerfOverlay
+  input/         InputManager
+  map/           MapLoader
+  nav/           NavMeshBuilder, PathfindingSystem, FlowField, DynamicObstacle, DebugRenderer
+  network/       Netcode (inputsync+snapshot+gameloop), Transport, LobbySystem
+  physics/       PhysicsSystem
+  renderer/      Renderer, RenderGraph, Context, Device, Swapchain, Buffer, Image, Mesh, Model, Texture, Pipeline, Descriptors, PostProcessPasses, SpecializedRenderers, + others
+  replay/        Replay (recorder+player)
+  scene/         Scene
+  scripting/     ScriptEngine, LuaBindings
+  terrain/       IsometricCamera
+  vfx/           VFXRenderer (renderer+trail+mesh), VFXLoader (loader+factory), ParticleSystem, CompositeVFXSequencer
+  window/        Window
+docs/
+  ARCHITECTURE.md          Engine structure, Vulkan pipeline, VFX system, camera/physics
+  GAMEPLAY.md              Ability system, units, NPCs, map, HUD
+  IMPLEMENTATION_PLAN.md   Prioritized roadmap P0–P4
+tests/
+  19 test files covering: ability, animation, audio, combat, determinism, fixedpoint, flowfield,
+  fog, jungle, maploader, minion, mirror, nav, networking, physics, replay, snapshot, structure, terrain
+```
 
-- **`tests/`** — Unit test suite (15+ test files for core simulation and math)
 - **`assets/`** — JSON data, textures, and models
 - **`shaders/`** — GLSL shader source (compiled to SPIR-V during build)
 - **`extern/`** — Third-party libraries (EnTT, GLFW, GLM, spdlog, etc.)
-- **`docs/`** — Architecture deep dives and design specifications
 - **`tools/`** — Asset cooking and development tools

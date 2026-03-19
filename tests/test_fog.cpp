@@ -160,7 +160,7 @@ void test_soft_falloff() {
   float edgeX = 100.0f + edgeDist;
   int ex =
       static_cast<int>((edgeX / FogSystem::WORLD_SIZE) * FogSystem::MAP_SIZE);
-  ex = std::clamp(ex, 0, FogSystem::MAP_SIZE - 1);
+  ex = std::clamp(ex, 0, static_cast<int>(FogSystem::MAP_SIZE) - 1);
   uint8_t edgeVal = fog.getVisionBuffer()[cx * FogSystem::MAP_SIZE + ex];
   assert(edgeVal < 255);
 

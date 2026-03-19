@@ -296,11 +296,12 @@ add_executable(test_animation  tests/test_animation.cpp)
 add_executable(test_physics    tests/test_physics.cpp)
 add_executable(test_audio      tests/test_audio.cpp)
 add_executable(test_replay     tests/test_replay.cpp)
+add_executable(test_fog        tests/test_fog.cpp)
 
 foreach(_test
     test_mirror test_maploader test_terrain test_fixedpoint
     test_nav test_ability test_combat test_animation
-    test_physics test_audio test_replay)
+    test_physics test_audio test_replay test_fog)
     target_link_libraries(${_test} PRIVATE glory_test_common)
 endforeach()
 
@@ -315,6 +316,7 @@ add_test(NAME animation  COMMAND test_animation)
 add_test(NAME physics    COMMAND test_physics)
 add_test(NAME audio      COMMAND test_audio)
 add_test(NAME replay     COMMAND test_replay)
+add_test(NAME fog        COMMAND test_fog)
 
 # ── Asset cook tool ───────────────────────────────────────────────────────────
 add_executable(asset_cook tools/asset_cook.cpp)
