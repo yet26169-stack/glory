@@ -83,8 +83,8 @@ void FogOfWarRenderer::createImages() {
 
 // ── transitionInitialLayouts ──────────────────────────────────────────────────
 void FogOfWarRenderer::transitionInitialLayouts() {
+    auto poolLock = m_device->lockGraphicsPool();
     VkCommandPool pool  = m_device->getGraphicsCommandPool();
-    VkQueue       queue = m_device->getGraphicsQueue();
 
     VkCommandBufferAllocateInfo allocInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
     allocInfo.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -116,8 +116,8 @@ void FogOfWarRenderer::transitionInitialLayouts() {
     VkSubmitInfo2 submitInfo{ VK_STRUCTURE_TYPE_SUBMIT_INFO_2 };
     submitInfo.commandBufferInfoCount = 1;
     submitInfo.pCommandBufferInfos    = &cmdInfo;
-    vkQueueSubmit2(queue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(queue);
+    m_device->submitGraphics(1, &submitInfo);
+    m_device->graphicsQueueWaitIdle();
 
     vkFreeCommandBuffers(m_device->getDevice(), pool, 1, &cmd);
 }
@@ -133,8 +133,8 @@ void FogOfWarRenderer::uploadInitialGrid() {
     m_stagingBuffer.unmap();
     m_stagingBuffer.flush();
 
+    auto poolLock = m_device->lockGraphicsPool();
     VkCommandPool pool  = m_device->getGraphicsCommandPool();
-    VkQueue       queue = m_device->getGraphicsQueue();
 
     VkCommandBufferAllocateInfo allocInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
     allocInfo.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -180,8 +180,8 @@ void FogOfWarRenderer::uploadInitialGrid() {
     VkSubmitInfo2 submitInfo{ VK_STRUCTURE_TYPE_SUBMIT_INFO_2 };
     submitInfo.commandBufferInfoCount = 1;
     submitInfo.pCommandBufferInfos    = &cmdInfo;
-    vkQueueSubmit2(queue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(queue);
+    m_device->submitGraphics(1, &submitInfo);
+    m_device->graphicsQueueWaitIdle();
 
     vkFreeCommandBuffers(m_device->getDevice(), pool, 1, &cmd);
 }

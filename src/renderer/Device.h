@@ -3,6 +3,7 @@
 #include <vulkan/vulkan.h>
 #include <vk_mem_alloc.h>
 
+#include <mutex>
 #include <optional>
 #include <vector>
 
@@ -54,6 +55,34 @@ public:
     SwapchainSupportDetails querySwapchainSupport() const;
     SwapchainSupportDetails querySwapchainSupport(VkPhysicalDevice device) const;
 
+    // Thread-safe queue submission wrappers.  These serialise access to each
+    // VkQueue handle so that buildScene() can safely run on a background
+    // thread while the main thread keeps rendering the loading screen.
+    VkResult submitGraphics(uint32_t submitCount, const VkSubmitInfo2* submits,
+                            VkFence fence = VK_NULL_HANDLE) const;
+    VkResult submitTransfer(uint32_t submitCount, const VkSubmitInfo2* submits,
+                            VkFence fence = VK_NULL_HANDLE) const;
+    VkResult submitCompute(uint32_t submitCount, const VkSubmitInfo2* submits,
+                           VkFence fence = VK_NULL_HANDLE) const;
+    VkResult present(const VkPresentInfoKHR* presentInfo) const;
+
+    // Legacy vkQueueSubmit (used by ImpostorSystem)
+    VkResult submitGraphicsLegacy(uint32_t submitCount, const VkSubmitInfo* submits,
+                                  VkFence fence = VK_NULL_HANDLE) const;
+
+    VkResult graphicsQueueWaitIdle() const;
+    VkResult transferQueueWaitIdle() const;
+    VkResult computeQueueWaitIdle()  const;
+
+    // Lock guard accessors for command pool thread safety.
+    // Callers must hold the lock while using command buffers from the pool.
+    std::unique_lock<std::mutex> lockTransferPool() const {
+        return std::unique_lock(m_transferPoolMutex);
+    }
+    std::unique_lock<std::mutex> lockGraphicsPool() const {
+        return std::unique_lock(m_graphicsPoolMutex);
+    }
+
     VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates,
                                  VkImageTiling tiling,
                                  VkFormatFeatureFlags features) const;
@@ -77,6 +106,17 @@ private:
     VkCommandPool    m_computeCommandPool    = VK_NULL_HANDLE;
     QueueFamilyIndices m_indices;
     bool m_cleaned = false;
+
+    // Mutexes for thread-safe queue access (mutable because submit methods
+    // are logically const — they don't change Device state).
+    mutable std::mutex m_graphicsQueueMutex;
+    mutable std::mutex m_transferQueueMutex;
+    mutable std::mutex m_computeQueueMutex;
+
+    // Mutexes for command pool thread safety — each VkCommandPool must only
+    // be accessed from one thread at a time.
+    mutable std::mutex m_transferPoolMutex;
+    mutable std::mutex m_graphicsPoolMutex;
 
     void pickPhysicalDevice();
     void createLogicalDevice();

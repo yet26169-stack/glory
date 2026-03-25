@@ -92,7 +92,7 @@ void ImpostorSystem::generateAtlas(const Scene& scene) {
     if (!m_device || m_entries.empty()) return;
 
     VkDevice dev = m_device->getDevice();
-    VkQueue  q   = m_device->getGraphicsQueue();
+    auto poolLock = m_device->lockGraphicsPool();
     VkCommandPool pool = m_device->getGraphicsCommandPool();
 
     // 1. Create depth buffer for capture
@@ -215,8 +215,8 @@ void ImpostorSystem::generateAtlas(const Scene& scene) {
     VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
     submit.commandBufferCount = 1;
     submit.pCommandBuffers = &cmd;
-    vkQueueSubmit(q, 1, &submit, VK_NULL_HANDLE);
-    vkQueueWaitIdle(q);
+    m_device->submitGraphicsLegacy(1, &submit);
+    m_device->graphicsQueueWaitIdle();
     vkFreeCommandBuffers(dev, pool, 1, &cmd);
 
     // Update descriptor set with the now-filled atlas

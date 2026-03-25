@@ -81,6 +81,7 @@
 
 #include <glm/glm.hpp>
 #include <functional>
+#include <future>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -110,6 +111,11 @@ public:
     void setVictoryCallback(std::function<void(uint8_t)> cb) { m_onVictory = std::move(cb); }
 
     void buildScene();
+
+    // Kick off buildScene() on a background thread so the loading screen can
+    // render while assets are being loaded.
+    void buildSceneAsync();
+    bool isBuildSceneDone() const;
 
     void setSelectedHeroId(const std::string& id) { m_selectedHeroId = id; }
     const HeroRegistry& getHeroRegistry() const { return m_heroRegistry; }
@@ -288,6 +294,9 @@ private:
     // ── Hero system ──────────────────────────────────────────────────────
     HeroRegistry m_heroRegistry;
     std::string  m_selectedHeroId;
+
+    // ── Async scene loading ──────────────────────────────────────────────
+    std::future<void> m_buildSceneFuture;
 
     // Per-pass recording methods (called from render graph execute lambdas)
     void recordShadowPass(VkCommandBuffer cmd, const FrameContext& ctx);

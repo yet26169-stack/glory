@@ -460,4 +460,53 @@ VkFormat Device::findDepthFormat() const {
         VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 }
 
+// ── Thread-safe queue submission wrappers ────────────────────────────────────
+
+VkResult Device::submitGraphics(uint32_t submitCount, const VkSubmitInfo2* submits,
+                                VkFence fence) const {
+    std::lock_guard lock(m_graphicsQueueMutex);
+    return vkQueueSubmit2(m_graphicsQueue, submitCount, submits, fence);
+}
+
+VkResult Device::submitTransfer(uint32_t submitCount, const VkSubmitInfo2* submits,
+                                VkFence fence) const {
+    // When transfer queue aliases graphics queue, lock the graphics mutex
+    // to avoid concurrent access to the same VkQueue handle.
+    std::lock_guard lock(m_dedicatedTransfer ? m_transferQueueMutex : m_graphicsQueueMutex);
+    return vkQueueSubmit2(m_transferQueue, submitCount, submits, fence);
+}
+
+VkResult Device::submitCompute(uint32_t submitCount, const VkSubmitInfo2* submits,
+                               VkFence fence) const {
+    std::lock_guard lock(m_dedicatedCompute ? m_computeQueueMutex : m_graphicsQueueMutex);
+    return vkQueueSubmit2(m_computeQueue, submitCount, submits, fence);
+}
+
+VkResult Device::present(const VkPresentInfoKHR* presentInfo) const {
+    // Present queue may alias graphics queue, so lock graphics mutex too.
+    std::scoped_lock lock(m_graphicsQueueMutex);
+    return vkQueuePresentKHR(m_presentQueue, presentInfo);
+}
+
+VkResult Device::submitGraphicsLegacy(uint32_t submitCount, const VkSubmitInfo* submits,
+                                      VkFence fence) const {
+    std::lock_guard lock(m_graphicsQueueMutex);
+    return vkQueueSubmit(m_graphicsQueue, submitCount, submits, fence);
+}
+
+VkResult Device::graphicsQueueWaitIdle() const {
+    std::lock_guard lock(m_graphicsQueueMutex);
+    return vkQueueWaitIdle(m_graphicsQueue);
+}
+
+VkResult Device::transferQueueWaitIdle() const {
+    std::lock_guard lock(m_dedicatedTransfer ? m_transferQueueMutex : m_graphicsQueueMutex);
+    return vkQueueWaitIdle(m_transferQueue);
+}
+
+VkResult Device::computeQueueWaitIdle() const {
+    std::lock_guard lock(m_dedicatedCompute ? m_computeQueueMutex : m_graphicsQueueMutex);
+    return vkQueueWaitIdle(m_computeQueue);
+}
+
 } // namespace glory

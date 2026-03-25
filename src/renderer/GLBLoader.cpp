@@ -223,7 +223,8 @@ Model Model::loadFromGLB(const Device &device, VmaAllocator allocator,
 
 // ── Model::loadGLBTextures ──────────────────────────────────────────────────
 std::vector<Model::GLBTexture> Model::loadGLBTextures(const Device &device,
-                                            const std::string &filepath) {
+                                            const std::string &filepath,
+                                            TextureUploadBatch *batch) {
   tinygltf::TinyGLTF loader;
   tinygltf::Model gltfModel;
   std::string err, warn;
@@ -282,7 +283,8 @@ std::vector<Model::GLBTexture> Model::loadGLBTextures(const Device &device,
 
     GLBTexture glbTex;
     glbTex.materialIndex = i;
-    glbTex.texture = Texture::createFromPixels(device, pixels, w, h);
+    glbTex.texture = Texture::createFromPixels(device, pixels, w, h,
+                                               VK_FORMAT_R8G8B8A8_SRGB, batch);
     textures.push_back(std::move(glbTex));
     spdlog::info("Loaded GLB texture '{}' for material {} ({}x{}, {} components)", img.name, i, w,
                  h, img.component);

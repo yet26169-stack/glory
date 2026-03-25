@@ -1,15 +1,52 @@
 #pragma once
 
+#include "renderer/Buffer.h"
 #include "renderer/Image.h"
 
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
 #include <string>
+#include <vector>
 
 namespace glory {
 
 class Device;
+
+// ── TextureUploadBatch ──────────────────────────────────────────────────────
+// Collects texture upload commands (layout transitions + buffer→image copies)
+// into a single command buffer so they can be flushed with one GPU submission
+// instead of one vkQueueWaitIdle per texture.
+class TextureUploadBatch {
+public:
+  explicit TextureUploadBatch(const Device &device);
+  ~TextureUploadBatch();
+
+  TextureUploadBatch(const TextureUploadBatch &) = delete;
+  TextureUploadBatch &operator=(const TextureUploadBatch &) = delete;
+
+  // Record a transition + copy + transition for one texture image.
+  // The staging buffer is kept alive internally until flush().
+  void stageUpload(VkImage image, const void *pixels,
+                   uint32_t width, uint32_t height, VkFormat format,
+                   VmaAllocator allocator);
+
+  // Submit the command buffer and wait for all uploads to complete.
+  // After flush(), the batch can be reused by calling stageUpload() again.
+  void flush();
+
+  bool empty() const { return m_uploadCount == 0; }
+
+private:
+  const Device &m_device;
+  VkCommandPool m_pool = VK_NULL_HANDLE;  // private pool for thread safety
+  VkCommandBuffer m_cmd = VK_NULL_HANDLE;
+  std::vector<Buffer> m_stagingBuffers;
+  uint32_t m_uploadCount = 0;
+  bool m_recording = false;
+
+  void ensureRecording();
+};
 
 class Texture {
 public:
@@ -56,9 +93,11 @@ public:
   static Texture createNoise(const Device &device);
 
   /// Create texture from raw RGBA pixel data (generic factory).
+  /// If batch is non-null, the upload is deferred; call batch->flush() later.
   static Texture createFromPixels(const Device &device, const uint32_t *pixels,
                                   uint32_t width, uint32_t height,
-                                  VkFormat format = VK_FORMAT_R8G8B8A8_SRGB);
+                                  VkFormat format = VK_FORMAT_R8G8B8A8_SRGB,
+                                  TextureUploadBatch *batch = nullptr);
 
 private:
   Image m_image;

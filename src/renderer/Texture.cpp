@@ -14,17 +14,153 @@
 
 namespace glory {
 
+// ═════════════════════════════════════════════════════════════════════════════
+// TextureUploadBatch — records transitions + copies into one command buffer
+// ═════════════════════════════════════════════════════════════════════════════
+
+TextureUploadBatch::TextureUploadBatch(const Device &device) : m_device(device) {
+  // Create a private command pool so this batch can safely record on a
+  // background thread without interfering with the main thread's pool.
+  VkCommandPoolCreateInfo poolInfo{};
+  poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+  poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+  poolInfo.queueFamilyIndex = device.getQueueFamilies().graphicsFamily.value();
+  VK_CHECK(vkCreateCommandPool(device.getDevice(), &poolInfo, nullptr, &m_pool),
+           "TextureUploadBatch: failed to create command pool");
+}
+
+TextureUploadBatch::~TextureUploadBatch() {
+  if (!empty()) {
+    spdlog::warn("TextureUploadBatch destroyed with {} unflushed uploads", m_uploadCount);
+  }
+  if (m_pool != VK_NULL_HANDLE) {
+    // Destroying the pool implicitly frees all command buffers from it.
+    vkDestroyCommandPool(m_device.getDevice(), m_pool, nullptr);
+  }
+}
+
+void TextureUploadBatch::ensureRecording() {
+  if (m_recording) return;
+
+  VkCommandBufferAllocateInfo allocInfo{};
+  allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  allocInfo.commandPool = m_pool;
+  allocInfo.commandBufferCount = 1;
+  VK_CHECK(vkAllocateCommandBuffers(m_device.getDevice(), &allocInfo, &m_cmd),
+           "TextureUploadBatch: failed to allocate command buffer");
+
+  VkCommandBufferBeginInfo beginInfo{};
+  beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+  VK_CHECK(vkBeginCommandBuffer(m_cmd, &beginInfo),
+           "TextureUploadBatch: failed to begin command buffer");
+
+  m_recording = true;
+}
+
+void TextureUploadBatch::stageUpload(VkImage image, const void *pixels,
+                                     uint32_t width, uint32_t height,
+                                     VkFormat format, VmaAllocator allocator) {
+  ensureRecording();
+
+  VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * height * 4;
+
+  m_stagingBuffers.emplace_back(allocator, imageSize,
+                                VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                VMA_MEMORY_USAGE_CPU_ONLY);
+  Buffer &staging = m_stagingBuffers.back();
+  void *mapped = staging.map();
+  std::memcpy(mapped, pixels, static_cast<size_t>(imageSize));
+  staging.unmap();
+  staging.flush();
+
+  // Barrier: UNDEFINED → TRANSFER_DST
+  VkImageMemoryBarrier2 toTransfer{};
+  toTransfer.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+  toTransfer.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  toTransfer.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+  toTransfer.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  toTransfer.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  toTransfer.image = image;
+  toTransfer.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+  toTransfer.srcStageMask  = VK_PIPELINE_STAGE_2_NONE;
+  toTransfer.srcAccessMask = VK_ACCESS_2_NONE;
+  toTransfer.dstStageMask  = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+  toTransfer.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+
+  VkDependencyInfo depPre{};
+  depPre.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+  depPre.imageMemoryBarrierCount = 1;
+  depPre.pImageMemoryBarriers = &toTransfer;
+  vkCmdPipelineBarrier2(m_cmd, &depPre);
+
+  // Copy staging → image
+  VkBufferImageCopy region{};
+  region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+  region.imageExtent = {width, height, 1};
+  vkCmdCopyBufferToImage(m_cmd, staging.getBuffer(), image,
+                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+  // Barrier: TRANSFER_DST → SHADER_READ_ONLY
+  VkImageMemoryBarrier2 toShader{};
+  toShader.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+  toShader.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+  toShader.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  toShader.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  toShader.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  toShader.image = image;
+  toShader.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+  toShader.srcStageMask  = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+  toShader.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+  toShader.dstStageMask  = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+  toShader.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+
+  VkDependencyInfo depPost{};
+  depPost.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+  depPost.imageMemoryBarrierCount = 1;
+  depPost.pImageMemoryBarriers = &toShader;
+  vkCmdPipelineBarrier2(m_cmd, &depPost);
+
+  ++m_uploadCount;
+}
+
+void TextureUploadBatch::flush() {
+  if (!m_recording || m_uploadCount == 0) return;
+
+  VK_CHECK(vkEndCommandBuffer(m_cmd), "TextureUploadBatch: failed to end command buffer");
+
+  VkCommandBufferSubmitInfo cmdInfo{};
+  cmdInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+  cmdInfo.commandBuffer = m_cmd;
+
+  VkSubmitInfo2 submitInfo{};
+  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+  submitInfo.commandBufferInfoCount = 1;
+  submitInfo.pCommandBufferInfos = &cmdInfo;
+
+  VK_CHECK(m_device.submitGraphics(1, &submitInfo), "TextureUploadBatch: submit failed");
+  m_device.graphicsQueueWaitIdle();
+
+  spdlog::info("TextureUploadBatch: flushed {} uploads in 1 GPU submission",
+               m_uploadCount);
+
+  // Release staging memory
+  m_stagingBuffers.clear();
+
+  // Reset pool instead of freeing individual command buffers — faster.
+  vkResetCommandPool(m_device.getDevice(), m_pool, 0);
+  m_cmd = VK_NULL_HANDLE;
+  m_uploadCount = 0;
+  m_recording = false;
+}
+
 namespace {
 void transitionImageLayout(const Device &device, VkImage image,
                            VkImageLayout oldLayout, VkImageLayout newLayout) {
-  // Always use the graphics queue for layout transitions.  Using the transfer
-  // queue for TRANSFER_DST→SHADER_READ_ONLY and then the graphics queue for the
-  // barrier introduces a cross-queue race: vkQueueWaitIdle on the transfer queue
-  // provides CPU-side ordering but no GPU-side memory visibility guarantee for
-  // the graphics queue.  Routing all transitions through the graphics queue
-  // eliminates that hazard at negligible cost (transitions are load-time only).
+  // Always use the graphics queue for layout transitions.
+  auto poolLock = device.lockGraphicsPool();
   VkCommandPool pool  = device.getGraphicsCommandPool();
-  VkQueue       queue = device.getGraphicsQueue();
 
   VkCommandBufferAllocateInfo allocInfo{};
   allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -86,14 +222,15 @@ void transitionImageLayout(const Device &device, VkImage image,
   submitInfo.commandBufferInfoCount = 1;
   submitInfo.pCommandBufferInfos = &cmdInfo;
 
-  vkQueueSubmit2(queue, 1, &submitInfo, VK_NULL_HANDLE);
-  vkQueueWaitIdle(queue);
+  device.submitGraphics(1, &submitInfo);
+  device.graphicsQueueWaitIdle();
 
   vkFreeCommandBuffers(device.getDevice(), pool, 1, &cmd);
 }
 
 void copyBufferToImage(const Device &device, VkBuffer buffer, VkImage image,
                        uint32_t width, uint32_t height) {
+  auto poolLock = device.lockTransferPool();
   VkCommandBufferAllocateInfo allocInfo{};
   allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
   allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -133,8 +270,8 @@ void copyBufferToImage(const Device &device, VkBuffer buffer, VkImage image,
   submitInfo.commandBufferInfoCount = 1;
   submitInfo.pCommandBufferInfos = &cmdInfo;
 
-  vkQueueSubmit2(device.getTransferQueue(), 1, &submitInfo, VK_NULL_HANDLE);
-  vkQueueWaitIdle(device.getTransferQueue());
+  device.submitTransfer(1, &submitInfo);
+  device.transferQueueWaitIdle();
 
   vkFreeCommandBuffers(device.getDevice(), device.getTransferCommandPool(), 1,
                        &cmd);
@@ -1244,32 +1381,39 @@ Texture Texture::createNoise(const Device& device) {
 // ── Generic pixel upload factory ────────────────────────────────────────────
 Texture Texture::createFromPixels(const Device &device, const uint32_t *pixels,
                                   uint32_t width, uint32_t height,
-                                  VkFormat format) {
+                                  VkFormat format, TextureUploadBatch *batch) {
   Texture tex;
   tex.m_vkDevice = device.getDevice();
-
-  VkDeviceSize size = static_cast<VkDeviceSize>(width) * height * 4;
-
-  Buffer staging(device.getAllocator(), size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                 VMA_MEMORY_USAGE_CPU_ONLY);
-  void *mapped = staging.map();
-  std::memcpy(mapped, pixels, static_cast<size_t>(size));
-  staging.unmap();
-  staging.flush();
 
   tex.m_image =
       Image(device, width, height, format,
             VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
             VK_IMAGE_ASPECT_COLOR_BIT);
 
-  transitionImageLayout(device, tex.m_image.getImage(),
-                        VK_IMAGE_LAYOUT_UNDEFINED,
-                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-  copyBufferToImage(device, staging.getBuffer(), tex.m_image.getImage(), width,
-                    height);
-  transitionImageLayout(device, tex.m_image.getImage(),
-                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  if (batch) {
+    // Deferred: record into the batch command buffer (no GPU stall now)
+    batch->stageUpload(tex.m_image.getImage(), pixels, width, height,
+                       format, device.getAllocator());
+  } else {
+    // Immediate: legacy path with per-texture GPU stalls
+    VkDeviceSize size = static_cast<VkDeviceSize>(width) * height * 4;
+
+    Buffer staging(device.getAllocator(), size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                   VMA_MEMORY_USAGE_CPU_ONLY);
+    void *mapped = staging.map();
+    std::memcpy(mapped, pixels, static_cast<size_t>(size));
+    staging.unmap();
+    staging.flush();
+
+    transitionImageLayout(device, tex.m_image.getImage(),
+                          VK_IMAGE_LAYOUT_UNDEFINED,
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    copyBufferToImage(device, staging.getBuffer(), tex.m_image.getImage(), width,
+                      height);
+    transitionImageLayout(device, tex.m_image.getImage(),
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  }
 
   tex.createSampler(device);
   return tex;

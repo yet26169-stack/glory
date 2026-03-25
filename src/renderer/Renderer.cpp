@@ -30,6 +30,7 @@
 #include <array>
 #include <cstring>
 #include <fstream>
+#include <future>
 #include <stdexcept>
 
 #ifndef GLFW_INCLUDE_VULKAN
@@ -403,6 +404,7 @@ Renderer::~Renderer() {
     m_clickIndicatorRenderer.reset();
     m_groundDecalRenderer.reset();
     m_distortionRenderer.reset();
+    m_outlineRenderer.reset();
     m_inkingPass.reset();
     m_fogOfWar.reset();
     if (m_waterRenderer) { m_waterRenderer->destroy(); m_waterRenderer.reset(); }
@@ -870,7 +872,7 @@ void Renderer::renderFrame(float alpha) {
     submitInfo.pCommandBufferInfos      = &cmdBufInfo;
     submitInfo.signalSemaphoreInfoCount = 2;
     submitInfo.pSignalSemaphoreInfos    = signalSemInfos;
-    VK_CHECK(vkQueueSubmit2(m_device->getGraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE),
+    VK_CHECK(m_device->submitGraphics(1, &submitInfo),
              "Queue submit failed");
 
     VkSemaphore renderFinished = m_sync->getRenderFinishedSemaphore(imageIndex);
@@ -882,7 +884,7 @@ void Renderer::renderFrame(float alpha) {
     pi.swapchainCount     = 1;
     pi.pSwapchains        = swapchains;
     pi.pImageIndices      = &imageIndex;
-    result = vkQueuePresentKHR(m_device->getPresentQueue(), &pi);
+    result = m_device->present(&pi);
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || m_window.wasResized()) {
         m_window.resetResizedFlag();
         recreateSwapchain();
@@ -1854,20 +1856,46 @@ void Renderer::recordTonemapPass(VkCommandBuffer cmd, const FrameContext& ctx) {
 }
 
 
+// ── Async scene loading helpers ───────────────────────────────────────────
+void Renderer::buildSceneAsync() {
+    m_buildSceneFuture = std::async(std::launch::async, [this]() {
+        buildScene();
+    });
+}
+
+bool Renderer::isBuildSceneDone() const {
+    if (!m_buildSceneFuture.valid()) return true;  // never started or already consumed
+    if (m_buildSceneFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        // Calling .get() re-throws any exception from the background thread.
+        const_cast<std::future<void>&>(m_buildSceneFuture).get();
+        return true;
+    }
+    return false;
+}
+
 // ── buildScene ───────────────────────────────────────────────────────────────
 void Renderer::buildScene() {
+    GLORY_ZONE_N("buildScene");
+
+    // Batch all texture GPU uploads into a single command buffer submission.
+    // This eliminates 50+ individual vkQueueWaitIdle stalls.
+    TextureUploadBatch uploadBatch(*m_device);
+
     // ── Load map data for minimap & spawn system ─────────────────────────
-    try {
-        m_mapData = MapLoader::LoadFromFile(std::string(ASSET_DIR) + "maps/map_summonersrift.json");
-        spdlog::info("Map '{}' loaded ({} towers per team)", m_mapData.mapName,
-                     m_mapData.teams[0].towers.size());
-    } catch (const std::exception& e) {
-        spdlog::warn("Could not load map JSON: {} — using default bounds", e.what());
-        // m_mapData keeps its default values (200×200, center 100,0,100)
+    {
+        GLORY_ZONE_N("buildScene:mapData");
+        try {
+            m_mapData = MapLoader::LoadFromFile(std::string(ASSET_DIR) + "maps/map_summonersrift.json");
+            spdlog::info("Map '{}' loaded ({} towers per team)", m_mapData.mapName,
+                         m_mapData.teams[0].towers.size());
+        } catch (const std::exception& e) {
+            spdlog::warn("Could not load map JSON: {} — using default bounds", e.what());
+        }
     }
 
     // ── Navigation: init flow fields from map lane endpoints ─────────────
     {
+        GLORY_ZONE_N("buildScene:navigation");
         NavMeshData emptyNav;  // stub navmesh for now
         m_dynamicObstacles.init();
         m_pathfinding.init(emptyNav);
@@ -1907,10 +1935,29 @@ void Renderer::buildScene() {
         }
     };
 
-    // Default textures
-    uint32_t defaultTex  = m_scene.addTexture(Texture::createDefault(*m_device));
-    uint32_t checkerTex  = m_scene.addTexture(Texture::createCheckerboard(*m_device));
-    uint32_t flatNorm    = m_scene.addTexture(Texture::createFlatNormal(*m_device));
+    // Default textures — use batched upload path for thread safety
+    uint32_t white = 0xFFFFFFFF;
+    uint32_t defaultTex = m_scene.addTexture(
+        Texture::createFromPixels(*m_device, &white, 1, 1,
+                                  VK_FORMAT_R8G8B8A8_SRGB, &uploadBatch));
+
+    // Checkerboard (8 tiles × 16px = 256×256)
+    constexpr uint32_t kTiles = 8, kTileSize = 16;
+    constexpr uint32_t kCheckerRes = kTiles * kTileSize * 2;
+    std::vector<uint32_t> checkerPixels(kCheckerRes * kCheckerRes);
+    for (uint32_t y = 0; y < kCheckerRes; ++y)
+        for (uint32_t x = 0; x < kCheckerRes; ++x)
+            checkerPixels[y * kCheckerRes + x] =
+                ((x / kTileSize + y / kTileSize) & 1) ? 0xFF444444 : 0xFFCCCCCC;
+    uint32_t checkerTex = m_scene.addTexture(
+        Texture::createFromPixels(*m_device, checkerPixels.data(), kCheckerRes, kCheckerRes,
+                                  VK_FORMAT_R8G8B8A8_SRGB, &uploadBatch));
+
+    // Flat normal (tangent-space (0,0,1) → (128,128,255,255) ABGR)
+    uint32_t flatPixel = 0xFFFF8080;
+    uint32_t flatNorm = m_scene.addTexture(
+        Texture::createFromPixels(*m_device, &flatPixel, 1, 1,
+                                  VK_FORMAT_R8G8B8A8_UNORM, &uploadBatch));
     m_flatNormIndex      = flatNorm;
 
     // Bind to bindless descriptor array
@@ -1957,7 +2004,8 @@ void Renderer::buildScene() {
         }
 
         m_toonRamp = Texture::createFromPixels(*m_device, pixels, RAMP_W, 1,
-                                               VK_FORMAT_R8G8B8A8_UNORM);
+                                               VK_FORMAT_R8G8B8A8_UNORM,
+                                               &uploadBatch);
         m_descriptors->writeToonRamp(m_toonRamp.getImageView(), m_toonRamp.getSampler());
         spdlog::info("Toon ramp texture created and bound to descriptor binding 5");
     }
@@ -1998,60 +2046,75 @@ void Renderer::buildScene() {
     };
     std::unordered_map<std::string, MapAsset> mapAssets;
 
-    auto loadMapAsset = [&](const std::string& filename) {
-        std::string path = std::string(MODEL_DIR) + "map models/" + filename;
-        try {
-            Model model = Model::loadFromGLB(*m_device, m_device->getAllocator(), path);
-
-            // Read per-submesh glTF material indices BEFORE moving model into scene
-            uint32_t subCount = model.getMeshCount();
-            std::vector<int> subMatIndices;
-            subMatIndices.reserve(subCount);
-            for (uint32_t si = 0; si < subCount; ++si)
-                subMatIndices.push_back(model.getMeshMaterialIndex(si));
-
-            uint32_t meshIdx = m_scene.addMesh(std::move(model));
-
-            // Load ALL embedded textures and build glTF-materialIndex → scene-texIdx map
-            auto glbTextures = Model::loadGLBTextures(*m_device, path);
-            std::unordered_map<int, uint32_t> matToTex;
-            uint32_t primaryTex = defaultTex;
-            for (auto& t : glbTextures) {
-                uint32_t tid = m_scene.addTexture(std::move(t.texture));
-                m_bindless->registerTexture(
-                    m_scene.getTexture(tid).getImageView(),
-                    m_scene.getTexture(tid).getSampler());
-                matToTex[t.materialIndex] = tid;
-                if (primaryTex == defaultTex) primaryTex = tid;
-            }
-
-            // Map each sub-mesh to its correct texture
-            std::vector<uint32_t> subTextures;
-            subTextures.reserve(subCount);
-            for (int gltfMatIdx : subMatIndices)
-                subTextures.push_back(matToTex.count(gltfMatIdx) ? matToTex[gltfMatIdx] : primaryTex);
-
-            mapAssets[filename] = { meshIdx, primaryTex, subTextures };
-            spdlog::info("Loaded map asset: {} (mesh={}, {} textures, {} submeshes)",
-                         filename, meshIdx, glbTextures.size(), subCount);
-        } catch (const std::exception& e) {
-            spdlog::warn("Failed to load map asset '{}': {}", filename, e.what());
-        }
+    // Phase 1: Parse GLB files in parallel (CPU-heavy glTF parsing + GPU
+    // buffer creation which is now thread-safe via pool/queue locks).
+    struct ParsedMapModel {
+        std::string filename;
+        Model model;
+        std::vector<int> subMatIndices;
+        bool ok = false;
     };
 
-    loadMapAsset("blue_team_tower_1.glb");
-    loadMapAsset("blue_team_tower_2.glb");
-    loadMapAsset("blue_team_tower_3.glb");
-    loadMapAsset("blue_team_inhib.glb");
-    loadMapAsset("blue_team_nexus.glb");
-    loadMapAsset("red_team_tower_1.glb");
-    loadMapAsset("read_team_tower_2.glb");
-    loadMapAsset("red_team_tower3.glb");
-    loadMapAsset("red_team_inhib.glb");
-    loadMapAsset("red_team_nexus.glb");
-    loadMapAsset("arcane+tile+3d+model.glb");
-    loadMapAsset("jungle_tile.glb");
-    loadMapAsset("river_tile.glb");
+    const std::vector<std::string> mapFiles = {
+        "blue_team_tower_1.glb", "blue_team_tower_2.glb",
+        "blue_team_tower_3.glb", "blue_team_inhib.glb",
+        "blue_team_nexus.glb",   "red_team_tower_1.glb",
+        "read_team_tower_2.glb", "red_team_tower3.glb",
+        "red_team_inhib.glb",    "red_team_nexus.glb",
+        "arcane+tile+3d+model.glb", "jungle_tile.glb", "river_tile.glb"
+    };
+
+    std::vector<std::future<ParsedMapModel>> modelFutures;
+    modelFutures.reserve(mapFiles.size());
+    for (auto& filename : mapFiles) {
+        modelFutures.push_back(std::async(std::launch::async,
+            [this, filename]() -> ParsedMapModel {
+                ParsedMapModel pm;
+                pm.filename = filename;
+                std::string path = std::string(MODEL_DIR) + "map models/" + filename;
+                try {
+                    pm.model = Model::loadFromGLB(*m_device, m_device->getAllocator(), path);
+                    uint32_t subCount = pm.model.getMeshCount();
+                    pm.subMatIndices.reserve(subCount);
+                    for (uint32_t si = 0; si < subCount; ++si)
+                        pm.subMatIndices.push_back(pm.model.getMeshMaterialIndex(si));
+                    pm.ok = true;
+                } catch (const std::exception& e) {
+                    spdlog::warn("Failed to load map model '{}': {}", filename, e.what());
+                }
+                return pm;
+            }));
+    }
+
+    // Phase 2: Collect results and register in scene + load textures (serial).
+    for (auto& fut : modelFutures) {
+        auto pm = fut.get();
+        if (!pm.ok) continue;
+
+        uint32_t meshIdx = m_scene.addMesh(std::move(pm.model));
+
+        std::string path = std::string(MODEL_DIR) + "map models/" + pm.filename;
+        auto glbTextures = Model::loadGLBTextures(*m_device, path, &uploadBatch);
+        std::unordered_map<int, uint32_t> matToTex;
+        uint32_t primaryTex = defaultTex;
+        for (auto& t : glbTextures) {
+            uint32_t tid = m_scene.addTexture(std::move(t.texture));
+            m_bindless->registerTexture(
+                m_scene.getTexture(tid).getImageView(),
+                m_scene.getTexture(tid).getSampler());
+            matToTex[t.materialIndex] = tid;
+            if (primaryTex == defaultTex) primaryTex = tid;
+        }
+
+        std::vector<uint32_t> subTextures;
+        subTextures.reserve(pm.subMatIndices.size());
+        for (int gltfMatIdx : pm.subMatIndices)
+            subTextures.push_back(matToTex.count(gltfMatIdx) ? matToTex[gltfMatIdx] : primaryTex);
+
+        mapAssets[pm.filename] = { meshIdx, primaryTex, subTextures };
+        spdlog::info("Loaded map asset: {} (mesh={}, {} textures, {} submeshes)",
+                     pm.filename, meshIdx, glbTextures.size(), pm.subMatIndices.size());
+    }
 
     // ── Give structures proper meshes from map models ───────────────────
     {
@@ -2112,26 +2175,52 @@ void Renderer::buildScene() {
         spdlog::info("[Renderer] Structure meshes assigned from map models");
     }
 
-    // ── Lane tiles (stone-textured flat quads along each lane path) ─────────
+    // ── Lane tiles (GLB tile models placed along each lane path) ──────────
     {
-        std::string laneTilePath = std::string(MODEL_DIR) +
-                                   "map models/arcane+tile+3d+model.glb";
-        uint32_t laneTileMesh = 0;
-        uint32_t laneTileTex  = checkerTex;
-        bool     laneTileOK   = false;
+        // Use actual GLB tile meshes instead of procedural flat quads.
+        // All three tile GLBs are ~1x1 unit and get scaled to laneWidth.
+        struct TileAsset {
+            uint32_t mesh = 0;
+            uint32_t texture = 0;
+            std::vector<uint32_t> subMeshTextures;
+            bool ok = false;
+        };
 
-        // Procedural 1×1 flat quad — fast (2 tris), reused for all 86 tiles.
-        auto tileQuad = Model::createTerrain(*m_device, m_device->getAllocator(),
-                                             1.0f, 1, 0.0f);
-        laneTileMesh = m_scene.addMesh(std::move(tileQuad));
+        TileAsset laneTile, riverTile, jungleTile;
 
         if (mapAssets.count("arcane+tile+3d+model.glb")) {
-            laneTileTex = mapAssets["arcane+tile+3d+model.glb"].texture;
-            laneTileOK = true;
+            auto& a              = mapAssets["arcane+tile+3d+model.glb"];
+            laneTile.mesh            = a.mesh;
+            laneTile.texture         = a.texture;
+            laneTile.subMeshTextures = a.subMeshTextures;
+            laneTile.ok              = true;
+        }
+        if (mapAssets.count("river_tile.glb")) {
+            auto& a               = mapAssets["river_tile.glb"];
+            riverTile.mesh            = a.mesh;
+            riverTile.texture         = a.texture;
+            riverTile.subMeshTextures = a.subMeshTextures;
+            riverTile.ok              = true;
+        }
+        if (mapAssets.count("jungle_tile.glb")) {
+            auto& a                = mapAssets["jungle_tile.glb"];
+            jungleTile.mesh            = a.mesh;
+            jungleTile.texture         = a.texture;
+            jungleTile.subMeshTextures = a.subMeshTextures;
+            jungleTile.ok              = true;
         }
 
-        if (laneTileOK) {
-            // Quad is 1×1; scale it so it covers the lane width in both axes.
+        // Fallback: procedural 1x1 quad if GLB failed to load
+        if (!laneTile.ok) {
+            auto tileQuad = Model::createTerrain(*m_device, m_device->getAllocator(),
+                                                  1.0f, 1, 0.0f);
+            laneTile.mesh    = m_scene.addMesh(std::move(tileQuad));
+            laneTile.texture = checkerTex;
+            laneTile.ok      = true;
+        }
+
+        if (laneTile.ok) {
+            // GLB tiles are ~1x1 unit; scale to laneWidth for each lane.
             auto placeLaneTiles = [&](const std::vector<glm::vec3>& waypoints,
                                       float laneWidth, const std::string& laneName,
                                       float laneY)
@@ -2154,33 +2243,29 @@ void Renderer::buildScene() {
                         glm::vec3 pos = a + dir * (walked + stride * 0.5f);
                         pos.y = laneY;
 
-                        uint32_t currentMesh = laneTileMesh;
-                        uint32_t currentTex  = laneTileTex;
-
-                        // River / jungle zones: swap texture only (keep flat quad mesh)
+                        // Pick the right tile variant (mesh + textures)
+                        const TileAsset* cur = &laneTile;
                         if (std::abs(pos.x + pos.z - 200.0f) < 25.0f) {
-                            if (mapAssets.count("river_tile.glb"))
-                                currentTex = mapAssets["river_tile.glb"].texture;
+                            if (riverTile.ok) cur = &riverTile;
                         } else if (laneName != "MidLane") {
-                            if (mapAssets.count("jungle_tile.glb"))
-                                currentTex = mapAssets["jungle_tile.glb"].texture;
+                            if (jungleTile.ok) cur = &jungleTile;
                         }
 
                         auto tile = m_scene.createEntity(
                             laneName + "_tile_" + std::to_string(tileCount));
                         m_scene.getRegistry().emplace<MeshComponent>(
-                            tile, MeshComponent{ currentMesh });
+                            tile, MeshComponent{ cur->mesh });
                         m_scene.getRegistry().emplace<MaterialComponent>(
-                            tile, MaterialComponent{ currentTex, flatNorm,
+                            tile, MaterialComponent{ cur->texture, flatNorm,
                                                      /*shininess*/0.0f, /*metallic*/0.0f,
-                                                     /*roughness*/0.8f, /*emissive*/0.0f });
+                                                     /*roughness*/0.8f, /*emissive*/0.0f,
+                                                     cur->subMeshTextures });
                         m_scene.getRegistry().emplace<MapComponent>(tile);
 
                         auto& tt    = m_scene.getRegistry().get<TransformComponent>(tile);
                         tt.position = pos;
                         tt.rotation = glm::vec3(0.0f, yaw, 0.0f);
-                        
-                        tt.scale = glm::vec3(laneWidth);
+                        tt.scale    = glm::vec3(laneWidth);
 
                         ++tileCount;
                         walked += stride;
@@ -2239,7 +2324,7 @@ void Renderer::buildScene() {
         // Load ALL textures and build per-sub-mesh mapping
         uint32_t charTex = defaultTex;
         std::vector<uint32_t> charSubMeshTextures;
-        auto glbTextures = Model::loadGLBTextures(*m_device, charPath);
+        auto glbTextures = Model::loadGLBTextures(*m_device, charPath, &uploadBatch);
         if (!glbTextures.empty()) {
             std::unordered_map<int, uint32_t> matToTex;
             for (auto& t : glbTextures) {
@@ -2462,7 +2547,7 @@ void Renderer::buildScene() {
         auto skinnedData = Model::loadSkinnedFromGLB(*m_device, m_device->getAllocator(), minionPath, 0.6f);
 
         uint32_t minionTex = defaultTex;
-        auto glbTextures = Model::loadGLBTextures(*m_device, minionPath);
+        auto glbTextures = Model::loadGLBTextures(*m_device, minionPath, &uploadBatch);
         if (!glbTextures.empty()) {
             for (auto& t : glbTextures) {
                 uint32_t tid = m_scene.addTexture(std::move(t.texture));
@@ -2584,7 +2669,7 @@ void Renderer::buildScene() {
 
             // Try to load embedded texture(s); fall back to default
             uint32_t qTexIdx = defaultTex;
-            auto glbTextures = Model::loadGLBTextures(*m_device, qModelPath);
+            auto glbTextures = Model::loadGLBTextures(*m_device, qModelPath, &uploadBatch);
             if (!glbTextures.empty()) {
                 for (auto& t : glbTextures) {
                     uint32_t tid = m_scene.addTexture(std::move(t.texture));
@@ -2602,7 +2687,8 @@ void Renderer::buildScene() {
             // Reuse the same Q model for the D-key purple trick skillshot
             // but with a solid purple texture so it's visually distinct
             uint32_t purplePixel = 0xFF9900CC;  // ABGR: opaque purple (R=0xCC, G=0x00, B=0x99)
-            auto purpleTex = Texture::createFromPixels(*m_device, &purplePixel, 1, 1);
+            auto purpleTex = Texture::createFromPixels(*m_device, &purplePixel, 1, 1,
+                                                      VK_FORMAT_R8G8B8A8_SRGB, &uploadBatch);
             uint32_t purpleTexIdx = m_scene.addTexture(std::move(purpleTex));
             m_bindless->registerTexture(
                 m_scene.getTexture(purpleTexIdx).getImageView(),
@@ -2612,7 +2698,8 @@ void Renderer::buildScene() {
 
             // Reuse Q model for R-key bomb lob with a bright red-orange texture
             uint32_t bombPixel = 0xFF0044FF;  // ABGR: opaque red-orange
-            auto bombTex = Texture::createFromPixels(*m_device, &bombPixel, 1, 1);
+            auto bombTex = Texture::createFromPixels(*m_device, &bombPixel, 1, 1,
+                                                    VK_FORMAT_R8G8B8A8_SRGB, &uploadBatch);
             uint32_t bombTexIdx = m_scene.addTexture(std::move(bombTex));
             m_bindless->registerTexture(
                 m_scene.getTexture(bombTexIdx).getImageView(),
@@ -2634,6 +2721,11 @@ void Renderer::buildScene() {
                               m_descriptors->getLayout(),
                               m_bindless->getLayout(),
                               *m_bindless);
+    }
+
+    // ── Flush all batched texture uploads in a single GPU submission ─────
+    if (!uploadBatch.empty()) {
+        uploadBatch.flush();
     }
 
     // ── Mega-buffer: suballocate all scene meshes ────────────────────────

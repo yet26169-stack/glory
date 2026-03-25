@@ -475,12 +475,21 @@ void LoadingState::enter(GameStateMachine& sm) {
     m_timer = 0.0f;
 
     sm.renderer().setSelectedHeroId(sm.selectedHeroId());
-    sm.renderer().buildScene();
-    m_sceneBuilt = true;
+    sm.renderer().buildSceneAsync();
 }
 
 void LoadingState::update(GameStateMachine& sm, float dt) {
     m_timer += dt;
+
+    // Poll for async buildScene() completion
+    if (!m_sceneBuilt) {
+        if (sm.renderer().isBuildSceneDone()) {
+            m_sceneBuilt = true;
+        } else {
+            return;  // still loading — keep rendering the loading screen
+        }
+    }
+
     if (m_sceneBuilt) {
         auto* netLoop = sm.netLoop();
         if (netLoop && netLoop->getRole() != NetworkRole::Offline) {

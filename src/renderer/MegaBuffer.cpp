@@ -103,7 +103,8 @@ void MegaBuffer::flush() {
         return;
     }
 
-    // One-shot command buffer for the copy
+    // One-shot command buffer for the copy — lock pool for thread safety
+    auto poolLock = m_device->lockTransferPool();
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -143,8 +144,8 @@ void MegaBuffer::flush() {
     submitInfo.commandBufferInfoCount = 1;
     submitInfo.pCommandBufferInfos    = &cmdInfo;
 
-    vkQueueSubmit2(m_device->getTransferQueue(), 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(m_device->getTransferQueue());
+    m_device->submitTransfer(1, &submitInfo);
+    m_device->transferQueueWaitIdle();
 
     vkFreeCommandBuffers(m_device->getDevice(), m_device->getTransferCommandPool(), 1, &cmd);
 

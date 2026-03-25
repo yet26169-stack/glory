@@ -89,7 +89,7 @@ uint64_t AsyncComputeManager::submit(uint32_t frameIndex) {
     submitInfo.signalSemaphoreInfoCount = 1;
     submitInfo.pSignalSemaphoreInfos    = &signalInfo;
 
-    VK_CHECK(vkQueueSubmit2(m_computeQueue, 1, &submitInfo, VK_NULL_HANDLE),
+    VK_CHECK(m_device->submitCompute(1, &submitInfo),
              "Async compute submit failed");
 
     return signalValue;

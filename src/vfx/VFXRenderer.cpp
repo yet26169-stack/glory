@@ -50,6 +50,10 @@ VFXRenderer::VFXRenderer(const Device& device, const RenderFormats& formats)
 VFXRenderer::~VFXRenderer() {
     VkDevice dev = m_device.getDevice();
 
+    // Wait for all GPU work to finish before destroying buffers that may
+    // still be referenced by in-flight descriptor sets / command buffers.
+    vkDeviceWaitIdle(dev);
+
     // Release descriptor sets before destroying ParticleSystems (and their buffers)
     for (auto& ps : m_effects)
         ps->releaseDescriptorSet(dev, m_descPool);

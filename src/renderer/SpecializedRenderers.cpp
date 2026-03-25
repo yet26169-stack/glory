@@ -2479,7 +2479,7 @@ void OutlineRenderer::renderOutline(VkCommandBuffer cmd,
     vkCmdBindVertexBuffers(cmd, 1, 1, &instBuf, &instOffset);
     // skinned.vert reads boneBaseIndex at offset 0 in its own PC block
     vkCmdPushConstants(cmd, m_outlineLayout,
-                       VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(uint32_t), &boneBase);
+                       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(uint32_t), &boneBase);
     mesh.bind(cmd);
     mesh.draw(cmd);
 

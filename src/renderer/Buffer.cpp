@@ -254,7 +254,10 @@ Buffer Buffer::createDeviceLocal(
                              &target.m_buffer, &target.m_allocation, nullptr),
              "Failed to create device-local buffer");
 
-    // 3. One-shot command buffer for the copy
+    // 3. One-shot command buffer for the copy — lock the transfer pool
+    //    so concurrent buildScene (bg thread) and main thread don't collide.
+    auto poolLock = device.lockTransferPool();
+
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -285,10 +288,12 @@ Buffer Buffer::createDeviceLocal(
     submitInfo.commandBufferInfoCount = 1;
     submitInfo.pCommandBufferInfos  = &cmdInfo;
 
-    vkQueueSubmit2(device.getTransferQueue(), 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(device.getTransferQueue());
+    device.submitTransfer(1, &submitInfo);
+    device.transferQueueWaitIdle();
 
     vkFreeCommandBuffers(device.getDevice(), device.getTransferCommandPool(), 1, &cmd);
+
+    poolLock.unlock();
 
     return target;
 }

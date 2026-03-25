@@ -41,9 +41,11 @@ public:
     int materialIndex; // glTF material index
     Texture texture;
   };
-  // Extract embedded base-color textures from a GLB file
+  // Extract embedded base-color textures from a GLB file.
+  // If batch is non-null, GPU uploads are deferred into the batch.
   static std::vector<GLBTexture> loadGLBTextures(const Device &device,
-                                              const std::string &filepath);
+                                              const std::string &filepath,
+                                              TextureUploadBatch *batch = nullptr);
 
   // Axis-aligned bounding box
   struct AABB {
