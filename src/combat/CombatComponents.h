@@ -18,9 +18,6 @@ struct TeamComponent {
     Team team = Team::NEUTRAL;
 };
 
-// Marker for debug-spawned test dummies (never moves, never attacks)
-struct TestDummyTag {};
-
 // ── Combat state machine ──────────────────────────────────────────────────
 enum class CombatState : uint8_t {
     IDLE,             // Can perform any action

@@ -28,7 +28,6 @@ struct LODConfig {
     float lod1Distance = 30.0f;  // switch to 50%
     float lod2Distance = 50.0f;  // switch to 25%
     float lod3Distance = 70.0f;  // switch to 12.5%
-    float impostorDistance = 90.0f; // switch to billboard
 };
 
 /// Runtime LOD selection system.
@@ -59,8 +58,7 @@ public:
                        const LODChain& chain);
 
     /// Select the LOD level for a given camera distance.
-    /// Returns the index into the LODChain (0 = full, N = coarsest),
-    /// or -1 if beyond impostor distance (caller should render billboard).
+    /// Returns the index into the LODChain (0 = full, N = coarsest).
     int selectLOD(uint32_t modelIndex, uint32_t subMeshIndex,
                   float distance) const;
 
@@ -68,9 +66,6 @@ public:
     /// Returns LOD 0 if no chain is registered.
     LODLevel getLODLevel(uint32_t modelIndex, uint32_t subMeshIndex,
                          float distance) const;
-
-    /// Check if an entity at this distance should be an impostor.
-    bool shouldBeImpostor(float distance) const;
 
     /// Total registered chains.
     uint32_t chainCount() const { return m_totalChains; }
@@ -82,9 +77,9 @@ public:
 private:
     // Per quality level: MOBA_PERFORMANCE=0, HIGH_QUALITY=1, ULTRA=2
     LODConfig m_configs[3] = {
-        { 25.0f, 40.0f, 55.0f, 70.0f },  // performance — aggressive
-        { 35.0f, 55.0f, 75.0f, 100.0f },  // high quality
-        { 50.0f, 80.0f, 110.0f, 140.0f }, // ultra
+        { 25.0f, 40.0f, 55.0f },   // performance — aggressive
+        { 35.0f, 55.0f, 75.0f },   // high quality
+        { 50.0f, 80.0f, 110.0f },  // ultra
     };
 
     int m_quality = 0; // default: MOBA_PERFORMANCE

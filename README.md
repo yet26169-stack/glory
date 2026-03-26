@@ -1,21 +1,21 @@
-# Glory Engine
+# Glory
 
-![CI Status](https://github.com/donkey-ux/glory/actions/workflows/ci.yml/badge.svg)
+![CI Status](https://github.com/yet26169-stack/glory/actions/workflows/ci.yml/badge.svg)
 
-A custom Vulkan 1.3 MOBA game engine written in C++20, inspired by League of Legends and StarCraft II. Features a stylized toon-shading pipeline, GPU-driven rendering, ECS architecture, deterministic lockstep netcode, and Lua scripting.
+A simple, pragmatic MOBA game built on a custom Vulkan 1.3 engine in C++20. One map, one champion, minion waves, towers, jungle camps, abilities, and a HUD — everything needed for a playable game, nothing more.
 
-## Features
+## What's in the box
 
-- **Vulkan 1.3 renderer** — HDR pipeline, bloom, SSAO, tone mapping, dynamic shadows
-- **Toon shading** — multi-band ramp lighting, Sobel inking, rim highlights
-- **GPU-driven rendering** — indirect draw, Hi-Z occlusion culling, bindless textures
-- **ECS (EnTT)** — parallel system scheduling with dependency DAG
-- **Deterministic netcode** — lockstep with rollback over ENet, fixed-point math
-- **Lua scripting** — ability system powered by sol2/Lua 5.4
-- **3D spatial audio** — miniaudio integration with priority voice limiting
-- **Flow field navigation** — GPU-accelerated pathfinding for minion waves
-- **VFX system** — particles, trails, distortion, shield bubbles, explosions
-- **HUD** — floating damage numbers, health bars, ability cooldowns, minimap, scoreboard
+- **Vulkan 1.3 renderer** — toon shading, HDR tone mapping, dynamic shadows, SSAO, bloom
+- **GPU-driven pipeline** — indirect draw, Hi-Z occlusion culling, bindless textures (4096 slots)
+- **MOBA gameplay** — minion waves, tower/inhibitor/nexus structures, jungle camps, auto-attacks
+- **Abilities** — data-driven ability system with projectiles, AoE, status effects (Lua scripted)
+- **VFX** — GPU particles, trails, explosions, shield bubbles, cone effects, distortion
+- **Navigation** — Recast/Detour pathfinding with flow fields for minion steering
+- **Networking** — deterministic lockstep with rollback over ENet
+- **HUD** — health bars, ability bar, minimap, scoreboard, floating damage numbers
+- **Audio** — 3D spatial audio via miniaudio
+- **Replay** — deterministic replay recording and playback
 
 ## Dependencies
 
@@ -33,12 +33,6 @@ Bundled in `extern/`: EnTT, meshoptimizer, TinyGLTF, stb, ImGui, miniaudio, ENet
 
 ```bash
 cmake -B build
-cmake --build build --parallel
-```
-
-Debug build:
-```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build --parallel
 ```
 
@@ -76,6 +70,8 @@ cmake --build build --target cook_assets
 
 ## Tests
 
+12 tests covering combat, abilities, animation, fog of war, navigation, physics, replay, and more:
+
 ```bash
 cd build && ctest --output-on-failure
 ```
@@ -84,37 +80,29 @@ cd build && ctest --output-on-failure
 
 ```
 src/
-  ability/       AbilitySystem, ProjectileSystem
-  animation/     AnimationPlayer, CPUSkinning
-  assets/        AssetRegistry, CookedLoader
-  audio/         AudioEngine (engine+handle+resource mgr), GameAudioEvents, miniaudio_impl
-  camera/        Camera
-  combat/        CombatSystem (combat+structures+respawn), NPCSystem (waves+behavior), EconomySystem, HeroRegistry, GpuCollisionSystem
-  core/          Application, SimulationLoop, FramePacer, Systems (scheduler+gameplay), GameState, Log, Allocators
-  fog/           FogSystem, FogOfWarGameplay
-  hud/           HUD, HUDWidgets (floatingtext+healthbar+abilitybar+feed+respawn), Minimap, Scoreboard, PerfOverlay
-  input/         InputManager
-  map/           MapLoader
-  nav/           NavMeshBuilder, PathfindingSystem, FlowField, DynamicObstacle, DebugRenderer
-  network/       Netcode (inputsync+snapshot+gameloop), Transport, LobbySystem
-  physics/       PhysicsSystem
-  renderer/      Renderer, RenderGraph, Context, Device, Swapchain, Buffer, Image, Mesh, Model, Texture, Pipeline, Descriptors, PostProcessPasses, SpecializedRenderers, + others
-  replay/        Replay (recorder+player)
-  scene/         Scene
-  scripting/     ScriptEngine, LuaBindings
-  terrain/       IsometricCamera
-  vfx/           VFXRenderer (renderer+trail+mesh), VFXLoader (loader+factory), ParticleSystem, CompositeVFXSequencer
-  window/        Window
-docs/
-  ARCHITECTURE.md          Engine structure, Vulkan pipeline, VFX system, camera/physics
-  GAMEPLAY.md              Ability system, units, NPCs, map, HUD
-  IMPLEMENTATION_PLAN.md   Prioritized roadmap P0–P4
-tests/
-  19 test files covering: ability, animation, audio, combat, determinism, fixedpoint, flowfield,
-  fog, jungle, maploader, minion, mirror, nav, networking, physics, replay, snapshot, structure, terrain
+  ability/       Ability system, projectiles, status effects
+  animation/     Skeletal animation player, CPU/GPU skinning
+  assets/        Asset registry, cooked asset loader
+  audio/         Spatial audio engine (miniaudio)
+  camera/        Isometric camera controller
+  combat/        Combat state machine, structures, economy, hero registry
+  core/          Application loop, simulation loop, system scheduler, game state
+  fog/           Fog of War visibility and rendering
+  hud/           ImGui game HUD (health bars, abilities, minimap, scoreboard)
+  input/         Input manager and targeting
+  map/           Map data loading and lane definitions
+  nav/           Recast/Detour pathfinding, flow fields, lane followers
+  network/       Lockstep netcode, input sync, state snapshots
+  physics/       Collision detection and physics integration
+  renderer/      Vulkan 1.3 renderer, render graph, post-processing, VFX renderers
+  replay/        Deterministic replay recorder and player
+  scene/         ECS scene graph (EnTT) and components
+  scripting/     Lua script engine and ability bindings
+  terrain/       Terrain heightmaps
+  vfx/           GPU particle system, trails, mesh effects, VFX sequencer
+  window/        GLFW window management
+shaders/         56 GLSL shaders (compiled to SPIR-V at build time)
+assets/          JSON ability/VFX definitions, textures, models
+docs/            Architecture, gameplay, and implementation plan
+tests/           19 test files (12 active CTest targets)
 ```
-
-- **`assets/`** — JSON data, textures, and models
-- **`shaders/`** — GLSL shader source (compiled to SPIR-V during build)
-- **`extern/`** — Third-party libraries (EnTT, GLFW, GLM, spdlog, etc.)
-- **`tools/`** — Asset cooking and development tools

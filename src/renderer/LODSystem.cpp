@@ -25,7 +25,6 @@ void LODSystem::loadConfig(const std::string& configPath) {
             if (p.contains("lod1Distance"))     cfg.lod1Distance     = p["lod1Distance"].get<float>();
             if (p.contains("lod2Distance"))     cfg.lod2Distance     = p["lod2Distance"].get<float>();
             if (p.contains("lod3Distance"))     cfg.lod3Distance     = p["lod3Distance"].get<float>();
-            if (p.contains("impostorDistance")) cfg.impostorDistance = p["impostorDistance"].get<float>();
         };
 
         readPreset("performance", m_configs[0]);
@@ -53,7 +52,7 @@ int LODSystem::selectLOD(uint32_t modelIndex, uint32_t subMeshIndex,
     uint32_t k = key(modelIndex, subMeshIndex);
     if (k >= m_chains.size() || m_chains[k].levels.empty()) {
         // No chain registered — always LOD 0
-        return shouldBeImpostor(distance) ? -1 : 0;
+        return 0;
     }
 
     const auto& chain = m_chains[k];
@@ -62,8 +61,8 @@ int LODSystem::selectLOD(uint32_t modelIndex, uint32_t subMeshIndex,
             return i;
         }
     }
-    // Beyond all LOD levels — impostor
-    return -1;
+    // Beyond all LOD levels — use coarsest
+    return static_cast<int>(chain.levels.size()) - 1;
 }
 
 LODLevel LODSystem::getLODLevel(uint32_t modelIndex, uint32_t subMeshIndex,
@@ -79,13 +78,8 @@ LODLevel LODSystem::getLODLevel(uint32_t modelIndex, uint32_t subMeshIndex,
             return lod;
         }
     }
-    // Beyond furthest — return coarsest LOD (caller checks shouldBeImpostor
-    // separately and may skip drawing the mesh entirely)
+    // Beyond furthest — return coarsest LOD
     return chain.levels.back();
-}
-
-bool LODSystem::shouldBeImpostor(float distance) const {
-    return distance > m_configs[m_quality].impostorDistance;
 }
 
 } // namespace glory

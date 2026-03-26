@@ -35,10 +35,8 @@
 #include "renderer/HiZPass.h"
 #include "renderer/MegaBuffer.h"
 #include "renderer/LODSystem.h"
-#include "renderer/ImpostorSystem.h"
 #include "renderer/AsyncComputeManager.h"
 #include "renderer/SSAOPass.h"
-#include "renderer/SSRPass.h"
 #include "renderer/GpuTimer.h"
 #include "renderer/ParallelRecorder.h"
 #include "renderer/ThreadedCommandPool.h"
@@ -75,6 +73,7 @@
 #include "core/PoolAllocator.h"
 #include "core/GameplaySystem.h"
 #include "renderer/StagingPool.h"
+#include "renderer/BoneSlotPool.h"
 #include "hud/HUD.h"
 #include "hud/PerfOverlay.h"
 #include "map/MapTypes.h"
@@ -91,6 +90,7 @@ namespace glory {
 class Window;
 
 class Renderer {
+    friend class SceneBuilder;
 public:
     enum class RenderQuality { MOBA_PERFORMANCE, HIGH_QUALITY, ULTRA };
 
@@ -189,9 +189,8 @@ private:
     // Per-model, per-submesh MeshHandle for mega-buffer offsets
     std::vector<std::vector<MeshHandle>> m_meshHandles;
 
-    // ── LOD & Impostor ────────────────────────────────────────────────────
+    // ── LOD ──────────────────────────────────────────────────────────────
     LODSystem       m_lodSystem;
-    ImpostorSystem  m_impostorSystem;
 
     // ── Memory allocators ─────────────────────────────────────────────────
     FrameAllocator  m_frameAllocator;       // 16 MB linear bump, reset each frame
@@ -219,6 +218,7 @@ private:
     std::function<void(uint8_t)> m_onVictory;           // nexus death callback
     GpuCollisionSystem             m_gpuCollision;    // GPU spatial hash + broadphase
     SimulationLoop                 m_simLoop;         // parallel ECS system scheduler
+    BoneSlotPool                   m_boneSlotPool;    // bone slot allocation for skinned meshes
     GameplaySystem                 m_gameplaySystem;  // extracted gameplay logic
     ScriptEngine                   m_scriptEngine;    // Lua 5.4 scripting VM
 
@@ -279,9 +279,8 @@ private:
     std::vector<GpuTimingResult> m_lastGpuResults;
     float m_lastGpuTotalMs = 0.0f;
 
-    // ── Post-processing: SSAO / SSR ─────────────────────────────────────
+    // ── Post-processing: SSAO ───────────────────────────────────────────
     SSAOPass m_ssaoPass;
-    SSRPass  m_ssrPass;
     RenderQuality m_renderQuality = RenderQuality::MOBA_PERFORMANCE;
 
     // ── Render graph ─────────────────────────────────────────────────────
@@ -317,7 +316,6 @@ private:
     glm::vec3 screenToWorld(float mx, float my) const; // unproject to Y=0 plane
     glm::vec2 worldToScreen(const glm::vec3& worldPos) const; // project world to screen pixels
 
-    void spawnTestEnemy();
     entt::entity pickEntityUnderCursor();
 
 

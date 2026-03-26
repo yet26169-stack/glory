@@ -66,7 +66,7 @@ public:
                            VkFence fence = VK_NULL_HANDLE) const;
     VkResult present(const VkPresentInfoKHR* presentInfo) const;
 
-    // Legacy vkQueueSubmit (used by ImpostorSystem)
+    // Legacy vkQueueSubmit
     VkResult submitGraphicsLegacy(uint32_t submitCount, const VkSubmitInfo* submits,
                                   VkFence fence = VK_NULL_HANDLE) const;
 

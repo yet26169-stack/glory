@@ -80,17 +80,6 @@ public:
   static Texture createFlatNormal(const Device &device);
   // Procedural brick normal map (256x256)
   static Texture createBrickNormal(const Device &device);
-  // Procedural marble texture (256x256, SRGB)
-  static Texture createMarble(const Device &device);
-  static Texture createWood(const Device &device);
-  static Texture createLava(const Device &device);
-  static Texture createRock(const Device &device);
-  static Texture createBrushedMetal(const Device &device);
-  static Texture createTiles(const Device &device);
-  static Texture createCircuit(const Device &device);
-  static Texture createHexGrid(const Device &device);
-  static Texture createGradient(const Device &device);
-  static Texture createNoise(const Device &device);
 
   /// Create texture from raw RGBA pixel data (generic factory).
   /// If batch is non-null, the upload is deferred; call batch->flush() later.

@@ -1,6 +1,21 @@
 #include "core/SimulationLoop.h"
 // All system types are forward-declared in GameSystems.h (via SimulationLoop.h).
-// Only concrete includes needed here are for spdlog.
+// Concrete includes needed for preTick / postTick subsystem calls.
+#include "scene/Components.h"
+#include "nav/DebugRenderer.h"
+#include "audio/AudioEngine.h"
+#include "audio/AudioResourceManager.h"
+#include "terrain/IsometricCamera.h"
+#include "vfx/VFXFactory.h"
+#include "scripting/ScriptEngine.h"
+#include "combat/GpuCollisionSystem.h"
+#include "nav/DynamicObstacle.h"
+#include "nav/PathfindingSystem.h"
+#include "renderer/FogOfWarRenderer.h"
+#include "fog/FogSystem.h"
+#include "fog/FogOfWarGameplay.h"
+#include "combat/CombatComponents.h"
+
 #include <spdlog/spdlog.h>
 
 namespace glory {
@@ -82,6 +97,61 @@ void SimulationLoop::tick(SimulationContext& ctx) {
     ctx.coneEffectTimer = m_coneState.timer;
 
     ++m_tick;
+}
+
+void SimulationLoop::step(SimulationContext& ctx) {
+    const float dt = ctx.dt;  // save before tick() overrides to FIXED_DT_FLOAT
+
+    // ── Pre-tick: housekeeping that must run before the ECS systems ──────
+
+    // Clear debug draws at start of each physics step
+    if (ctx.debugRenderer) ctx.debugRenderer->clear();
+
+    // Save previous transforms for interpolation
+    {
+        auto view = ctx.registry.view<TransformComponent>();
+        for (auto [e, t] : view.each()) {
+            t.prevPosition = t.position;
+            t.prevRotation = t.rotation;
+        }
+    }
+
+    // Advance game clock
+    if (ctx.gameTime) *ctx.gameTime += dt;
+
+    // Audio listener follows camera
+    if (ctx.audioEngine && ctx.isoCam) {
+        glm::vec3 camPos = ctx.isoCam->getPosition();
+        glm::vec3 camFwd = glm::normalize(ctx.isoCam->getTarget() - camPos);
+        ctx.audioEngine->setListenerPosition(camPos, camFwd, glm::vec3(0.0f, 1.0f, 0.0f));
+    }
+    if (ctx.audioResources) ctx.audioResources->tick();
+
+    // VFX definition hot-reload (checks filesystem timestamps)
+    if (ctx.vfxFactory) ctx.vfxFactory->tickHotReload();
+
+    // Lua script hot-reload
+    if (ctx.scriptEngine) ctx.scriptEngine->reloadModified();
+
+    // GPU collision: read back previous frame's results
+    if (ctx.gpuCollision)
+        const_cast<GpuCollisionSystem*>(ctx.gpuCollision)->readResults(ctx.currentFrame);
+
+    // Navigation: update obstacles + regenerate dirty flow fields
+    if (ctx.dynamicObstacles && ctx.pathfinding) {
+        ctx.dynamicObstacles->update(dt);
+        ctx.pathfinding->updateFlowFields(ctx.dynamicObstacles);
+    }
+
+    // ── Core simulation tick (ECS systems) ───────────────────────────────
+    tick(ctx);
+
+    // ── Post-tick: fog of war vision update ──────────────────────────────
+    if (ctx.fogOfWar && ctx.fogSystem && ctx.fowGameplay) {
+        ctx.fowGameplay->update(ctx.registry, *ctx.fogSystem, dt, Team::PLAYER);
+        ctx.fogOfWar->updateVisibility(
+            ctx.fogSystem->getVisibilityBuffer().data(), 128, 128);
+    }
 }
 
 } // namespace glory

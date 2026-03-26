@@ -5,6 +5,7 @@
 
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <array>
 #include <cstdint>
 
@@ -16,6 +17,9 @@ public:
 
     explicit AudioResourceManager(AudioEngine& engine);
     ~AudioResourceManager();
+
+    /// Set base directory for resolving relative sound paths (e.g. ASSET_DIR + "audio/").
+    void setBasePath(const std::string& basePath) { m_basePath = basePath; }
 
     SoundId loadSound(const std::string& path,
                       SoundGroup group = SoundGroup::SFX);
@@ -54,6 +58,8 @@ private:
 
     std::unordered_map<SoundId, SoundEntry>   m_sounds;
     std::unordered_map<std::string, SoundId>  m_nameToId;
+    std::unordered_set<SoundId>               m_failedSounds;
+    std::string                               m_basePath;
     SoundId m_nextId = 1;
 
     struct VoiceSlot {

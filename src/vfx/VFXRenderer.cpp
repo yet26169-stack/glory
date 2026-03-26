@@ -400,7 +400,9 @@ void VFXRenderer::update(float dt) {
         }
     }
 
-    // Flush graveyard: free descriptor sets and destroy entries whose GPU-safe frame has passed
+}
+
+void VFXRenderer::flushGraveyard() {
     VkDevice dev = m_device.getDevice();
     m_graveyard.erase(
         std::remove_if(m_graveyard.begin(), m_graveyard.end(),
@@ -952,7 +954,21 @@ TrailRenderer::TrailRenderer(const Device& device, const RenderFormats& formats)
 TrailRenderer::~TrailRenderer() {
     VkDevice dev = m_device.getDevice();
     vkDeviceWaitIdle(dev);
-    
+
+    // Free descriptor sets from active trails before destroying pool
+    for (auto& inst : m_activeTrails) {
+        if (inst->descSet != VK_NULL_HANDLE)
+            vkFreeDescriptorSets(dev, m_descPool, 1, &inst->descSet);
+    }
+    // Free descriptor sets from graveyard entries
+    for (auto& g : m_graveyard) {
+        if (g.inst->descSet != VK_NULL_HANDLE)
+            vkFreeDescriptorSets(dev, m_descPool, 1, &g.inst->descSet);
+    }
+
+    m_activeTrails.clear();
+    m_graveyard.clear();
+
     if (m_alphaPipeline) vkDestroyPipeline(dev, m_alphaPipeline, nullptr);
     if (m_additivePipeline) vkDestroyPipeline(dev, m_additivePipeline, nullptr);
     if (m_pipelineLayout) vkDestroyPipelineLayout(dev, m_pipelineLayout, nullptr);
@@ -988,7 +1004,12 @@ uint32_t TrailRenderer::spawn(const std::string& trailDefId, glm::vec3 startPos)
     allocInfo.descriptorPool = m_descPool;
     allocInfo.descriptorSetCount = 1;
     allocInfo.pSetLayouts = &m_descLayout;
-    VK_CHECK(vkAllocateDescriptorSets(m_device.getDevice(), &allocInfo, &inst->descSet), "Alloc Trail desc set");
+    VkResult allocResult = vkAllocateDescriptorSets(m_device.getDevice(), &allocInfo, &inst->descSet);
+    if (allocResult == VK_ERROR_OUT_OF_POOL_MEMORY) {
+        spdlog::warn("TrailRenderer: descriptor pool exhausted, dropping trail spawn");
+        return INVALID_TRAIL_HANDLE;
+    }
+    VK_CHECK(allocResult, "Alloc Trail desc set");
 
     // Write descriptor set
     VkDescriptorBufferInfo bufInfo{};
@@ -1051,6 +1072,8 @@ void TrailRenderer::detach(uint32_t handle) {
 }
 
 void TrailRenderer::update(float dt) {
+    ++m_frameCount;
+
     for (auto it = m_activeTrails.begin(); it != m_activeTrails.end(); ) {
         auto& inst = **it;
         
@@ -1090,12 +1113,29 @@ void TrailRenderer::update(float dt) {
         }
 
         if (inst.points.empty() && inst.detached) {
+            // Move to graveyard instead of immediate destruction
+            m_graveyard.push_back({ m_frameCount + GRAVEYARD_DELAY, std::move(*it) });
             it = m_activeTrails.erase(it);
         } else {
             updateInstanceBuffer(inst);
             ++it;
         }
     }
+
+}
+
+void TrailRenderer::flushGraveyard() {
+    VkDevice dev = m_device.getDevice();
+    m_graveyard.erase(
+        std::remove_if(m_graveyard.begin(), m_graveyard.end(),
+                       [this, dev](TrailGraveyardEntry& g) {
+                           if (g.killFrame <= m_frameCount) {
+                               vkFreeDescriptorSets(dev, m_descPool, 1, &g.inst->descSet);
+                               return true; // erase triggers ~TrailInstance → buffer destroy
+                           }
+                           return false;
+                       }),
+        m_graveyard.end());
 }
 
 void TrailRenderer::updateInstanceBuffer(TrailInstance& inst) {

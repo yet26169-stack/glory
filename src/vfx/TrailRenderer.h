@@ -32,6 +32,11 @@ public:
     // Per-frame update.
     void update(float dt);
 
+    // Sweep the deferred-deletion graveyard. Must be called AFTER the
+    // frame fence wait so that no in-flight command buffer still references
+    // the descriptor sets / buffers being freed.
+    void flushGraveyard();
+
     // Render all active trails.
     void render(VkCommandBuffer cmd, const glm::mat4& viewProj,
                 const glm::vec3& camRight, const glm::vec3& camUp);
@@ -64,6 +69,15 @@ private:
     std::unordered_map<std::string, TrailDef> m_defs;
     std::vector<std::unique_ptr<TrailInstance>> m_activeTrails;
     uint32_t m_nextHandle = 1;
+
+    // Deferred-deletion graveyard: descriptor sets freed only after GPU is done.
+    static constexpr int GRAVEYARD_DELAY = 4; // 2 frames-in-flight + safety margin
+    struct TrailGraveyardEntry {
+        int killFrame;
+        std::unique_ptr<TrailInstance> inst;
+    };
+    std::vector<TrailGraveyardEntry> m_graveyard;
+    int m_frameCount = 0;
 
     std::unique_ptr<Texture> m_whiteTexture;
 

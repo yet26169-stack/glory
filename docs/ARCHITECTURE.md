@@ -1,6 +1,4 @@
-# Glory Engine — Architecture
-
-> **Sources:** ENGINE_STRUCTURE_DEEP_DIVE, RENDERING_DOCUMENTATION_INDEX, RENDERING_SUMMARY, RENDERING_VFX_SYSTEM_DEEP_DIVE, GLORY_VULKAN_DEEP_ANALYSIS, CAMERA_PHYSICS, VFX_QUICK_START, docs_VFX_SYSTEM_IMPLEMENTATION_SPEC_Version2
+# Glory — Architecture
 
 ---
 
@@ -8,7 +6,7 @@
 
 ### 1.1 Overview
 
-The **Glory Engine** is a high-performance custom C++ game engine built on Vulkan 1.3, designed specifically for MOBA (Multiplayer Online Battle Arena) and RTS games. It targets high entity counts (hundreds of units), low-latency simulation, and a modern GPU-driven rendering pipeline.
+**Glory** is a custom C++ MOBA game built on Vulkan 1.3. It targets a single 5v5 map with high entity counts (hundreds of minions), low-latency simulation, and a GPU-driven rendering pipeline with toon shading.
 
 **Tech Stack:**
 - **Language:** C++20
@@ -30,7 +28,7 @@ Glory/
 ├── CMakeLists.txt
 ├── CMakePresets.json
 ├── extern/                         # EnTT, GLM, GLFW, spdlog, sol2, tinygltf, etc.
-├── shaders/                        # GLSL source (compiled to SPIR-V at build time)
+├── shaders/                        # 56 GLSL shaders (compiled to SPIR-V at build time)
 ├── assets/
 │   ├── abilities/                  # JSON ability definitions
 │   └── vfx/                        # JSON particle emitter definitions
@@ -41,43 +39,45 @@ Glory/
 │   ├── assets/                     # Asset loading and cooked format support
 │   ├── audio/                      # Spatial audio engine (miniaudio)
 │   ├── camera/                     # Isometric camera controller
-│   ├── combat/                     # Combat states, economy, and structures
-│   ├── core/                       # Application loop, threading, scheduler, math
+│   ├── combat/                     # Combat states, economy, structures, hero registry
+│   ├── core/                       # Application loop, simulation loop, system scheduler
 │   ├── fog/                        # Fog of War visibility and rendering
-│   ├── hud/                        # Dear ImGui-based game HUD
+│   ├── hud/                        # Dear ImGui game HUD
 │   ├── input/                      # Input mapping and targeting
-│   ├── map/                        # Map data and symmetry logic
-│   ├── math/                       # Deterministic fixed-point math
-│   ├── nav/                        # Pathfinding, splines, and lane followers
+│   ├── map/                        # Map data and lane definitions
+│   ├── nav/                        # Pathfinding, flow fields, lane followers
 │   ├── network/                    # Lockstep netcode and input sync
 │   ├── physics/                    # Collision detection and integration
-│   ├── renderer/                   # Vulkan 1.3 engine and render passes
+│   ├── renderer/                   # Vulkan 1.3 renderer and render passes
 │   ├── replay/                     # Deterministic replay system
-│   ├── scene/                      # Scene graph and ECS components
+│   ├── scene/                      # ECS scene graph and components
 │   ├── scripting/                  # Lua script engine and bindings
-│   ├── terrain/                    # Terrain heightmaps and textures
-│   ├── vfx/                        # Particle systems and trails
+│   ├── terrain/                    # Terrain heightmaps
+│   ├── vfx/                        # GPU particle systems and trails
 │   └── window/                     # GLFW window management
-└── tests/                          # Unit test suite
+├── tests/                          # 19 test files (12 active CTest targets)
+└── docs/                           # Architecture, gameplay, implementation plan
 ```
 
 ### 1.3 Module Architecture
 
-The engine is split into the following logical modules:
-
 | Module | Path | Responsibility |
 |--------|------|---------------|
-| **Core** | `src/core/` | Application entry, main loop, simulation loop, threading, system scheduler |
+| **Core** | `src/core/` | Application entry, main loop, simulation loop, system scheduler |
 | **Windowing** | `src/window/` | GLFW and Vulkan Surface wrapper |
 | **Renderer** | `src/renderer/` | Vulkan 1.3 backend, GPU-driven rendering, culling, post-processing |
-| **Ability** | `src/ability/` | Data-driven ability system (DoT, projectiles, status effects) |
+| **Scene** | `src/scene/` | ECS scene graph (EnTT), entity/component management |
+| **Ability** | `src/ability/` | Data-driven ability system (projectiles, AoE, status effects) |
 | **Animation** | `src/animation/` | Skeletal animation player with blending and retargeting |
-| **Combat** | `src/combat/` | Combat state machine, economy, and structure management |
-| **Nav** | `src/nav/` | Recast/Detour pathfinding, flow fields |
-| **Network** | `src/network/` | Deterministic lockstep networking with rollback support |
-| **VFX** | `src/vfx/` | Visual effects system (GPU particles, trails, mesh effects) |
-| **Fog** | `src/fog/` | Fog of War visibility and rendering |
-| **HUD** | `src/hud/` | Dear ImGui-based game HUD |
+| **Combat** | `src/combat/` | Combat state machine, structures, economy, hero registry |
+| **Nav** | `src/nav/` | Recast/Detour pathfinding, flow fields, lane followers |
+| **Network** | `src/network/` | Deterministic lockstep networking with rollback |
+| **VFX** | `src/vfx/` | GPU particles, trails, mesh effects, VFX sequencer |
+| **Fog** | `src/fog/` | Fog of War visibility and GPU blur/upsampling |
+| **HUD** | `src/hud/` | Dear ImGui game HUD (health bars, abilities, minimap) |
+| **Audio** | `src/audio/` | 3D spatial audio via miniaudio |
+| **Replay** | `src/replay/` | Deterministic replay recording and playback |
+| **Scripting** | `src/scripting/` | Lua script engine and ability bindings |
 
 ### 1.4 ECS (Entity Component System)
 
@@ -170,86 +170,150 @@ Tick N (FIXED_DT = 1/30 s):
 ### 1.6 Renderer File Architecture
 
 ```
-src/renderer/ (~12,685 lines)
+src/renderer/ (~19,100 lines across 60 files)
 
 CORE VULKAN INFRASTRUCTURE:
-├─ Renderer.h/cpp (1,300+ lines)         ← Main frame loop, command recording
-├─ Context.h/cpp (200 lines)             ← VkInstance creation, debug setup
-├─ Device.h/cpp (350+ lines)             ← VkDevice, VkPhysicalDevice, queues
-├─ Swapchain.h/cpp (150+ lines)          ← VkSwapchainKHR, image views
-├─ Pipeline.h/cpp (200+ lines)           ← Graphics pipeline, renderpass
-├─ Descriptors.h/cpp (250+ lines)        ← Descriptor sets, UBOs, bindless
-├─ Texture.h/cpp (400+ lines)            ← VkImage, VkSampler, STB loading
-├─ Buffer.h/cpp (150+ lines)             ← VMA-backed GPU buffers
-├─ Sync.h/cpp (100+ lines)               ← Fences, semaphores, frame sync
-├─ HDRFramebuffer.h/cpp (200+ lines)     ← HDR targets + bloom extraction
-├─ BloomPass.h/cpp (150+ lines)          ← Bloom compute + blur
-└─ ToneMapPass.h/cpp (100+ lines)        ← HDR→SDR tone-mapping
+├─ Renderer.h/cpp (~1,100 lines)        ← Main frame loop, init/destroy
+├─ RendererRecord.cpp (~1,075 lines)     ← Command recording, pipeline setup
+├─ SceneBuilder.h/cpp (~940 lines)       ← Scene construction (map, champions, structures)
+├─ BoneSlotPool.h/cpp (~60 lines)        ← Bone slot allocation with free-queue recycling
+├─ Context.h/cpp (~200 lines)            ← VkInstance creation, debug setup
+├─ Device.h/cpp (~510 lines)             ← VkDevice, queues, transfer pool
+├─ Swapchain.h/cpp (~160 lines)          ← VkSwapchainKHR, image views
+├─ Pipeline.h/cpp (~210 lines)           ← Graphics pipeline, renderpass
+├─ Descriptors.h/cpp (~350 lines)        ← Descriptor sets, UBOs
+├─ BindlessDescriptors.h/cpp (~150 lines)← Bindless texture array (4096 slots)
+├─ Texture.h/cpp (~625 lines)            ← VkImage, VkSampler, STB loading
+├─ Buffer.h/cpp (~300 lines)             ← VMA-backed GPU buffers
+├─ Image.h/cpp (~110 lines)              ← VkImage + VkImageView lifecycle
+├─ Sync.h/cpp (~125 lines)               ← Fences, semaphores, frame sync
+├─ RenderGraph.h/cpp (~200 lines)        ← Render pass dependency graph
+├─ HDRFramebuffer.h/cpp (~200 lines)     ← HDR targets + bloom extraction
+├─ PostProcessPasses.cpp (~2,500 lines)  ← Bloom, SSAO, tone map, inking, HiZ
+└─ LODSystem.h/cpp (~85 lines)           ← Runtime LOD selection
+
+ASSET LOADING:
+├─ Model.h/cpp (~1,180 lines)            ← Mesh loading, GLB textures, bounds
+├─ GLBLoader.cpp (~980 lines)            ← TinyGLTF parsing, skinned meshes
+├─ Material.h/cpp                        ← Material definitions
+├─ Mesh.h/cpp                            ← Mesh data structures
+├─ MegaBuffer.h/cpp (~170 lines)         ← Large GPU buffer allocator
+├─ DynamicMesh.h/cpp (~60 lines)         ← Runtime mesh generation
+├─ StaticSkinnedMesh.h/cpp (~45 lines)   ← GPU-skinned character meshes
+└─ StagingPool.h/cpp (~180 lines)        ← Staging buffer pool for uploads
 
 SPECIAL RENDERERS (VFX/Abilities):
-├─ ClickIndicatorRenderer.h/cpp          ← Click feedback UI animation
-├─ GroundDecalRenderer.h/cpp             ← Decal system with lifetime
-├─ DistortionRenderer.h/cpp              ← Post-process distortion
-├─ ShieldBubbleRenderer.h/cpp            ← Transparent shield effect
-├─ ConeAbilityRenderer.h/cpp             ← W-ability cone mesh
-├─ ExplosionRenderer.h/cpp               ← E-ability explosions
-├─ SpriteEffectRenderer.h/cpp            ← Sprite atlas VFX
-├─ DynamicMesh.h/cpp                     ← Runtime mesh generation
-├─ StaticSkinnedMesh.h/cpp               ← GPU-skinned character meshes
-├─ Model.h/cpp                           ← Mesh loading (OBJ, GLB)
-└─ DebugRenderer.h/cpp (src/nav/)        ← Debug shapes/lines
+├─ SpecializedRenderers.cpp (~2,820 lines) ← All VFX renderer implementations
+├─ FogOfWarRenderer.h/cpp (~510 lines)   ← FoW blur + upsample compute
+├─ ClickIndicatorRenderer.h              ← Click feedback animation
+├─ GroundDecalRenderer.h                 ← Decal system
+├─ DistortionRenderer.h                  ← Screen-space distortion
+├─ ShieldBubbleRenderer.h                ← Shield effect
+├─ ConeAbilityRenderer.h                 ← Cone ability mesh
+├─ ExplosionRenderer.h                   ← Explosion VFX
+├─ SpriteEffectRenderer.h                ← Sprite atlas VFX
+├─ OutlineRenderer.h                     ← Entity outline selection
+├─ InkingPass.h                          ← Toon inking edge pass
+├─ WaterRenderer.h                       ← Water surface
+└─ GpuTimer.h/cpp (~140 lines)           ← Per-pass GPU timestamp profiler
+
+SUPPORTING:
+├─ FrameContext.h                        ← Per-frame rendering context
+├─ RenderFormats.h                       ← Render target format definitions
+├─ RendererTypes.h                       ← Shared renderer type definitions
+├─ Frustum.h                             ← View frustum culling
+├─ AsyncComputeManager.h/cpp (~110 lines)← Async compute queue management
+├─ ParallelRecorder.h                    ← Multi-threaded command recording
+├─ ThreadedCommandPool.h                 ← Per-thread command pools
+└─ VkCheck.h                             ← VK_CHECK error macro
 ```
 
 ### 1.7 Shader Files
 
-All shader source files are in `/shaders/` and compiled to `.spv` (SPIR-V) bytecode via `glslc` during the CMake build.
+All shader source files are in `/shaders/` and compiled to `.spv` (SPIR-V) bytecode via `glslc` during the CMake build. 56 shaders total:
 
 ```
 shaders/
-├── bloom_blur.frag / bloom_extract.frag
-├── debug.frag / debug.vert
-├── deferred.frag / deferred.vert
-├── fog.frag / fog.vert               ← Fog of War shaders
-├── gbuffer.frag / gbuffer.vert
-├── grid.frag / grid.vert
-├── particle.frag / particle.vert     ← Billboard particle rendering
-├── particle_sim.comp                 ← GPU particle simulation
-├── postprocess.frag / postprocess.vert
-├── shadow.frag / shadow.vert
-├── sky.frag
-├── ssao.frag / ssao_blur.frag
-├── terrain.frag / terrain.vert
-├── triangle.frag / triangle.vert     ← Main PBR model shader
-├── skinned.vert                      ← GPU skeletal skinning
-└── water.frag / water.vert
+├── Core Rendering
+│   ├── triangle.vert / triangle.frag     ← Main PBR model shader
+│   ├── skinned.vert                      ← GPU skeletal skinning
+│   ├── shadow.vert / shadow_skinned.vert ← Shadow map passes
+│   ├── debug.vert / debug.frag           ← Debug visualization
+│   └── grid.vert / grid.frag             ← Debug ground grid
+│
+├── Post-Processing
+│   ├── tonemap.vert / tonemap.frag       ← HDR → SDR tone mapping
+│   ├── bloom_extract.frag / bloom_blur.frag ← Bloom passes
+│   ├── ssao.comp / ssao_blur.comp        ← Screen-space AO
+│   ├── hiz_generate.comp                 ← Hierarchical-Z for culling
+│   └── occlusion_cull.comp               ← GPU frustum/occlusion culling
+│
+├── Fog of War
+│   ├── fow_blur.comp                     ← FoW visibility blur
+│   └── fow_upsample.comp                 ← FoW texture upsampling
+│
+├── VFX / Particles
+│   ├── particle.vert / particle.frag     ← Billboard particle rendering
+│   ├── particle_sim.comp                 ← GPU particle simulation
+│   ├── particle_compact.comp / particle_sort.comp ← Particle stream ops
+│   ├── trail_ribbon.vert / trail_ribbon.frag      ← Ribbon trails
+│   ├── sprite_effect_billboard.vert / sprite_effect_additive.frag
+│   ├── mesh_effect.vert / mesh_effect_energy.frag / mesh_effect_slash.frag
+│   ├── distortion.frag                   ← Screen-space distortion
+│   ├── explosion_disk.vert / explosion_sphere.vert
+│   ├── explosion_fireball.frag / explosion_shockwave.frag
+│   └── collision_broadphase.comp / spatial_hash.comp ← Physics GPU compute
+│
+├── Ability Effects
+│   ├── cone_ability.vert                 ← Cone ability geometry
+│   ├── cone_energy.frag / cone_grid.frag ← Cone effect variants
+│   ├── cone_lightning.vert / cone_lightning.frag
+│   └── shield_bubble.vert / shield_bubble.frag
+│
+├── Environment
+│   ├── water.vert / water.frag           ← Water surface rendering
+│   ├── ground_decal.vert / ground_decal.frag
+│   ├── inking.vert / inking.frag         ← Ink-style edge rendering
+│   └── click_indicator.vert / click_indicator.frag
+│
+└── Outline
+    ├── outline.vert / outline.frag       ← Entity selection outline
+    └── outline_stencil.frag              ← Stencil pass for outlines
 ```
 
 ### 1.8 External Dependencies
 
-| Library | Path | Status |
-|---------|------|--------|
-| EnTT | `extern/entt/` | **INTEGRATED** |
-| ImGui | `extern/imgui/` | **INTEGRATED** |
-| nlohmann/json | `extern/nlohmann/` | **INTEGRATED** |
-| stb | `extern/stb/` | **INTEGRATED** |
-| TinyGLTF | `extern/tinygltf/` | **INTEGRATED** |
-| TinyOBJ | `extern/tinyobj/` | **INTEGRATED** |
-| VMA (Vulkan Memory Allocator) | `extern/vma/` | **INTEGRATED** |
-| meshoptimizer | `extern/meshopt/` | **INTEGRATED** |
+| Library | Path | Purpose |
+|---------|------|---------|
+| EnTT | `extern/entt/` | ECS framework |
+| ImGui | `extern/imgui/` | Debug UI and HUD |
+| nlohmann/json | `extern/nlohmann/` | JSON parsing |
+| stb | `extern/stb/` | Image loading |
+| TinyGLTF | `extern/tinygltf/` | GLB/glTF model loading |
+| TinyOBJ | `extern/tinyobj/` | OBJ model loading |
+| VMA | `extern/vma/` | Vulkan Memory Allocator |
+| meshoptimizer | `extern/meshopt/` | Mesh simplification and optimization |
+| miniaudio | `extern/miniaudio/` | Spatial audio |
+| ENet | `extern/enet/` | UDP networking |
+| sol2 | `extern/sol2/` | Lua C++ bindings |
+| Lua 5.4 | `extern/lua/` | Scripting runtime |
 
-### 1.9 Existing Tests
+### 1.9 Test Suite
+
+12 active CTest targets from 19 test source files:
 
 ```
 tests/
-├── test_ability.cpp
-├── test_fog.cpp
-├── test_maploader.cpp
-├── test_mirror.cpp
-├── test_nav.cpp
-└── test_terrain.cpp
+├── test_ability.cpp       ├── test_fog.cpp          ├── test_nav.cpp
+├── test_animation.cpp     ├── test_jungle.cpp       ├── test_physics.cpp
+├── test_audio.cpp         ├── test_maploader.cpp    ├── test_replay.cpp
+├── test_combat.cpp        ├── test_minion.cpp       ├── test_snapshot.cpp
+├── test_determinism.cpp   ├── test_mirror.cpp       ├── test_structure.cpp
+├── test_fixedpoint.cpp    ├── test_networking.cpp   └── test_terrain.cpp
+└── test_flowfield.cpp
 ```
 
-**Build & test gate:**
+**Build & test:**
 ```sh
 cmake --build build/ --parallel
 cd build/ && ctest --output-on-failure

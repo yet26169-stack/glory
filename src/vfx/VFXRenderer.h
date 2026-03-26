@@ -47,6 +47,11 @@ public:
     // Update all active emitter CPU state (emission, lifetime).
     void update(float dt);
 
+    // Sweep the deferred-deletion graveyard. Must be called AFTER the
+    // frame fence wait so that no in-flight command buffer still references
+    // the descriptor sets / buffers being freed.
+    void flushGraveyard();
+
     // Dispatch compute shaders to simulate live particles (call OUTSIDE render pass).
     void dispatchCompute(VkCommandBuffer cmd);
 
@@ -166,7 +171,7 @@ private:
     // ── Deferred deletion graveyard ────────────────────────────────────────
     // ParticleSystems moved here when dead; destroyed only after GPU is done.
     // Each entry holds the frame threshold after which destruction is safe.
-    static constexpr int GRAVEYARD_DELAY = 20; // Extra padding for safety
+    static constexpr int GRAVEYARD_DELAY = 3; // MAX_FRAMES_IN_FLIGHT (2) + 1 safety
     struct GraveyardEntry {
         int            killFrame;
         std::unique_ptr<ParticleSystem> ps;

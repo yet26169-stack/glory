@@ -212,11 +212,17 @@ SoundId AudioResourceManager::loadSound(const std::string& path, SoundGroup grou
         return it->second;
     }
 
+    // Resolve relative paths against the audio base directory
+    std::string resolvedPath = path;
+    if (!m_basePath.empty() && fsPath.is_relative()) {
+        resolvedPath = m_basePath + path;
+    }
+
     SoundId id = m_nextId++;
-    m_sounds[id] = SoundEntry{id, path, name, group};
+    m_sounds[id] = SoundEntry{id, resolvedPath, name, group};
     m_nameToId[name] = id;
 
-    spdlog::debug("AudioResourceManager: registered '{}' -> id={}", path, id);
+    spdlog::debug("AudioResourceManager: registered '{}' -> id={}", resolvedPath, id);
     return id;
 }
 
@@ -329,6 +335,9 @@ SoundHandle AudioResourceManager::initVoice(uint32_t slot, SoundId id, SoundGrou
     auto soundIt = m_sounds.find(id);
     if (soundIt == m_sounds.end()) return handle;
 
+    // Skip sounds that have already failed to load
+    if (m_failedSounds.count(id)) return handle;
+
     auto* engine = static_cast<ma_engine*>(m_engine.getEnginePtr());
     if (!engine) return handle;
 
@@ -343,8 +352,9 @@ SoundHandle AudioResourceManager::initVoice(uint32_t slot, SoundId id, SoundGrou
                                              flags, maGroup, nullptr, maSound);
     if (res != MA_SUCCESS) {
         delete maSound;
-        spdlog::debug("AudioResourceManager: failed to init sound '{}' ({})",
-                      soundIt->second.path, static_cast<int>(res));
+        m_failedSounds.insert(id);
+        spdlog::warn("AudioResourceManager: failed to init sound '{}' (miniaudio error {})",
+                     soundIt->second.path, static_cast<int>(res));
         return handle;
     }
 

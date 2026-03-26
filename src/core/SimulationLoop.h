@@ -31,6 +31,17 @@ class ExplosionRenderer;
 class ConeAbilityRenderer;
 class SpriteEffectRenderer;
 class ThreadPool;
+class DebugRenderer;
+class AudioEngine;
+class AudioResourceManager;
+class IsometricCamera;
+class VFXFactory;
+class ScriptEngine;
+class DynamicObstacleManager;
+class PathfindingSystem;
+class FogOfWarRenderer;
+class FogSystem;
+class FogOfWarGameplay;
 
 // All state needed by the simulation loop, passed by reference from the Renderer.
 struct SimulationContext {
@@ -81,6 +92,20 @@ struct SimulationContext {
 
     // Game time for economy passive income
     float* gameTime = nullptr;
+
+    // ── Pre-tick / post-tick subsystems (driven by SimulationLoop::step) ──
+    DebugRenderer*          debugRenderer      = nullptr;
+    AudioEngine*            audioEngine        = nullptr;
+    AudioResourceManager*   audioResources     = nullptr;
+    IsometricCamera*        isoCam             = nullptr;
+    VFXFactory*             vfxFactory         = nullptr;
+    ScriptEngine*           scriptEngine       = nullptr;
+    DynamicObstacleManager* dynamicObstacles   = nullptr;
+    PathfindingSystem*      pathfinding        = nullptr;
+    FogOfWarRenderer*       fogOfWar           = nullptr;
+    FogSystem*              fogSystem          = nullptr;
+    FogOfWarGameplay*       fowGameplay        = nullptr;
+    uint32_t                currentFrame       = 0;
 };
 
 // Runs all gameplay/simulation updates decoupled from the render loop.
@@ -97,6 +122,11 @@ public:
     // Advance the simulation by one fixed timestep tick.
     // Uses the SystemScheduler for dependency-declared parallel execution.
     void tick(SimulationContext& ctx);
+
+    // Full simulation step: preTick (transform save, audio, hot-reload,
+    // navigation, GPU collision) → tick → postTick (FoW).
+    // Renderer::simulateStep() delegates here for everything except input/HUD.
+    void step(SimulationContext& ctx);
 
     SystemScheduler&       scheduler()       { return m_scheduler; }
     const SystemScheduler& scheduler() const { return m_scheduler; }
