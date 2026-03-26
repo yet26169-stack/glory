@@ -741,7 +741,7 @@ void Renderer::renderFrame(float alpha) {
                 m_scene.getRegistry().get<TeamComponent>(m_playerEntity).team);
         m_hud.renderOverlays(m_scene.getRegistry(), m_playerEntity, vp,
                              static_cast<float>(hw), static_cast<float>(hh),
-                             realDt, playerTeam);
+                             realDt, playerTeam, m_renderAlpha);
     }
 
     ImGui::Render(); // always call Render() even if no windows built

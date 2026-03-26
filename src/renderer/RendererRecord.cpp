@@ -188,6 +188,19 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
         // ── Static entities ─────────────────────────────────────────────────
         glm::vec3 camPos = m_isoCam.getPosition();
 
+        // Debug: count structure entities with full render components
+        uint32_t dbgStructTotal = 0, dbgStructRenderable = 0;
+        uint32_t dbgStructFowPass = 0, dbgStructDrawn = 0;
+        {
+            auto& reg = m_scene.getRegistry();
+            for (auto se : reg.view<StructureComponent>()) {
+                ++dbgStructTotal;
+                if (reg.all_of<TransformComponent, MeshComponent, MaterialComponent>(se)
+                    && !reg.all_of<GPUSkinnedMeshComponent>(se))
+                    ++dbgStructRenderable;
+            }
+        }
+
         auto staticView = m_scene.getRegistry()
             .view<TransformComponent, MeshComponent, MaterialComponent>(
                 entt::exclude<GPUSkinnedMeshComponent>);
@@ -197,6 +210,9 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
             // FoW: skip enemies not in vision
             if (!FogOfWarGameplay::shouldRender(m_scene.getRegistry(), e, Team::PLAYER))
                 continue;
+
+            bool isStructure = m_scene.getRegistry().all_of<StructureComponent>(e);
+            if (isStructure) ++dbgStructFowPass;
 
             glm::mat4 model = t.getInterpolatedModelMatrix(m_renderAlpha);
             glm::vec3 worldPos = glm::vec3(model[3]);
@@ -212,6 +228,7 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
 
             uint32_t mi = mc.meshIndex;
             if (mi >= m_meshHandles.size()) continue;
+            if (isStructure) ++dbgStructDrawn;
 
             // Determine sub-mesh range: -1 means draw all sub-meshes
             uint32_t subCount = static_cast<uint32_t>(m_meshHandles[mi].size());
@@ -260,6 +277,10 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
                 ++objectCount;
             }
         }
+        spdlog::debug("[GBuffer] Structures: {}/{} have render components, "
+                      "{} passed FoW, {} drawn (no frustum cull, MAX_INSTANCES={})",
+                      dbgStructRenderable, dbgStructTotal,
+                      dbgStructFowPass, dbgStructDrawn, MAX_INSTANCES);
         instanceIndex = objectCount;
 
         // Flush scene buffer descriptor

@@ -29,9 +29,9 @@ public:
     /// Returns true if the spectate button was clicked.
     bool renderOverlays(const entt::registry& reg, entt::entity player,
                         const glm::mat4& vp, float screenW, float screenH,
-                        float dt, uint8_t playerTeam) {
+                        float dt, uint8_t playerTeam, float renderAlpha) {
         m_floatingText.update(vp, screenW, screenH, dt);
-        m_healthBar.render(reg, vp, screenW, screenH, playerTeam);
+        m_healthBar.render(reg, vp, screenW, screenH, playerTeam, renderAlpha);
         m_abilityBar.render(reg, player, screenW, screenH);
         m_killFeed.render(screenW, dt);
         m_scoreboard.render(screenW, screenH);

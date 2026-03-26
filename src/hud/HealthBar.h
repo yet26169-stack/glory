@@ -17,8 +17,11 @@ public:
         float barWidth       = 64.0f;  // pixels at reference distance
         float barHeight      = 6.0f;
         float manaBarHeight  = 4.0f;
-        float yOffset        = 3.2f;   // world units above entity origin (characters)
-        float structureYOffset = 8.0f; // world units above entity origin (towers/nexus)
+        float yOffset        = 3.2f;   // fallback height for skinned/unknown entities
+        float yPadding       = 0.3f;   // padding above model top (AABB-based entities)
+        float minionYOffset  = 1.5f;   // skinned minion entities
+        float championYOffset= 2.5f;   // skinned champion/hero entities
+        float monsterYOffset = 3.0f;   // jungle monster entities (reserved)
         float minScreenSize  = 4.0f;   // skip if bar < this many pixels wide
         float borderSize     = 1.0f;
 
@@ -36,7 +39,7 @@ public:
     ///   playerTeam – the local player's team for color selection
     void render(const entt::registry& reg,
                 const glm::mat4& vp, float screenW, float screenH,
-                uint8_t playerTeam);
+                uint8_t playerTeam, float renderAlpha);
 
     Config& config() { return m_config; }
 

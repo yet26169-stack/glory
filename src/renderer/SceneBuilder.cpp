@@ -375,6 +375,9 @@ void SceneBuilder::build(Renderer& r) {
                     tc.rotation.x = glm::radians(-90.0f);
             } else {
                 // Fallback to cube if model failed to load
+                spdlog::warn("[Renderer] Structure fallback to cube — model '{}' not found "
+                             "(team={}, type={})", modelFile, sc.teamIndex,
+                             static_cast<int>(sc.type));
                 uint32_t cubeMesh = r.m_scene.addMesh(Model::createCube(*r.m_device, r.m_device->getAllocator()));
                 float s = 1.0f;
                 switch (sc.type) {
@@ -386,9 +389,16 @@ void SceneBuilder::build(Renderer& r) {
                     case StructureType::NEXUS:       s = 3.5f;  break;
                 }
                 tc.scale = glm::vec3(s, s * 2.0f, s);
+                // Cube is centered at origin; raise so base sits at ground (y=0).
+                tc.position.y = s;
                 reg.emplace<MeshComponent>(e, MeshComponent{ cubeMesh });
                 reg.emplace<MaterialComponent>(e,
-                    MaterialComponent{ defaultTex, flatNorm, 0.0f, 0.0f, 0.3f, 0.6f });
+                    MaterialComponent{ checkerTex, flatNorm, 0.0f, 0.0f, 0.8f, 0.0f });
+                // Team-colored tint so cubes are visible against the fog
+                glm::vec4 teamTint = (sc.teamIndex == 0)
+                    ? glm::vec4(0.3f, 0.5f, 1.0f, 1.0f)   // blue team
+                    : glm::vec4(1.0f, 0.3f, 0.3f, 1.0f);   // red team
+                reg.emplace<TintComponent>(e, TintComponent{ teamTint });
             }
         }
         spdlog::info("[Renderer] Structure meshes assigned from map models");

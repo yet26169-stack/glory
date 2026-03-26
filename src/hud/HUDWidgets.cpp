@@ -2,6 +2,7 @@
 #include "ability/AbilityTypes.h"
 #include "combat/CombatComponents.h"
 #include "combat/EconomySystem.h"
+#include "combat/HeroDefinition.h"
 #include "combat/RespawnSystem.h"
 #include "combat/StructureSystem.h"
 #include "hud/AbilityBar.h"
@@ -113,7 +114,7 @@ float FloatingText::sizeForKind(DamageKind k) {
 
 void HealthBar::render(const entt::registry& reg,
                        const glm::mat4& vp, float screenW, float screenH,
-                       uint8_t playerTeam) {
+                       uint8_t playerTeam, float renderAlpha) {
     ImDrawList* dl = ImGui::GetForegroundDrawList();
     if (!dl) return;
 
@@ -123,14 +124,28 @@ void HealthBar::render(const entt::registry& reg,
         float maxHP     = stats.total().maxHP;
         if (maxHP <= 0.0f || currentHP <= 0.0f) continue;
 
-        // Determine Y offset based on entity type — structures are taller
-        float yOff = m_config.yOffset;
-        if (auto* sc = reg.try_get<StructureComponent>(entity)) {
-            yOff = m_config.structureYOffset;
+        // Compute Y offset from actual model bounds when available,
+        // falling back to per-type offsets for skinned / unknown entities.
+        float yOff;
+        if (auto* mc = reg.try_get<MeshComponent>(entity)) {
+            float modelTop = tc.scale.y * mc->localAABB.max.y;
+            yOff = modelTop + m_config.yPadding;
+        } else if (reg.all_of<GPUSkinnedMeshComponent>(entity)) {
+            if (reg.all_of<MinionComponent>(entity))
+                yOff = tc.scale.y * m_config.minionYOffset;
+            else if (reg.all_of<HeroComponent>(entity))
+                yOff = tc.scale.y * m_config.championYOffset;
+            else
+                yOff = tc.scale.y * m_config.yOffset;
+        } else {
+            yOff = m_config.yOffset;
         }
 
+        // Interpolate position to match the GPU-rendered transform
+        glm::vec3 interpPos = glm::mix(tc.prevPosition, tc.position, renderAlpha);
+
         // Project world position above head
-        glm::vec3 worldPos = tc.position + glm::vec3(0.0f, yOff, 0.0f);
+        glm::vec3 worldPos = interpPos + glm::vec3(0.0f, yOff, 0.0f);
         glm::vec4 clip = vp * glm::vec4(worldPos, 1.0f);
         if (clip.w <= 0.001f) continue;
         glm::vec3 ndc = glm::vec3(clip) / clip.w;
