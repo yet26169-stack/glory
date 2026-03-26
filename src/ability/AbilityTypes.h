@@ -172,8 +172,13 @@ struct AbilityDefinition {
     std::string              projectileTrailDef; // ID for TrailRenderer
     std::string              compositeCastVFX;   // ID for CompositeVFXSequencer
     std::string              compositeImpactVFX; // ID for CompositeVFXSequencer
+    std::string              castAnticipationVFX; // composite VFX played during CASTING phase
     std::string castSFX;
     std::string impactSFX;
+
+    std::string aimIndicatorDecal;     // decal effectRef for the aiming indicator
+    glm::vec4   aimIndicatorColor = {1.0f, 1.0f, 1.0f, 0.4f};
+    float       aimIndicatorScale = 1.0f;  // multiplied by areaRadius
 
     std::unordered_set<std::string> tags;  // "damage", "cc", "mobility", "ultimate"
 

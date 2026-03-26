@@ -104,6 +104,9 @@ Renderer::Renderer(Window& window) : m_window(window) {
     rangeDecal.fadeOutTime = 0.0f;
     m_groundDecalRenderer->registerDecal(rangeDecal);
 
+    m_deferredDecalRenderer = std::make_unique<DeferredDecalRenderer>(
+        *m_device, m_hdrFB->loadFormats(), *m_bindless);
+
     m_distortionRenderer = std::make_unique<DistortionRenderer>(
         *m_device, m_hdrFB->loadFormats(), m_hdrFB->colorCopyView(), m_hdrFB->sampler());
     // Register basic ripple distortion
@@ -151,6 +154,7 @@ Renderer::Renderer(Window& window) : m_window(window) {
     createInstanceBuffers();
     createGridPipeline();
     createSkinnedPipeline();
+    createDissolvePipeline();
 
     m_outlineRenderer = std::make_unique<OutlineRenderer>();
     m_outlineRenderer->init(*m_device, m_hdrFB->mainFormats(),
@@ -255,8 +259,32 @@ Renderer::Renderer(Window& window) : m_window(window) {
 
     RenderFormats swapFmts = RenderFormats::swapchain(m_swapchain->getImageFormat());
 
+    // Intermediate render target between tonemap and color grade
+    auto ext = m_window.getExtent();
+    m_toneMapResult = Texture::createRenderable(*m_device, ext.width, ext.height,
+                                                m_swapchain->getImageFormat());
+
     m_toneMap = std::make_unique<ToneMapPass>();
     m_toneMap->init(*m_device, swapFmts, m_hdrFB->colorView(), m_bloom->bloomResultView(), m_hdrFB->sampler());
+
+    // 3D LUT color grading
+    {
+        std::string lutPath = std::string(ASSET_DIR) + "luts/neutral_lut.png";
+        m_lut = ColorGradePass::loadLUT(*m_device, lutPath);
+
+        m_colorGrade = std::make_unique<ColorGradePass>();
+        m_colorGrade->init(*m_device, swapFmts,
+                           m_toneMapResult.getImageView(), m_hdrFB->sampler(),
+                           m_lut.imageView, m_lut.size);
+    }
+
+    // Radial blur post-process (uses m_toneMapResult as ping-pong input)
+    {
+        m_radialBlurIntermediate = Texture::createRenderable(*m_device, ext.width, ext.height,
+                                                             m_swapchain->getImageFormat());
+        m_radialBlur.init(*m_device, swapFmts,
+                          m_radialBlurIntermediate.getImageView(), m_hdrFB->sampler());
+    }
 
     // ── GPU-driven indirect rendering infrastructure ──
     {
@@ -288,6 +316,14 @@ Renderer::Renderer(Window& window) : m_window(window) {
         auto ext = m_window.getExtent();
         m_ssaoPass.init(*m_device, ext.width, ext.height,
                         m_hdrFB->depthView(), m_hdrFB->sampler());
+    }
+
+    // ── Post-processing: SSR (reads scene color + depth after GBuffer) ──
+    {
+        auto ext = m_window.getExtent();
+        m_ssrPass.init(*m_device, ext.width, ext.height,
+                       m_hdrFB->colorView(), m_hdrFB->depthView(),
+                       m_hdrFB->sampler());
     }
 
     m_isoCam.setBounds(glm::vec3(0, 0, 0), glm::vec3(200, 0, 200));
@@ -397,6 +433,7 @@ Renderer::~Renderer() {
     m_input.reset();
     m_clickIndicatorRenderer.reset();
     m_groundDecalRenderer.reset();
+    m_deferredDecalRenderer.reset();
     m_distortionRenderer.reset();
     m_outlineRenderer.reset();
     m_inkingPass.reset();
@@ -416,9 +453,17 @@ Renderer::~Renderer() {
     m_combatVfxQueue.reset();
     m_abilitySystem.reset();
 
+    if (m_colorGrade) m_colorGrade->destroy();
+    m_colorGrade.reset();
+    ColorGradePass::destroyLUT(*m_device, m_lut);
+    m_radialBlur.destroy();
+    m_radialBlurIntermediate = Texture{};
+    m_toneMapResult = Texture{};
+
     if (m_toneMap) m_toneMap->destroy();
     m_toneMap.reset();
     m_ssaoPass.destroy();
+    m_ssrPass.destroy();
     if (m_bloom) m_bloom->destroy();
     m_bloom.reset();
     if (m_hdrFB) m_hdrFB->destroy();
@@ -436,6 +481,7 @@ Renderer::~Renderer() {
     if (m_megaBuffer) { m_megaBuffer->destroy(); m_megaBuffer.reset(); }
 
     destroyGridPipeline();
+    destroyDissolvePipeline();
     destroySkinnedPipeline();
     m_dummyShadow = Texture{};
     m_toonRamp    = Texture{};
@@ -489,6 +535,7 @@ void Renderer::simulateStep(float dt) {
             .combatVfxQueue = m_combatVfxQueue.get(),
             .trailRenderer  = m_trailRenderer.get(),
             .groundDecals   = m_groundDecalRenderer.get(),
+            .deferredDecals = m_deferredDecalRenderer.get(),
             .meshEffects    = m_meshEffectRenderer.get(),
             .distortion     = m_distortionRenderer.get(),
             .explosions     = m_explosionRenderer.get(),
@@ -517,6 +564,26 @@ void Renderer::simulateStep(float dt) {
         };
         m_simLoop.step(simCtx);
         m_coneEffectTimer = simCtx.coneEffectTimer;
+
+        // Sync radial blur trigger from ability system
+        if (simCtx.radialBlurTriggered) {
+            triggerRadialBlur(simCtx.radialBlurWorldCenter,
+                              simCtx.radialBlurDuration,
+                              simCtx.radialBlurPeak);
+        }
+    }
+
+    // ── Radial blur timer decay ──────────────────────────────────────────
+    if (m_radialBlurTimer > 0.0f) {
+        m_radialBlurTimer -= dt;
+        if (m_radialBlurTimer <= 0.0f) {
+            m_radialBlurTimer    = 0.0f;
+            m_radialBlurIntensity = 0.0f;
+        } else {
+            float t = m_radialBlurTimer / m_radialBlurDuration;
+            // Ease-out: peak at start, fade to zero
+            m_radialBlurIntensity = m_radialBlurPeak * t * t;
+        }
     }
 
     // ── Input ────────────────────────────────────────────────────────────
@@ -898,6 +965,7 @@ FrameContext Renderer::buildFrameContext(VkCommandBuffer cmd, uint32_t imageInde
     ctx.cmdPools           = &m_cmdPools;
     ctx.asyncCompute       = &m_asyncCompute;
     ctx.ssaoPass           = &m_ssaoPass;
+    ctx.ssrPass            = &m_ssrPass;
 
     ctx.skinnedPipeline       = m_skinnedPipeline;
     ctx.skinnedPipelineLayout = m_skinnedPipelineLayout;
@@ -970,6 +1038,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
     m_renderGraph.setPassEnabled("Shadow",        !isLauncher);
     m_renderGraph.setPassEnabled("TransparentVFX",!isLauncher);
     m_renderGraph.setPassEnabled("SSAO",          m_ssaoPass.isEnabled() && !isLauncher);
+    m_renderGraph.setPassEnabled("SSR",           m_ssrPass.isEnabled() && !isLauncher);
 
     // ── Build per-frame context and execute the render graph ────────────────
     FrameContext ctx = buildFrameContext(cmd, imageIndex);
@@ -1033,11 +1102,26 @@ void Renderer::recreateSwapchain() {
     m_hdrFB->recreate(extent.width, extent.height);
     m_bloom->recreate(m_hdrFB->colorView(), extent.width, extent.height);
     m_vfxRenderer->setDepthBuffer(m_hdrFB->depthView(), m_hdrFB->sampler());
+    if (m_deferredDecalRenderer)
+        m_deferredDecalRenderer->updateDepthDescriptor(m_hdrFB->depthView(), m_hdrFB->sampler());
     m_distortionRenderer->updateDescriptorSet(m_hdrFB->colorCopyView());
     if (m_inkingPass) m_inkingPass->updateInput(m_hdrFB->characterDepthView());
     m_toneMap->updateDescriptorSets(m_hdrFB->colorView(), m_bloom->bloomResultView());
+
+    // Recreate post-process intermediates at new resolution
+    m_toneMapResult = Texture::createRenderable(*m_device, extent.width, extent.height,
+                                                m_swapchain->getImageFormat());
+    m_colorGrade->updateDescriptorSets(m_toneMapResult.getImageView(), m_lut.imageView);
+
+    m_radialBlurIntermediate = Texture::createRenderable(*m_device, extent.width, extent.height,
+                                                         m_swapchain->getImageFormat());
+    m_radialBlur.updateDescriptorSet(m_radialBlurIntermediate.getImageView());
+
     m_ssaoPass.recreate(extent.width, extent.height,
                         m_hdrFB->depthView(), m_hdrFB->sampler());
+    m_ssrPass.recreate(extent.width, extent.height,
+                       m_hdrFB->colorView(), m_hdrFB->depthView(),
+                       m_hdrFB->sampler());
     m_sync->recreateRenderFinishedSemaphores(m_swapchain->getImageCount());
     spdlog::info("Swapchain recreated ({}×{})", extent.width, extent.height);
 }
@@ -1089,6 +1173,27 @@ glm::vec2 Renderer::worldToScreen(const glm::vec3& worldPos) const {
         (ndc.x * 0.5f + 0.5f) * static_cast<float>(winW),
         (ndc.y * 0.5f + 0.5f) * static_cast<float>(winH)
     );
+}
+
+void Renderer::triggerRadialBlur(glm::vec3 worldCenter, float duration, float peakIntensity) {
+    // Project world position to normalized screen UV (0..1)
+    auto ext = m_swapchain->getExtent();
+    float aspect = static_cast<float>(ext.width) / static_cast<float>(ext.height);
+    glm::mat4 vp = m_isoCam.getProjectionMatrix(aspect) * m_isoCam.getViewMatrix();
+
+    glm::vec4 clipPos = vp * glm::vec4(worldCenter, 1.0f);
+    if (clipPos.w < 0.1f) return; // behind camera
+
+    glm::vec3 ndc = glm::vec3(clipPos) / clipPos.w;
+    m_radialBlurCenter = glm::vec2(ndc.x * 0.5f + 0.5f, ndc.y * 0.5f + 0.5f);
+
+    m_radialBlurDuration = duration;
+    m_radialBlurTimer    = duration;
+    m_radialBlurPeak     = peakIntensity;
+    m_radialBlurIntensity = peakIntensity;
+
+    spdlog::info("[RadialBlur] Triggered: center=({:.2f},{:.2f}) dur={:.2f}s peak={:.2f}",
+                 m_radialBlurCenter.x, m_radialBlurCenter.y, duration, peakIntensity);
 }
 
 } // namespace glory

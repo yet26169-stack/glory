@@ -1,10 +1,15 @@
 {
     "id": "ice_zone_cast_composite",
     "layers": [
-        { "delay": 0.0,  "type": "GROUND_DECAL", "effectRef": "decal_circle",          "anchor": "TARGET", "scale": 5.0, "color": [0.3, 0.6, 1.0, 0.5] },
-        { "delay": 0.0,  "type": "PARTICLE",     "effectRef": "vfx_ice_crystal_burst", "anchor": "TARGET" },
-        { "delay": 0.05, "type": "PARTICLE",     "effectRef": "vfx_ice_zone_ground",   "anchor": "TARGET" },
-        { "delay": 0.1,  "type": "PARTICLE",     "effectRef": "vfx_ice_mist",          "anchor": "TARGET" },
-        { "delay": 0.0,  "type": "DISTORTION",   "effectRef": "vfx_ripple",            "anchor": "TARGET" }
+        { "delay": 0.0,  "type": "GROUND_DECAL",  "effectRef": "decal_circle",              "anchor": "TARGET", "scale": 5.5, "color": [0.2, 0.5, 0.9, 0.6] },
+        { "delay": 0.0,  "type": "SHOCKWAVE",     "effectRef": "default",                   "anchor": "TARGET" },
+        { "delay": 0.0,  "type": "PARTICLE",      "effectRef": "vfx_ice_zone_ring_burst",   "anchor": "TARGET" },
+        { "delay": 0.0,  "type": "PARTICLE",      "effectRef": "vfx_ice_crystal_burst",     "anchor": "TARGET" },
+        { "delay": 0.03, "type": "PARTICLE",      "effectRef": "vfx_ice_zone_ground",       "anchor": "TARGET" },
+        { "delay": 0.05, "type": "PARTICLE",      "effectRef": "vfx_ice_mist",              "anchor": "TARGET" },
+        { "delay": 0.0,  "type": "PARTICLE",      "effectRef": "vfx_ice_zone_snowfall",     "anchor": "TARGET" },
+        { "delay": 0.0,  "type": "PARTICLE",      "effectRef": "vfx_ice_zone_frost_pillar", "anchor": "TARGET" },
+        { "delay": 0.0,  "type": "DISTORTION",    "effectRef": "vfx_ripple",                "anchor": "TARGET" },
+        { "delay": 0.1,  "type": "SPRITE_EFFECT", "effectRef": "vfx_ice_zone_flash",        "anchor": "TARGET" }
     ]
 }

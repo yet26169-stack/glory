@@ -31,6 +31,7 @@ struct AbilityInstance {
     float                    phaseTimer       = 0.0f;    // counts down within phase
     TargetInfo               currentTarget;
     std::vector<uint32_t>    vfxHandles;
+    uint32_t                 aimIndicatorHandle = 0;
 
     bool isReady() const {
         return level > 0 && currentPhase == AbilityPhase::READY;

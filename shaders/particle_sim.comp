@@ -25,9 +25,10 @@ struct GpuColorKey {
 layout(set = 0, binding = 2) uniform EmitterUBO {
     vec4  wind_dt;        // xyz=windDir*strength, w=dt
     vec4  phys;           // x=gravity, y=drag, z=alphaCurve, w=count
-    vec4  size;           // x=sizeMin, y=sizeMax, z=sizeEnd, w=reserved
+    vec4  size;           // x=sizeMin, y=sizeMax, z=sizeEnd, w=softFadeDistance
     vec4  forceParams;    // x=forceType, y=forceStrength, z=forceBitmask, w=reserved
     vec4  attractorPos;   // xyz=attractor world pos, w=reserved
+    vec4  atlasParams;   // x=atlasRows, y=atlasCols, z=frameRate, w=loop(0/1)
     uint  colorKeyCount;
     GpuColorKey colorKeys[8];
 } emitter;

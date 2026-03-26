@@ -34,6 +34,7 @@ layout(push_constant) uniform WaterPC {
     int   normalMapIdx;   // water surface ripple normals
     int   flowMapIdx;     // RG = flow direction encoded as [0,1]
     int   foamTexIdx;     // foam / noise texture
+    int   ssrTexIdx;      // SSR reflection texture (-1 = disabled)
 } pc;
 
 layout(location = 0) in vec2  fragUV;
@@ -95,6 +96,22 @@ void main() {
 
     // Ambient fill
     waterColor += vec3(0.03, 0.05, 0.09) * lightData.ambientStrength;
+
+    // ── Screen-space reflections ─────────────────────────────────────────────
+    if (pc.ssrTexIdx >= 0) {
+        // Compute screen UV from clip position
+        vec2 screenUV = (fragClipPos.xy / fragClipPos.w) * 0.5 + 0.5;
+
+        // Perturb screen UV with water normal for ripple distortion on reflections
+        screenUV += waterNormal.xz * 0.02;
+        screenUV = clamp(screenUV, vec2(0.0), vec2(1.0));
+
+        vec4 ssr = texture(textures[nonuniformEXT(pc.ssrTexIdx)], screenUV);
+
+        // Fresnel-weighted blend: stronger reflections at grazing angles
+        float ssrFresnel = pow(1.0 - max(dot(waterNormal, V), 0.0), 3.0);
+        waterColor = mix(waterColor, ssr.rgb, ssr.a * ssrFresnel * 0.6);
+    }
 
     float waterAlpha = mix(0.45, 0.85, fresnel); // Face-on=transparent, glancing=opaque
     outColor = vec4(waterColor + waterSpec, waterAlpha);

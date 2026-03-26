@@ -1,0 +1,26 @@
+{
+    "id": "vfx_storm_impact_sparks_burst",
+    "maxParticles": 96,
+    "emitRate": 0.0,
+    "burstCount": 64,
+    "looping": false,
+    "duration": 0.05,
+    "lifetimeMin": 0.2,
+    "lifetimeMax": 0.6,
+    "initialSpeedMin": 10.0,
+    "initialSpeedMax": 20.0,
+    "sizeMin": 0.03,
+    "sizeMax": 0.08,
+    "sizeEnd": 0.01,
+    "spreadAngle": 360.0,
+    "gravity": 5.0,
+    "drag": 2.0,
+    "forceType": 3,
+    "forceStrength": 4.0,
+    "blendMode": "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [4.0, 4.0, 6.0, 1.0]},
+        {"time": 0.5, "color": [2.0, 1.5, 4.0, 0.7]},
+        {"time": 1.0, "color": [0.3, 0.2, 1.0, 0.0]}
+    ]
+}

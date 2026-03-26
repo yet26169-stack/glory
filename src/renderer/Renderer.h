@@ -7,6 +7,7 @@
 #include "renderer/Buffer.h"
 #include "renderer/ClickIndicatorRenderer.h"
 #include "renderer/GroundDecalRenderer.h"
+#include "renderer/DeferredDecalRenderer.h"
 #include "renderer/DistortionRenderer.h"
 #include "renderer/InkingPass.h"
 #include "renderer/FogOfWarRenderer.h"
@@ -29,6 +30,8 @@
 #include "renderer/HDRFramebuffer.h"
 #include "renderer/BloomPass.h"
 #include "renderer/ToneMapPass.h"
+#include "renderer/ColorGradePass.h"
+#include "renderer/RadialBlurPass.h"
 #include "renderer/Sync.h"
 #include "renderer/Texture.h"
 #include "renderer/ShadowPass.h"
@@ -37,6 +40,7 @@
 #include "renderer/LODSystem.h"
 #include "renderer/AsyncComputeManager.h"
 #include "renderer/SSAOPass.h"
+#include "renderer/SSRPass.h"
 #include "renderer/GpuTimer.h"
 #include "renderer/ParallelRecorder.h"
 #include "renderer/ThreadedCommandPool.h"
@@ -123,6 +127,9 @@ public:
     entt::registry&       getRegistry()       { return m_scene.getRegistry(); }
     const entt::registry& getRegistry() const { return m_scene.getRegistry(); }
 
+    // Trigger a radial/zoom blur effect (e.g., during ultimate abilities)
+    void triggerRadialBlur(glm::vec3 worldCenter, float duration, float peakIntensity);
+
 private:
     Window& m_window;
 
@@ -137,11 +144,17 @@ private:
     std::unique_ptr<HDRFramebuffer> m_hdrFB;
     std::unique_ptr<BloomPass>      m_bloom;
     std::unique_ptr<ToneMapPass>    m_toneMap;
+    std::unique_ptr<ColorGradePass> m_colorGrade;
+    ColorGradePass::LUTImage        m_lut;
+    Texture                         m_toneMapResult;  // intermediate between tonemap & color grade
+    RadialBlurPass                  m_radialBlur;
+    Texture                         m_radialBlurIntermediate; // ping-pong for radial blur
     DebugRenderer                m_debugRenderer;
 
     // ── Rendering extras ──────────────────────────────────────────────────
     std::unique_ptr<ClickIndicatorRenderer> m_clickIndicatorRenderer;
     std::unique_ptr<GroundDecalRenderer>    m_groundDecalRenderer;
+    std::unique_ptr<DeferredDecalRenderer>  m_deferredDecalRenderer;
     std::unique_ptr<DistortionRenderer>     m_distortionRenderer;
     std::unique_ptr<InkingPass>             m_inkingPass;
     std::unique_ptr<FogOfWarRenderer>       m_fogOfWar;
@@ -243,6 +256,14 @@ private:
     bool      m_wireframe     = false;
     bool      m_showDebugUI   = false;   // Tab-toggled ImGui debug overlay
     bool      m_fogEnabled    = true;    // Fog on/off (toggle from debug UI)
+
+    // ── Radial blur state (ultimate ability screen effect) ────────────────
+    float     m_radialBlurIntensity = 0.0f;
+    float     m_radialBlurTimer     = 0.0f;
+    float     m_radialBlurDuration  = 0.0f;
+    float     m_radialBlurPeak      = 0.0f;
+    glm::vec2 m_radialBlurCenter    = {0.5f, 0.5f};
+
     entt::entity m_playerEntity  = entt::null;
     entt::entity m_hoveredEntity = entt::null;
     bool         m_prevFKeyDown  = false;  // edge-detect ward placement
@@ -261,6 +282,21 @@ private:
     VkPipeline       m_gridPipeline          = VK_NULL_HANDLE;
     VkPipelineLayout m_skinnedPipelineLayout = VK_NULL_HANDLE;
     VkPipeline       m_skinnedPipeline       = VK_NULL_HANDLE;
+    VkPipelineLayout m_dissolvePipelineLayout = VK_NULL_HANDLE;
+    VkPipeline       m_dissolveSkinnedPipeline = VK_NULL_HANDLE;
+
+    // ── Dissolve effect resources ────────────────────────────────────────
+    Texture  m_dissolveNoise;            // 256×256 Perlin noise for dissolve
+    uint32_t m_dissolveNoiseIdx = 0;     // bindless texture index
+
+    struct DissolvePushConstants {
+        uint32_t  boneBaseIndex;        //  0-3
+        float     dissolveProgress;     //  4-7
+        float     edgeWidth;            //  8-11
+        uint32_t  noiseTexIdx;          // 12-15
+        glm::vec4 edgeColor;            // 16-31 (xyz = HDR color)
+    };
+    static_assert(sizeof(DissolvePushConstants) == 32, "DissolvePushConstants must be 32 bytes");
 
     // ── ImGui ─────────────────────────────────────────────────────────────
     VkDescriptorPool m_imguiPool = VK_NULL_HANDLE;
@@ -281,6 +317,7 @@ private:
 
     // ── Post-processing: SSAO ───────────────────────────────────────────
     SSAOPass m_ssaoPass;
+    SSRPass  m_ssrPass;
     RenderQuality m_renderQuality = RenderQuality::MOBA_PERFORMANCE;
 
     // ── Render graph ─────────────────────────────────────────────────────
@@ -313,6 +350,8 @@ private:
     void destroyGridPipeline();
     void createSkinnedPipeline();
     void destroySkinnedPipeline();
+    void createDissolvePipeline();
+    void destroyDissolvePipeline();
     glm::vec3 screenToWorld(float mx, float my) const; // unproject to Y=0 plane
     glm::vec2 worldToScreen(const glm::vec3& worldPos) const; // project world to screen pixels
 

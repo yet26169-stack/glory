@@ -25,6 +25,7 @@ class NPCBehaviorSystem;
 class VFXRenderer;
 class TrailRenderer;
 class GroundDecalRenderer;
+class DeferredDecalRenderer;
 class MeshEffectRenderer;
 class DistortionRenderer;
 class ExplosionRenderer;
@@ -73,6 +74,7 @@ struct SimulationContext {
     VFXEventQueue*        combatVfxQueue  = nullptr;
     TrailRenderer*        trailRenderer   = nullptr;
     GroundDecalRenderer*  groundDecals    = nullptr;
+    DeferredDecalRenderer* deferredDecals = nullptr;
     MeshEffectRenderer*   meshEffects     = nullptr;
     DistortionRenderer*   distortion      = nullptr;
     ExplosionRenderer*    explosions      = nullptr;
@@ -86,6 +88,12 @@ struct SimulationContext {
     float  coneRange        = 0.0f;
     glm::vec3 coneApex      = glm::vec3(0.0f);
     glm::vec3 coneDirection = glm::vec3(0.0f, 0.0f, 1.0f);
+
+    // Radial blur state (sync-back from ability system → renderer)
+    glm::vec3 radialBlurWorldCenter = glm::vec3(0.0f);
+    float     radialBlurDuration    = 0.0f;
+    float     radialBlurPeak        = 0.0f;
+    bool      radialBlurTriggered   = false;
 
     // Thread pool for parallel system execution
     ThreadPool* threadPool = nullptr;

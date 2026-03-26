@@ -1,0 +1,26 @@
+{
+    "id": "vfx_storm_cast_charge",
+    "maxParticles": 64,
+    "emitRate": 80.0,
+    "burstCount": 0,
+    "looping": false,
+    "duration": 0.5,
+    "lifetimeMin": 0.2,
+    "lifetimeMax": 0.4,
+    "initialSpeedMin": 8.0,
+    "initialSpeedMax": 14.0,
+    "sizeMin": 0.06,
+    "sizeMax": 0.15,
+    "sizeEnd": 0.02,
+    "spreadAngle": 360.0,
+    "gravity": 0.0,
+    "drag": 2.0,
+    "forceType": 1,
+    "forceStrength": 20.0,
+    "blendMode": "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [0.4, 0.3, 2.0, 0.5]},
+        {"time": 0.5, "color": [0.6, 0.5, 3.0, 1.0]},
+        {"time": 1.0, "color": [1.0, 0.8, 4.0, 0.0]}
+    ]
+}

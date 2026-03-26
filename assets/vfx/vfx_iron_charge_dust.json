@@ -1,28 +1,61 @@
 {
-    "id":              "vfx_iron_charge_dust",
-    "maxParticles":    256,
-    "emitRate":        80.0,
-    "burstCount":      0.0,
-    "looping":         true,
-    "duration":        2.0,
-    "lifetimeMin":     0.6,
-    "lifetimeMax":     1.2,
+    "id": "vfx_iron_charge_dust",
+    "maxParticles": 256,
+    "emitRate": 80.0,
+    "burstCount": 0.0,
+    "looping": true,
+    "duration": 2.0,
+    "lifetimeMin": 0.6,
+    "lifetimeMax": 1.2,
     "initialSpeedMin": 3.0,
     "initialSpeedMax": 7.0,
-    "sizeMin":         0.4,
-    "sizeMax":         0.8,
-    "sizeEnd":         1.5,
+    "sizeMin": 0.4,
+    "sizeMax": 0.8,
+    "sizeEnd": 1.5,
     "rotationSpeedMin": -180.0,
     "rotationSpeedMax": 180.0,
-    "drag":            3.0,
-    "alphaCurve":      1.5,
-    "spreadAngle":     120.0,
-    "gravity":         0.5,
-    "blendMode":       "alpha",
+    "drag": 3.0,
+    "alphaCurve": 1.5,
+    "spreadAngle": 120.0,
+    "gravity": 0.5,
+    "blendMode": "alpha",
     "colorOverLifetime": [
-        {"time": 0.0, "color": [0.6, 0.45, 0.25, 0.0]},
-        {"time": 0.1, "color": [0.6, 0.45, 0.25, 0.6]},
-        {"time": 0.5, "color": [0.8, 0.7, 0.5, 0.4]},
-        {"time": 1.0, "color": [0.8, 0.7, 0.5, 0.0]}
-    ]
+        {
+            "time": 0.0,
+            "color": [
+                0.6,
+                0.45,
+                0.25,
+                0.0
+            ]
+        },
+        {
+            "time": 0.1,
+            "color": [
+                0.6,
+                0.45,
+                0.25,
+                0.6
+            ]
+        },
+        {
+            "time": 0.5,
+            "color": [
+                0.8,
+                0.7,
+                0.5,
+                0.4
+            ]
+        },
+        {
+            "time": 1.0,
+            "color": [
+                0.8,
+                0.7,
+                0.5,
+                0.0
+            ]
+        }
+    ],
+    "softFadeDistance": 0.8
 }

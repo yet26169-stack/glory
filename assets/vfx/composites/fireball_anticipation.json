@@ -1,0 +1,7 @@
+{
+    "id": "fireball_anticipation_composite",
+    "layers": [
+        { "delay": 0.0, "type": "PARTICLE",     "effectRef": "vfx_anticipation_fire_hands", "anchor": "CASTER", "followAnchor": true },
+        { "delay": 0.0, "type": "GROUND_DECAL", "effectRef": "decal_circle",                "anchor": "CASTER", "scale": 1.5, "color": [1.0, 0.3, 0.05, 0.3] }
+    ]
+}

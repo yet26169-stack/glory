@@ -1,0 +1,28 @@
+{
+    "id":              "vfx_sparks_burst",
+    "maxParticles":    16,
+    "emitRate":        0.0,
+    "burstCount":      10.0,
+    "looping":         false,
+    "duration":        0.05,
+    "lifetimeMin":     0.15,
+    "lifetimeMax":     0.4,
+    "initialSpeedMin": 6.0,
+    "initialSpeedMax": 14.0,
+    "sizeMin":         0.04,
+    "sizeMax":         0.1,
+    "sizeEnd":         0.01,
+    "rotationSpeedMin": 0.0,
+    "rotationSpeedMax": 0.0,
+    "spreadAngle":     180.0,
+    "gravity":         12.0,
+    "drag":            1.0,
+    "alphaCurve":      2.0,
+    "softFadeDistance": 0.2,
+    "blendMode":       "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [1.0, 0.9,  0.5, 1.0]},
+        {"time": 0.3, "color": [1.0, 0.55, 0.1, 0.9]},
+        {"time": 1.0, "color": [0.8, 0.2,  0.0, 0.0]}
+    ]
+}

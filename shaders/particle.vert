@@ -22,7 +22,10 @@ struct GpuColorKey {
 layout(set = 0, binding = 2) uniform EmitterUBO {
     vec4  wind_dt;        // xyz=windDir*strength, w=dt
     vec4  phys;           // x=gravity, y=drag, z=alphaCurve, w=count
-    vec4  size;           // x=sizeMin, y=sizeMax, z=sizeEnd, w=reserved
+    vec4  size;           // x=sizeMin, y=sizeMax, z=sizeEnd, w=softFadeDistance
+    vec4  forceParams;    // x=forceType, y=forceStrength, z=forceBitmask, w=reserved
+    vec4  attractorPos;   // xyz=attractor world pos, w=reserved
+    vec4  atlasParams;    // x=atlasRows, y=atlasCols, z=frameRate, w=loop(0/1)
     uint  colorKeyCount;
     GpuColorKey colorKeys[8];
 } emitter;
@@ -34,7 +37,9 @@ layout(push_constant) uniform RenderPC {
 } pc;
 
 layout(location = 0) out vec4 fragColor;
-layout(location = 1) out vec2 fragUV;
+layout(location = 1) out vec2 fragUV;       // atlas-adjusted UV for texture sampling
+layout(location = 2) flat out float fragSoftFade; // soft particle depth-fade distance
+layout(location = 3) out vec2 fragQuadUV;   // raw [0,1] quad UV for circle mask
 
 const vec2 OFFSETS[6] = vec2[6](
     vec2(-0.5,  0.5), vec2( 0.5,  0.5), vec2(-0.5, -0.5),
@@ -53,9 +58,11 @@ void main() {
     Particle p = particles[pi];
 
     if (p.params.w < 0.1) {
-        gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
-        fragColor   = vec4(0.0);
-        fragUV      = vec2(0.0);
+        gl_Position  = vec4(0.0, 0.0, 2.0, 1.0);
+        fragColor    = vec4(0.0);
+        fragUV       = vec2(0.0);
+        fragSoftFade = 0.5;
+        fragQuadUV   = vec2(0.0);
         return;
     }
 
@@ -65,8 +72,6 @@ void main() {
     // Size interpolation
     float size = p.params.x;
     if (emitter.size.z > 0.0) {
-        // If sizeEnd is set, interpolate from initial size (p.params.x) to sizeEnd.
-        // We calculate current size here to avoid modifying p.params.x in compute (which would break lerp).
         size = mix(p.params.x, emitter.size.z, lifeFrac);
     }
 
@@ -85,11 +90,44 @@ void main() {
                   + pc.camRight.xyz * rotated.x * size
                   + pc.camUp.xyz    * rotated.y * size;
 
-    gl_Position = pc.viewProj * vec4(worldPos, 1.0);
-    fragColor   = p.color;
-    
-    // Atlas Frame UV adjustment
-    uint frame = uint(p.params.w);
-    // TODO: support atlas UV offsets if needed. For now assume full texture.
-    fragUV = UVS[vi];
+    gl_Position  = pc.viewProj * vec4(worldPos, 1.0);
+    fragColor    = p.color;
+    fragSoftFade = emitter.size.w;  // softFadeDistance from EmitterParams
+
+    // ── Flipbook atlas UV computation ──────────────────────────────────────
+    float atlasRows    = emitter.atlasParams.x;
+    float atlasCols    = emitter.atlasParams.y;
+    float flipbookFPS  = emitter.atlasParams.z;  // 0 = lifetime-based
+    float loopFlag     = emitter.atlasParams.w;   // >0.5 = loop
+    float totalFrames  = atlasRows * atlasCols;
+
+    vec2 uv = UVS[vi];
+
+    if (totalFrames > 1.0) {
+        // Random start frame is stored in integer part of params.w
+        uint baseFrame = uint(p.params.w);
+
+        // Compute current animation frame
+        uint animFrame;
+        if (flipbookFPS > 0.0) {
+            // FPS-based: advance at fixed rate
+            animFrame = baseFrame + uint(p.velAge.w * flipbookFPS);
+        } else {
+            // Lifetime-based: spread all frames over particle lifetime
+            animFrame = baseFrame + uint(lifeFrac * totalFrames);
+        }
+
+        if (loopFlag > 0.5)
+            animFrame = animFrame % uint(totalFrames);
+        else
+            animFrame = min(animFrame, uint(totalFrames) - 1u);
+
+        uint row = animFrame / uint(atlasCols);
+        uint col = animFrame % uint(atlasCols);
+        vec2 frameSize = vec2(1.0 / atlasCols, 1.0 / atlasRows);
+        uv = uv * frameSize + vec2(float(col), float(row)) * frameSize;
+    }
+
+    fragUV     = uv;
+    fragQuadUV = UVS[vi];
 }

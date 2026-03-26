@@ -9,6 +9,7 @@ namespace glory {
 
 class TrailRenderer;
 class GroundDecalRenderer;
+class DeferredDecalRenderer;
 class MeshEffectRenderer;
 class ExplosionRenderer;
 class ConeAbilityRenderer;
@@ -38,6 +39,7 @@ public:
                 VFXEventQueue& particleQueue,
                 TrailRenderer& trails,
                 GroundDecalRenderer& decals,
+                DeferredDecalRenderer& deferredDecals,
                 MeshEffectRenderer& meshFX,
                 ExplosionRenderer& explosions,
                 ConeAbilityRenderer& cones,

@@ -1,8 +1,14 @@
 {
     "id": "nature_shield_cast_composite",
     "layers": [
-        { "delay": 0.0, "type": "PARTICLE",     "effectRef": "vfx_heal_rising",  "anchor": "CASTER" },
-        { "delay": 0.0, "type": "PARTICLE",     "effectRef": "vfx_shield_pulse", "anchor": "CASTER" },
-        { "delay": 0.0, "type": "GROUND_DECAL", "effectRef": "decal_circle",     "anchor": "CASTER", "scale": 3.0, "color": [0.2, 0.8, 0.3, 0.4] }
+        { "delay": 0.0,  "type": "SHIELD",        "effectRef": "default",                     "anchor": "CASTER", "scale": 1.2, "color": [0.2, 0.9, 0.3, 0.35], "duration": 3.0 },
+        { "delay": 0.0,  "type": "GROUND_DECAL",  "effectRef": "decal_circle",                "anchor": "CASTER", "scale": 3.5, "color": [0.15, 0.7, 0.2, 0.5] },
+        { "delay": 0.0,  "type": "PARTICLE",      "effectRef": "vfx_nature_shield_leaves",    "anchor": "CASTER", "followAnchor": true },
+        { "delay": 0.0,  "type": "PARTICLE",      "effectRef": "vfx_nature_shield_vines",     "anchor": "CASTER", "followAnchor": true },
+        { "delay": 0.0,  "type": "PARTICLE",      "effectRef": "vfx_heal_rising",             "anchor": "CASTER" },
+        { "delay": 0.0,  "type": "PARTICLE",      "effectRef": "vfx_shield_pulse",            "anchor": "CASTER" },
+        { "delay": 0.05, "type": "PARTICLE",      "effectRef": "vfx_nature_shield_sparkles",  "anchor": "CASTER", "followAnchor": true },
+        { "delay": 0.0,  "type": "SPRITE_EFFECT", "effectRef": "vfx_nature_shield_flash",     "anchor": "CASTER" },
+        { "delay": 0.0,  "type": "DISTORTION",    "effectRef": "vfx_ripple",                  "anchor": "CASTER" }
     ]
 }

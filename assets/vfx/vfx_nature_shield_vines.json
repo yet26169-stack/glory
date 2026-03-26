@@ -1,0 +1,26 @@
+{
+    "id": "vfx_nature_shield_vines",
+    "maxParticles": 32,
+    "emitRate": 0.0,
+    "burstCount": 20,
+    "looping": false,
+    "duration": 0.2,
+    "lifetimeMin": 0.5,
+    "lifetimeMax": 1.0,
+    "initialSpeedMin": 4.0,
+    "initialSpeedMax": 8.0,
+    "sizeMin": 0.05,
+    "sizeMax": 0.12,
+    "sizeEnd": 0.02,
+    "spreadAngle": 60.0,
+    "gravity": -3.0,
+    "drag": 4.0,
+    "forceType": 2,
+    "forceStrength": 3.0,
+    "blendMode": "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [0.1, 1.5, 0.2, 1.0]},
+        {"time": 0.5, "color": [0.3, 1.0, 0.4, 0.7]},
+        {"time": 1.0, "color": [0.1, 0.4, 0.1, 0.0]}
+    ]
+}

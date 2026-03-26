@@ -16,7 +16,8 @@
                 "basePerLevel": [60, 100, 140, 180, 220],
                 "apRatio": 0.5
             },
-            "duration": 3.0
+            "duration": 3.0,
+            "applyVFX": "vfx_shield_buff_persist"
         },
         {
             "type": "HOT",
@@ -25,7 +26,8 @@
                 "apRatio": 0.2
             },
             "duration": 3.0,
-            "tickRate": 0.5
+            "tickRate": 0.5,
+            "applyVFX": "vfx_heal_rising"
         }
     ],
     "onHitEffects": [],

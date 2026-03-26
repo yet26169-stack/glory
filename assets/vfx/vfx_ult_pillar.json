@@ -1,10 +1,10 @@
 {
     "id": "vfx_ult_pillar",
-    "maxParticles": 192,
-    "emitRate": 150.0,
-    "burstCount": 0.0,
-    "looping": true,
-    "duration": 1.5,
+    "maxParticles": 128,
+    "emitRate": 0.0,
+    "burstCount": 80,
+    "looping": false,
+    "duration": 0.05,
     "lifetimeMin": 0.2,
     "lifetimeMax": 0.5,
     "initialSpeedMin": 8.0,
@@ -17,9 +17,9 @@
     "drag": 1.0,
     "blendMode": "additive",
     "colorOverLifetime": [
-        {"time": 0.0, "color": [0.9,  0.95, 1.0,  1.0]},
-        {"time": 0.3, "color": [0.5,  0.7,  1.0,  0.9]},
-        {"time": 0.7, "color": [0.2,  0.4,  0.9,  0.5]},
-        {"time": 1.0, "color": [0.05, 0.1,  0.5,  0.0]}
+        {"time": 0.0, "color": [5.0, 5.0, 10.0, 1.0]},
+        {"time": 0.3, "color": [2.0, 2.0, 5.0,  0.9]},
+        {"time": 0.7, "color": [0.5, 0.7, 2.0,  0.5]},
+        {"time": 1.0, "color": [0.1, 0.15, 0.8, 0.0]}
     ]
 }

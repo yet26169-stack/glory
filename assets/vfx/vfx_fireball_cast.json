@@ -17,9 +17,18 @@
     "drag":            2.0,
     "spreadAngle":     40.0,
     "gravity":         1.5,
+    "softFadeDistance": 0.6,
     "colorOverLifetime": [
         {"time": 0.0, "color": [1.0, 0.65, 0.1, 1.0]},
         {"time": 0.4, "color": [1.0, 0.2,  0.0, 0.8]},
         {"time": 1.0, "color": [0.2, 0.05, 0.0, 0.0]}
+    ],
+    "subEmitters": [
+        {
+            "trigger": "onDeath",
+            "emitterRef": "vfx_sparks_burst",
+            "probability": 0.6,
+            "inheritVelocity": 1
+        }
     ]
 }

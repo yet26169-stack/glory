@@ -1,0 +1,28 @@
+{
+    "id": "vfx_stun_stars",
+    "maxParticles": 16,
+    "emitRate": 10.0,
+    "burstCount": 8,
+    "looping": true,
+    "duration": 1.5,
+    "lifetimeMin": 0.4,
+    "lifetimeMax": 0.8,
+    "initialSpeedMin": 1.5,
+    "initialSpeedMax": 3.0,
+    "sizeMin": 0.08,
+    "sizeMax": 0.15,
+    "sizeEnd": 0.04,
+    "spreadAngle": 360.0,
+    "gravity": 0.0,
+    "drag": 4.0,
+    "forceType": 2,
+    "forceStrength": 6.0,
+    "emitOffset": [0.0, 2.5, 0.0],
+    "blendMode": "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [3.0, 3.0, 1.0, 0.0]},
+        {"time": 0.2, "color": [4.0, 4.0, 1.5, 1.0]},
+        {"time": 0.8, "color": [2.0, 2.0, 0.8, 0.7]},
+        {"time": 1.0, "color": [1.0, 1.0, 0.3, 0.0]}
+    ]
+}

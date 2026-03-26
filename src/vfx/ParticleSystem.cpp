@@ -66,10 +66,16 @@ ParticleSystem::ParticleSystem(const Device&          device,
     // Fill parameters
     m_emitterParams->wind_dt = {def.windDirection * def.windStrength, 0.0f}; // dt set in update/render
     m_emitterParams->phys    = {def.gravity, def.drag, def.alphaCurve, static_cast<float>(m_maxParticles)};
-    m_emitterParams->size    = {def.sizeMin, def.sizeMax, def.sizeEnd, 0.0f};
+    m_emitterParams->size    = {def.sizeMin, def.sizeMax, def.sizeEnd, def.softFadeDistance};
     float bitmask = static_cast<float>(def.forceParams_bitmask ? def.forceParams_bitmask : (1u << def.forceType));
     m_emitterParams->forceParams  = {static_cast<float>(def.forceType), def.forceStrength, bitmask, 0.0f};
     m_emitterParams->attractorPos = {def.attractorPos.x, def.attractorPos.y, def.attractorPos.z, 0.0f};
+    // atlasParams.z: prefer flipbookFPS if set; fallback to legacy atlasFrameRate
+    const float effectiveFPS = (def.flipbookFPS != 0.0f) ? def.flipbookFPS : def.atlasFrameRate;
+    m_emitterParams->atlasParams  = {static_cast<float>(def.atlasRows),
+                                     static_cast<float>(def.atlasCols),
+                                     effectiveFPS,
+                                     def.atlasLoopFrames ? 1.0f : 0.0f};
 
     const uint32_t keyCount = std::min(static_cast<uint32_t>(def.colorOverLifetime.size()), 8u);
     m_emitterParams->colorKeyCount = keyCount;
@@ -216,6 +222,30 @@ bool ParticleSystem::isAlive() const {
     return false;
 }
 
+// ── scanDeaths ────────────────────────────────────────────────────────────
+std::vector<ParticleDeathEvent> ParticleSystem::scanDeaths() {
+    std::vector<ParticleDeathEvent> events;
+    if (!m_particles || !m_def || m_def->subEmitters.empty())
+        return events;
+
+    // Lazily initialise the alive bitset on first call
+    if (m_wasAlive.size() != m_maxParticles)
+        m_wasAlive.assign(m_maxParticles, false);
+
+    for (uint32_t i = 0; i < m_maxParticles; ++i) {
+        const bool aliveNow = m_particles[i].params.w >= 0.1f;
+        if (m_wasAlive[i] && !aliveNow) {
+            // Particle i just died — record its last known position/velocity
+            events.push_back({
+                glm::vec3(m_particles[i].posLife),
+                glm::vec3(m_particles[i].velAge)
+            });
+        }
+        m_wasAlive[i] = aliveNow;
+    }
+    return events;
+}
+
 // ── spawnParticle ─────────────────────────────────────────────────────────
 void ParticleSystem::spawnParticle() {
     // Find a dead slot (simple linear scan; fast for small emitters)
@@ -262,9 +292,13 @@ void ParticleSystem::spawnParticle() {
             p.velAge  = {vel.x, vel.y, vel.z, 0.0f};
             p.color   = col;
             
-            // Packed params.w: atlasFrame (integer part) + active (0.5 bias if active)
-            // For now, use frame 0; future expansion can randomize frame if needed.
-            const float activePacked = 0.5f; // 0 frame + active
+            // Packed params.w: atlasFrame (integer part) + active bias (0.5)
+            float startFrame = 0.0f;
+            if (m_def->flipbookRandomStart && m_def->atlasFrameCount > 1) {
+                std::uniform_int_distribution<uint32_t> frameDist(0, m_def->atlasFrameCount - 1);
+                startFrame = static_cast<float>(frameDist(m_rng));
+            }
+            const float activePacked = startFrame + 0.5f;
             p.params  = {size, rot, angVel, activePacked};
 
             return; // only spawn one particle per call

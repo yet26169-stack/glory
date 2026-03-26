@@ -2,6 +2,7 @@
 #include "vfx/VFXEventQueue.h"
 #include "vfx/TrailRenderer.h"
 #include "renderer/GroundDecalRenderer.h"
+#include "renderer/DeferredDecalRenderer.h"
 #include "vfx/MeshEffectRenderer.h"
 #include "renderer/ExplosionRenderer.h"
 #include "renderer/ConeAbilityRenderer.h"
@@ -46,6 +47,7 @@ void CompositeVFXSequencer::loadDirectory(const std::string& dirPath) {
                     else if (typeStr == "SHIELD") layer.type = VFXLayerType::SHIELD;
                     else if (typeStr == "SPRITE_EFFECT") layer.type = VFXLayerType::SPRITE_EFFECT;
                     else if (typeStr == "DISTORTION") layer.type = VFXLayerType::DISTORTION;
+                    else if (typeStr == "DEFERRED_DECAL") layer.type = VFXLayerType::DEFERRED_DECAL;
 
                     layer.effectRef = lj.value("effectRef", "");
                     layer.duration = lj.value("duration", -1.0f);
@@ -126,6 +128,7 @@ void CompositeVFXSequencer::update(float dt,
                                     VFXEventQueue& particleQueue,
                                     TrailRenderer& trails,
                                     GroundDecalRenderer& decals,
+                                    DeferredDecalRenderer& deferredDecals,
                                     MeshEffectRenderer& meshFX,
                                     ExplosionRenderer& explosions,
                                     ConeAbilityRenderer& cones,
@@ -186,6 +189,16 @@ void CompositeVFXSequencer::update(float dt,
                     case VFXLayerType::DISTORTION:
                         distortions.spawn(layer.effectRef, pos);
                         break;
+                    case VFXLayerType::DEFERRED_DECAL: {
+                        DeferredDecal dd;
+                        dd.transform = glm::translate(glm::mat4(1.0f), pos)
+                                     * glm::scale(glm::mat4(1.0f), glm::vec3(layer.scale));
+                        dd.color     = layer.color;
+                        dd.lifetime  = layer.duration > 0.0f ? layer.duration : 3.0f;
+                        dd.fadeTime  = 0.5f;
+                        deferredDecals.addDecal(dd);
+                        break;
+                    }
                     default: break;
                 }
                 it->fired[i] = true;

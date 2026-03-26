@@ -45,14 +45,31 @@ struct alignas(16) GpuColorKey {
 struct alignas(16) EmitterParams {
     glm::vec4  wind_dt;        // xyz=windDir*strength, w=dt
     glm::vec4  phys;           // x=gravity, y=drag, z=alphaCurve, w=count
-    glm::vec4  size;           // x=sizeMin, y=sizeMax, z=sizeEnd, w=reserved
+    glm::vec4  size;           // x=sizeMin, y=sizeMax, z=sizeEnd, w=softFadeDistance
     glm::vec4  forceParams;    // x=forceType (0-3), y=forceStrength, z=forceBitmask, w=reserved
     glm::vec4  attractorPos;   // xyz=attractor world position, w=reserved
+    glm::vec4  atlasParams;   // x=atlasRows, y=atlasCols, z=atlasFrameRate, w=loop(0/1)
     uint32_t   colorKeyCount;
     float      _pad[3];
     GpuColorKey colorKeys[8];
 };
 static_assert(sizeof(EmitterParams) <= 512, "EmitterParams must be compact");
+
+// ── Sub-emitter definition ─────────────────────────────────────────────────
+// Describes a child effect that should be spawned when a particle triggers
+// a specific event (death, collision, or a lifetime fraction).
+struct SubEmitterDef {
+    enum class Trigger : uint8_t {
+        OnDeath,              // fires when a particle's lifetime reaches 0
+        OnCollision,          // fires on ground/geometry collision (future)
+        OnLifetimeFraction    // fires when particle age/totalLife crosses triggerTime
+    };
+    Trigger     trigger          = Trigger::OnDeath;
+    std::string emitterRef;      // ID of the child EmitterDef to spawn
+    float       triggerTime      = 1.0f;   // for OnLifetimeFraction: normalised [0..1]
+    uint32_t    inheritVelocity  = 0;      // 0=none, 1=inherit parent velocity
+    float       probability      = 1.0f;   // 0..1 chance to actually fire
+};
 
 // ── Emitter definition (loaded from JSON or hard-coded) ───────────────────
 struct EmitterDef {
@@ -61,6 +78,14 @@ struct EmitterDef {
     // Texture
     std::string  textureAtlas;    // path relative to ASSET_DIR, "" = use default white
     uint32_t     atlasFrameCount = 1;
+    uint32_t     atlasRows       = 1;
+    uint32_t     atlasCols       = 1;
+    float        atlasFrameRate  = 10.0f;  // frames per second (legacy, see flipbookFPS)
+    bool         atlasLoopFrames = true;
+
+    // Flipbook animation
+    float        flipbookFPS        = 0.0f;   // 0 = spread all frames over particle lifetime; >0 = fixed FPS
+    bool         flipbookRandomStart = false;  // randomize starting frame per particle
 
     // Particle budget
     uint32_t     maxParticles    = 256;
@@ -87,6 +112,7 @@ struct EmitterDef {
     float        gravity         = 4.0f;    // m/s² downward
     float        drag            = 0.0f;    // damping: vel *= (1.0 - drag * dt)
     float        alphaCurve      = 1.0f;    // 1.0 = linear, >1.0 = fast fade in, etc.
+    float        softFadeDistance = 0.5f;   // depth-fade for soft particles (0 = hard, higher = softer)
     glm::vec3    windDirection   {0.0f};
     float        windStrength    = 0.0f;
 
@@ -102,6 +128,9 @@ struct EmitterDef {
 
     enum class BlendMode : uint8_t { Alpha, Additive };
     BlendMode blendMode = BlendMode::Alpha;
+
+    // Sub-emitters: child effects triggered by particle events
+    std::vector<SubEmitterDef> subEmitters;
 };
 
 // ── VFX Event (game logic → render thread via SPSC queue) ─────────────────

@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
+#include <random>
 #include <spdlog/spdlog.h>
 #include <stdexcept>
 
@@ -389,11 +390,61 @@ void VFXRenderer::update(float dt) {
 
     for (auto& ps : m_effects) ps->update(dt);
 
+    // ── Sub-emitter spawning (death events → child effects) ─────────────
+    // Collect death events from all active effects that have sub-emitters,
+    // then spawn child effects. We batch the spawns into a temporary list
+    // to avoid mutating m_effects while iterating.
+    struct PendingSubSpawn {
+        std::string defId;
+        glm::vec3   position;
+        glm::vec3   direction;
+    };
+    std::vector<PendingSubSpawn> subSpawns;
+
+    static thread_local std::mt19937 subRng{ std::random_device{}() };
+    static thread_local std::uniform_real_distribution<float> probDist(0.0f, 1.0f);
+
+    for (auto& ps : m_effects) {
+        const EmitterDef* def = ps->emitterDef();
+        if (!def || def->subEmitters.empty()) continue;
+
+        auto deaths = ps->scanDeaths();
+        if (deaths.empty()) continue;
+
+        for (const auto& se : def->subEmitters) {
+            if (se.trigger != SubEmitterDef::Trigger::OnDeath) continue;
+            if (se.emitterRef.empty()) continue;
+
+            for (const auto& evt : deaths) {
+                if (se.probability < 1.0f && probDist(subRng) > se.probability)
+                    continue;
+
+                glm::vec3 dir = (se.inheritVelocity && glm::length(evt.velocity) > 0.001f)
+                                  ? glm::normalize(evt.velocity)
+                                  : glm::vec3(0.0f, 1.0f, 0.0f);
+
+                subSpawns.push_back({ se.emitterRef, evt.position, dir });
+            }
+        }
+    }
+
+    for (auto& ss : subSpawns) {
+        VFXEvent ev;
+        ev.type = VFXEventType::Spawn;
+        std::strncpy(ev.effectID, ss.defId.c_str(), sizeof(ev.effectID) - 1);
+        ev.effectID[sizeof(ev.effectID) - 1] = '\0';
+        ev.position  = ss.position;
+        ev.direction = ss.direction;
+        ev.scale     = 1.0f;
+        ev.lifetime  = 0.0f; // use definition default
+        handleSpawn(ev);
+    }
+
     // Move dead effects to graveyard — DO NOT destroy immediately.
     auto it = m_effects.begin();
     while (it != m_effects.end()) {
         if (!(*it)->isAlive() || (*it)->handle() == 0) {
-            m_graveyard.push_back({ m_frameCount + GRAVEYARD_DELAY, std::move(*it) });
+            m_graveyard.push_back({ m_renderFrame + GRAVEYARD_DELAY, std::move(*it) });
             it = m_effects.erase(it);
         } else {
             ++it;
@@ -403,11 +454,12 @@ void VFXRenderer::update(float dt) {
 }
 
 void VFXRenderer::flushGraveyard() {
+    ++m_renderFrame;
     VkDevice dev = m_device.getDevice();
     m_graveyard.erase(
         std::remove_if(m_graveyard.begin(), m_graveyard.end(),
                        [this, dev](GraveyardEntry& g){
-                           if (g.killFrame <= m_frameCount) {
+                           if (g.killFrame <= m_renderFrame) {
                                g.ps->releaseDescriptorSet(dev, m_descPool);
                                return true; // erase triggers ~ParticleSystem → buffer destroy
                            }
@@ -1114,7 +1166,7 @@ void TrailRenderer::update(float dt) {
 
         if (inst.points.empty() && inst.detached) {
             // Move to graveyard instead of immediate destruction
-            m_graveyard.push_back({ m_frameCount + GRAVEYARD_DELAY, std::move(*it) });
+            m_graveyard.push_back({ m_renderFrame + GRAVEYARD_DELAY, std::move(*it) });
             it = m_activeTrails.erase(it);
         } else {
             updateInstanceBuffer(inst);
@@ -1125,11 +1177,12 @@ void TrailRenderer::update(float dt) {
 }
 
 void TrailRenderer::flushGraveyard() {
+    ++m_renderFrame;
     VkDevice dev = m_device.getDevice();
     m_graveyard.erase(
         std::remove_if(m_graveyard.begin(), m_graveyard.end(),
                        [this, dev](TrailGraveyardEntry& g) {
-                           if (g.killFrame <= m_frameCount) {
+                           if (g.killFrame <= m_renderFrame) {
                                vkFreeDescriptorSets(dev, m_descPool, 1, &g.inst->descSet);
                                return true; // erase triggers ~TrailInstance → buffer destroy
                            }

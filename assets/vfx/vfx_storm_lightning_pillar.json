@@ -1,0 +1,24 @@
+{
+    "id": "vfx_storm_lightning_pillar",
+    "maxParticles": 128,
+    "emitRate": 0.0,
+    "burstCount": 96,
+    "looping": false,
+    "duration": 0.05,
+    "lifetimeMin": 0.2,
+    "lifetimeMax": 0.5,
+    "initialSpeedMin": 15.0,
+    "initialSpeedMax": 30.0,
+    "sizeMin": 0.15,
+    "sizeMax": 0.4,
+    "sizeEnd": 0.05,
+    "spreadAngle": 15.0,
+    "gravity": -20.0,
+    "drag": 1.0,
+    "blendMode": "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [4.0, 4.0, 8.0, 1.0]},
+        {"time": 0.3, "color": [2.0, 1.5, 5.0, 0.8]},
+        {"time": 1.0, "color": [0.3, 0.2, 1.5, 0.0]}
+    ]
+}

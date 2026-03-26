@@ -1,25 +1,50 @@
 {
-    "id":              "vfx_fireball_explosion_smoke",
-    "maxParticles":    64,
-    "emitRate":        0.0,
-    "burstCount":      32.0,
-    "looping":         false,
-    "duration":        2.0,
-    "lifetimeMin":     1.0,
-    "lifetimeMax":     2.0,
+    "id": "vfx_fireball_explosion_smoke",
+    "maxParticles": 64,
+    "emitRate": 0.0,
+    "burstCount": 32.0,
+    "looping": false,
+    "duration": 2.0,
+    "lifetimeMin": 1.0,
+    "lifetimeMax": 2.0,
     "initialSpeedMin": 1.0,
     "initialSpeedMax": 4.0,
-    "sizeMin":         1.0,
-    "sizeMax":         2.0,
-    "sizeEnd":         3.5,
-    "drag":            2.5,
+    "sizeMin": 1.0,
+    "sizeMax": 2.0,
+    "sizeEnd": 3.5,
+    "drag": 2.5,
     "rotationSpeedMin": -30.0,
     "rotationSpeedMax": 30.0,
-    "spreadAngle":     120.0,
-    "gravity":         -0.8,
+    "spreadAngle": 120.0,
+    "gravity": -0.8,
     "colorOverLifetime": [
-        {"time": 0.0, "color": [0.2, 0.2, 0.2, 0.6]},
-        {"time": 0.5, "color": [0.1, 0.1, 0.1, 0.4]},
-        {"time": 1.0, "color": [0.05, 0.05, 0.05, 0.0]}
-    ]
+        {
+            "time": 0.0,
+            "color": [
+                0.2,
+                0.2,
+                0.2,
+                0.6
+            ]
+        },
+        {
+            "time": 0.5,
+            "color": [
+                0.1,
+                0.1,
+                0.1,
+                0.4
+            ]
+        },
+        {
+            "time": 1.0,
+            "color": [
+                0.05,
+                0.05,
+                0.05,
+                0.0
+            ]
+        }
+    ],
+    "softFadeDistance": 0.8
 }

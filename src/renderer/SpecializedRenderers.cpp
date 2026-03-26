@@ -1756,7 +1756,7 @@ void GroundDecalRenderer::render(VkCommandBuffer cmd, const glm::mat4& viewProj,
         pc.alpha     = alpha;
         pc.elapsed   = inst.elapsed;
         pc.appTime   = appTime;
-        pc.color     = inst.def->color;
+        pc.color     = (inst.colorOverride.a >= 0.0f) ? inst.colorOverride : inst.def->color;
         pc.fowMapMin = m_fowMapMin;
         pc.fowMapMax = m_fowMapMax;
 
@@ -1778,6 +1778,12 @@ void GroundDecalRenderer::destroy(uint32_t handle) {
 
 void GroundDecalRenderer::destroyAll() {
     m_activeDecals.clear();
+}
+
+void GroundDecalRenderer::setColor(uint32_t handle, glm::vec4 color) {
+    for (auto& d : m_activeDecals) {
+        if (d.handle == handle) { d.colorOverride = color; return; }
+    }
 }
 
 void GroundDecalRenderer::createDescriptorLayout() {
@@ -2726,7 +2732,7 @@ void WaterRenderer::createPipeline(const RenderFormats& formats,
     cb.attachmentCount = 2;
     cb.pAttachments    = blends;
 
-    // Push constant: WaterPC (92 bytes), vertex + fragment
+    // Push constant: WaterPC (96 bytes), vertex + fragment
     VkPushConstantRange pcRange{};
     pcRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     pcRange.size       = sizeof(WaterPC);
@@ -2787,6 +2793,7 @@ void WaterRenderer::render(VkCommandBuffer cmd, VkDescriptorSet mainSet,
     pc.normalMapIdx        = m_normalMapIdx;
     pc.flowMapIdx          = m_flowMapIdx;
     pc.foamTexIdx          = m_foamTexIdx;
+    pc.ssrTexIdx           = ssrBindlessIdx;
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
     VkDescriptorSet sets[2] = { mainSet, bindlessSet };

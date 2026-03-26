@@ -12,11 +12,13 @@
 #include <unordered_map>
 #include <vector>
 #include <queue>
+#include <optional>
 
 namespace glory {
 
 class TrailRenderer;
 class ScriptEngine;
+class GroundDecalRenderer;
 
 // ── AbilitySystem ──────────────────────────────────────────────────────────
 // Processes ability requests, drives the per-slot state machine, resolves
@@ -57,7 +59,8 @@ public:
 
     // ── Per-frame update ──────────────────────────────────────────────────
 
-    void update(entt::registry& registry, float dt, TrailRenderer* trailRenderer = nullptr);
+    void update(entt::registry& registry, float dt, TrailRenderer* trailRenderer = nullptr,
+                GroundDecalRenderer* groundDecals = nullptr);
 
     // Public hit resolver called by ProjectileSystem when a projectile lands
     void resolveHit(entt::registry& reg, entt::entity caster,
@@ -79,7 +82,21 @@ public:
     /// Attach GameAudioEvents for ability sounds.
     void setAudioEvents(class GameAudioEvents* audio) { m_audio = audio; }
 
+    // ── Radial blur trigger (polled after update) ─────────────────────────
+    struct RadialBlurEvent {
+        glm::vec3 worldPos{0.f};
+        float     duration      = 0.5f;
+        float     peakIntensity = 0.8f;
+    };
+    /// Returns the pending event and clears it. Check .has_value() before use.
+    std::optional<RadialBlurEvent> consumeRadialBlur() {
+        auto ev = m_pendingRadialBlur;
+        m_pendingRadialBlur.reset();
+        return ev;
+    }
+
 private:
+    std::optional<RadialBlurEvent> m_pendingRadialBlur;
     VFXEventQueue& m_vfxQueue;
     CompositeVFXSequencer m_compositeSequencer;
     ScriptEngine* m_scriptEngine = nullptr;
@@ -90,9 +107,11 @@ private:
     std::queue<AbilityRequest> m_requests;
 
     // ── State machine ──────────────────────────────────────────────────────
-    void processRequest(entt::registry& reg, const AbilityRequest& req);
+    void processRequest(entt::registry& reg, const AbilityRequest& req,
+                        GroundDecalRenderer* groundDecals);
     void tickAbility(entt::registry& reg, entt::entity entity,
-                     AbilityInstance& inst, float dt, TrailRenderer* trailRenderer);
+                     AbilityInstance& inst, float dt, TrailRenderer* trailRenderer,
+                     GroundDecalRenderer* groundDecals);
 
     // ── Validation ────────────────────────────────────────────────────────
     bool validateRequest(entt::registry& reg, const AbilityRequest& req,

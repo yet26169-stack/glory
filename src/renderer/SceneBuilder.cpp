@@ -4,6 +4,7 @@
 #include "renderer/StaticSkinnedMesh.h"
 #include "renderer/Texture.h"
 #include "renderer/WaterRenderer.h"
+#include "renderer/SSRPass.h"
 #include "scene/Components.h"
 #include "combat/CombatComponents.h"
 #include "combat/HeroDefinition.h"
@@ -192,6 +193,8 @@ void SceneBuilder::build(Renderer& r) {
         uint32_t texture;                    // primary (sub-mesh 0) texture
         std::vector<uint32_t> subMeshTextures; // per-sub-mesh textures (empty = all use 'texture')
         bool isZUp = false;                  // model needs -90° X rotation
+        glm::vec3 boundsMin{0.0f};           // local-space AABB min
+        glm::vec3 boundsMax{0.0f};           // local-space AABB max
     };
     std::unordered_map<std::string, MapAsset> mapAssets;
 
@@ -265,6 +268,8 @@ void SceneBuilder::build(Renderer& r) {
         // Z-up heuristic: if model Y range >> Z range, it was exported Z-up
         try {
             auto bounds = Model::getGLBBounds(path);
+            mapAssets[pm.filename].boundsMin = bounds.min;
+            mapAssets[pm.filename].boundsMax = bounds.max;
             float yExtent = bounds.max.y - bounds.min.y;
             float zExtent = bounds.max.z - bounds.min.z;
             if (yExtent > zExtent * 2.0f) {
@@ -364,15 +369,53 @@ void SceneBuilder::build(Renderer& r) {
 
             if (mapAssets.count(modelFile)) {
                 auto& asset = mapAssets[modelFile];
-                reg.emplace<MeshComponent>(e, MeshComponent{ asset.mesh });
+
+                // Target visible height per structure type (world units)
+                float targetHeight = 6.0f;
+                switch (sc.type) {
+                    case StructureType::TOWER_T1:
+                    case StructureType::TOWER_T2:
+                    case StructureType::TOWER_T3:    targetHeight = 8.0f; break;
+                    case StructureType::TOWER_NEXUS: targetHeight = 8.0f; break;
+                    case StructureType::INHIBITOR:   targetHeight = 5.0f; break;
+                    case StructureType::NEXUS:       targetHeight = 7.0f; break;
+                }
+
+                // Uniform scale so the model reaches targetHeight
+                float modelHeight = asset.boundsMax.y - asset.boundsMin.y;
+                float scaleFactor = (modelHeight > 1e-4f)
+                                      ? (targetHeight / modelHeight)
+                                      : 1.0f;
+                tc.scale = glm::vec3(scaleFactor);
+
+                // Raise so the base of the scaled model sits at ground (y = 0)
+                tc.position.y = -asset.boundsMin.y * scaleFactor;
+
+                if (asset.isZUp)
+                    tc.rotation.x = glm::radians(-90.0f);
+
+                AABB localAABB;
+                localAABB.min = asset.boundsMin;
+                localAABB.max = asset.boundsMax;
+                reg.emplace<MeshComponent>(e, MeshComponent{
+                    asset.mesh, -1, localAABB });
                 reg.emplace<MaterialComponent>(e, MaterialComponent{
                     asset.texture, flatNorm,
                     /*shininess=*/0.0f, /*metallic=*/0.0f,
                     /*roughness=*/0.6f, /*emissive=*/0.0f,
                     asset.subMeshTextures });
-                tc.scale = glm::vec3(1.0f);
-                if (asset.isZUp)
-                    tc.rotation.x = glm::radians(-90.0f);
+
+                // Subtle team tint for visibility/differentiation
+                glm::vec4 teamTint = (sc.teamIndex == 0)
+                    ? glm::vec4(0.7f, 0.8f, 1.0f, 1.0f)   // blue tinge
+                    : glm::vec4(1.0f, 0.8f, 0.7f, 1.0f);   // red tinge
+                reg.emplace<TintComponent>(e, TintComponent{ teamTint });
+
+                spdlog::info("[Renderer] Structure GLB '{}' assigned: "
+                             "mesh={}, scale={:.1f} (modelH={:.3f}), "
+                             "pos=({:.1f},{:.1f},{:.1f})",
+                             modelFile, asset.mesh, scaleFactor, modelHeight,
+                             tc.position.x, tc.position.y, tc.position.z);
             } else {
                 // Fallback to cube if model failed to load
                 spdlog::warn("[Renderer] Structure fallback to cube — model '{}' not found "
@@ -953,6 +996,14 @@ void SceneBuilder::build(Renderer& r) {
                               r.m_descriptors->getLayout(),
                               r.m_bindless->getLayout(),
                               *r.m_bindless);
+
+        // Register SSR output in bindless array for water to sample
+        if (r.m_ssrPass.isEnabled() && r.m_ssrPass.getReflectionView()) {
+            int ssrIdx = static_cast<int>(r.m_bindless->registerTexture(
+                r.m_ssrPass.getReflectionView(), r.m_ssrPass.getReflectionSampler()));
+            r.m_waterRenderer->ssrBindlessIdx = ssrIdx;
+            spdlog::info("[SSR] Registered in bindless slot {}", ssrIdx);
+        }
     }
 
     // ── Flush all batched texture uploads in a single GPU submission ─────

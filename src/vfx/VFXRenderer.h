@@ -178,6 +178,7 @@ private:
     };
     std::vector<GraveyardEntry> m_graveyard;
     int                         m_frameCount = 0;
+    int                         m_renderFrame = 0; // incremented per render, not per tick
 
     // ── Initialisation helpers ─────────────────────────────────────────────
     void createDescriptorLayoutAndPool();

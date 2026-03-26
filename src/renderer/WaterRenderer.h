@@ -29,8 +29,9 @@ public:
         int       normalMapIdx;      // offset 80
         int       flowMapIdx;        // offset 84
         int       foamTexIdx;        // offset 88
+        int       ssrTexIdx;         // offset 92  (-1 = no SSR)
     };
-    static_assert(sizeof(WaterPC) == 92, "WaterPC must be 92 bytes");
+    static_assert(sizeof(WaterPC) == 96, "WaterPC must be 96 bytes");
 
     // renderPass   — main HDR render pass (3 attachments, stencil format)
     // mainLayout   — descriptor set layout for the main frame descriptors
@@ -55,6 +56,9 @@ public:
     float flowSpeed            = 0.25f;
     float distortionStrength   = 0.07f;
     float foamScale            = 3.5f;
+
+    // SSR texture bindless index (set each frame by Renderer; -1 = disabled)
+    int ssrBindlessIdx         = -1;
 
     void destroy();
 

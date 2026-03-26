@@ -1,0 +1,23 @@
+{
+    "id": "vfx_storm_cast_lightning_flicker",
+    "maxParticles": 8,
+    "emitRate": 0.0,
+    "burstCount": 4,
+    "looping": false,
+    "duration": 0.05,
+    "lifetimeMin": 0.03,
+    "lifetimeMax": 0.08,
+    "initialSpeedMin": 0.0,
+    "initialSpeedMax": 0.5,
+    "sizeMin": 2.0,
+    "sizeMax": 4.0,
+    "sizeEnd": 5.0,
+    "spreadAngle": 360.0,
+    "gravity": 0.0,
+    "drag": 0.0,
+    "blendMode": "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [5.0, 5.0, 8.0, 1.0]},
+        {"time": 1.0, "color": [1.0, 0.8, 3.0, 0.0]}
+    ]
+}

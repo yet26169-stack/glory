@@ -31,6 +31,8 @@ void ExplosionRenderer::addExplosion(glm::vec3) {}
 uint32_t DistortionRenderer::spawn(const std::string&, glm::vec3) { return 0; }
 void MeshEffectRenderer::spawn(const std::string&, glm::vec3, glm::vec3, float) {}
 uint32_t GroundDecalRenderer::spawn(const std::string&, glm::vec3, float, float) { return 0; }
+void GroundDecalRenderer::setColor(uint32_t, glm::vec4) {}
+void GroundDecalRenderer::destroy(uint32_t) {}
 void SpriteEffectRenderer::spawn(uint32_t, const glm::vec3&, float, const glm::vec4&) {}
 }
 

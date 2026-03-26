@@ -1,0 +1,181 @@
+#version 450
+
+// Screen-space reflections via linear raymarching in screen space.
+// Reconstructs normals from depth (no GBuffer normals required).
+// Outputs half-res reflection color + confidence (alpha).
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(set = 0, binding = 0) uniform sampler2D sceneColor;  // HDR scene color
+layout(set = 0, binding = 1) uniform sampler2D depthTex;     // full-res depth (reversed-Z)
+layout(set = 0, binding = 2, rgba16f) uniform writeonly image2D ssrOut; // half-res reflection
+
+layout(push_constant) uniform SSRParams {
+    mat4  viewProj;
+    mat4  invViewProj;
+    vec4  cameraPos;    // xyz = camera world position
+    vec2  screenSize;   // full-res width, height
+    float maxDistance;   // max raymarch world distance (default 50)
+    float thickness;     // depth comparison thickness (default 0.3)
+    uint  maxSteps;      // max raymarch steps (default 64)
+    float stepStride;    // initial step size in pixels (default 2.0)
+    float _pad0;
+    float _pad1;
+} pc;
+
+// Reconstruct world position from screen UV + depth (reversed-Z)
+vec3 worldFromUVDepth(vec2 uv, float depth) {
+    vec4 clip = vec4(uv * 2.0 - 1.0, depth, 1.0);
+    vec4 world = pc.invViewProj * clip;
+    return world.xyz / world.w;
+}
+
+// Project world position to screen UV + depth
+vec3 projectToScreen(vec3 worldPos) {
+    vec4 clip = pc.viewProj * vec4(worldPos, 1.0);
+    clip.xyz /= clip.w;
+    return vec3(clip.xy * 0.5 + 0.5, clip.z);
+}
+
+// Reconstruct normal from depth cross products (same technique as SSAO)
+vec3 reconstructNormal(vec2 uv, vec2 texelSize) {
+    float dc = texture(depthTex, uv).r;
+    float dl = texture(depthTex, uv - vec2(texelSize.x, 0)).r;
+    float dr = texture(depthTex, uv + vec2(texelSize.x, 0)).r;
+    float db = texture(depthTex, uv - vec2(0, texelSize.y)).r;
+    float dt = texture(depthTex, uv + vec2(0, texelSize.y)).r;
+
+    vec3 posC = worldFromUVDepth(uv, dc);
+    vec3 posL = worldFromUVDepth(uv - vec2(texelSize.x, 0), dl);
+    vec3 posR = worldFromUVDepth(uv + vec2(texelSize.x, 0), dr);
+    vec3 posB = worldFromUVDepth(uv - vec2(0, texelSize.y), db);
+    vec3 posT = worldFromUVDepth(uv + vec2(0, texelSize.y), dt);
+
+    vec3 dX = (abs(dl - dc) < abs(dr - dc)) ? (posC - posL) : (posR - posC);
+    vec3 dY = (abs(db - dc) < abs(dt - dc)) ? (posC - posB) : (posT - posC);
+
+    return normalize(cross(dX, dY));
+}
+
+void main() {
+    ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 outSize = imageSize(ssrOut);
+    if (gid.x >= outSize.x || gid.y >= outSize.y) return;
+
+    // Map half-res pixel to full-res UV
+    vec2 uv = (vec2(gid) + 0.5) / vec2(outSize);
+    vec2 texelSize = 1.0 / pc.screenSize;
+
+    float depth = texture(depthTex, uv).r;
+
+    // Skip sky (reversed-Z: near=1, far=0)
+    if (depth < 0.0001) {
+        imageStore(ssrOut, gid, vec4(0.0));
+        return;
+    }
+
+    vec3 worldPos = worldFromUVDepth(uv, depth);
+    vec3 normal   = reconstructNormal(uv, texelSize);
+    vec3 viewDir  = normalize(worldPos - pc.cameraPos.xyz);
+
+    // Reflect view direction around normal
+    vec3 reflDir = reflect(viewDir, normal);
+
+    // Skip reflections that point toward the camera (backfacing)
+    if (dot(reflDir, normal) < 0.0) {
+        imageStore(ssrOut, gid, vec4(0.0));
+        return;
+    }
+
+    // Project start and a small step along reflected ray to screen
+    vec3 startScreen = projectToScreen(worldPos);
+    vec3 endWorld    = worldPos + reflDir * pc.maxDistance;
+    vec3 endScreen   = projectToScreen(endWorld);
+
+    // Screen-space ray direction
+    vec2 rayDir = endScreen.xy - startScreen.xy;
+    float rayLen = length(rayDir * pc.screenSize); // in pixels
+
+    if (rayLen < 1.0) {
+        imageStore(ssrOut, gid, vec4(0.0));
+        return;
+    }
+
+    // Normalize to pixel-size steps
+    vec2 stepDir = rayDir / rayLen;
+    float depthStep = (endScreen.z - startScreen.z) / rayLen;
+
+    // Adaptive stride: start with pc.stepStride pixels per step
+    float stride = pc.stepStride;
+    uint steps = min(pc.maxSteps, uint(rayLen / stride));
+    if (steps == 0u) {
+        imageStore(ssrOut, gid, vec4(0.0));
+        return;
+    }
+
+    // Linear raymarch
+    vec2 currentUV = startScreen.xy;
+    float currentDepth = startScreen.z;
+    bool hit = false;
+    vec2 hitUV = vec2(0.0);
+
+    for (uint i = 1u; i <= steps; ++i) {
+        currentUV    += stepDir * stride / pc.screenSize;
+        currentDepth += depthStep * stride;
+
+        // Out-of-screen check
+        if (currentUV.x < 0.0 || currentUV.x > 1.0 ||
+            currentUV.y < 0.0 || currentUV.y > 1.0) {
+            break;
+        }
+
+        float sampledDepth = texture(depthTex, currentUV).r;
+
+        // Reversed-Z: closer objects have HIGHER depth values
+        // A hit is when our ray's depth is LESS than the sampled depth
+        // (ray went behind a surface)
+        float depthDiff = currentDepth - sampledDepth;
+
+        // depthDiff < 0 means ray is behind the surface (hit candidate)
+        if (depthDiff < 0.0 && depthDiff > -pc.thickness) {
+            // Binary refinement (4 iterations)
+            float lo = float(i - 1u) * stride;
+            float hi = float(i) * stride;
+
+            for (int r = 0; r < 4; ++r) {
+                float mid = (lo + hi) * 0.5;
+                vec2 midUV = startScreen.xy + stepDir * mid / pc.screenSize;
+                float midDepth = startScreen.z + depthStep * mid;
+                float midSample = texture(depthTex, midUV).r;
+                float midDiff = midDepth - midSample;
+
+                if (midDiff < 0.0 && midDiff > -pc.thickness) {
+                    hi = mid;
+                    hitUV = midUV;
+                } else {
+                    lo = mid;
+                }
+            }
+
+            hitUV = startScreen.xy + stepDir * ((lo + hi) * 0.5) / pc.screenSize;
+            hit = true;
+            break;
+        }
+    }
+
+    if (hit) {
+        // Edge fade: reduce intensity near screen borders
+        vec2 edgeFade = smoothstep(vec2(0.0), vec2(0.05), hitUV) *
+                        (1.0 - smoothstep(vec2(0.95), vec2(1.0), hitUV));
+        float fade = edgeFade.x * edgeFade.y;
+
+        // Distance fade
+        float dist = length(hitUV - startScreen.xy) * length(pc.screenSize);
+        float distFade = 1.0 - smoothstep(pc.maxDistance * 0.7, pc.maxDistance, dist);
+
+        vec3 reflColor = texture(sceneColor, hitUV).rgb;
+        imageStore(ssrOut, gid, vec4(reflColor, fade * distFade));
+    } else {
+        imageStore(ssrOut, gid, vec4(0.0));
+    }
+}

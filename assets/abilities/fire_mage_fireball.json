@@ -39,6 +39,7 @@
     "impactVFX": ["vfx_fireball_explosion", "vfx_fireball_explosion_smoke", "vfx_fireball_explosion_sparks"],
     "projectileTrailDef": "fireball_trail",
     "compositeCastVFX": "fireball_cast_composite",
+    "castAnticipationVFX": "fireball_anticipation_composite",
     "compositeImpactVFX": "fireball_impact_composite",
     "castSFX": "sfx_fireball_cast",
     "impactSFX": "sfx_fireball_impact",

@@ -1,0 +1,10 @@
+{
+    "id": "storm_strike_cast_composite",
+    "layers": [
+        { "delay": 0.0,  "type": "PARTICLE",     "effectRef": "vfx_storm_cast_charge",            "anchor": "CASTER", "followAnchor": true },
+        { "delay": 0.0,  "type": "PARTICLE",     "effectRef": "vfx_storm_cast_sparks",            "anchor": "CASTER", "followAnchor": true },
+        { "delay": 0.0,  "type": "GROUND_DECAL", "effectRef": "decal_circle",                     "anchor": "CASTER", "scale": 3.0, "color": [0.2, 0.15, 0.6, 0.5] },
+        { "delay": 0.1,  "type": "DISTORTION",   "effectRef": "vfx_ripple",                       "anchor": "CASTER" },
+        { "delay": 0.2,  "type": "PARTICLE",     "effectRef": "vfx_storm_cast_lightning_flicker",  "anchor": "CASTER" }
+    ]
+}

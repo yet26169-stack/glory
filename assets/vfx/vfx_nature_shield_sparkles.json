@@ -1,0 +1,24 @@
+{
+    "id": "vfx_nature_shield_sparkles",
+    "maxParticles": 64,
+    "emitRate": 30.0,
+    "burstCount": 0,
+    "looping": true,
+    "duration": 3.0,
+    "lifetimeMin": 0.3,
+    "lifetimeMax": 0.7,
+    "initialSpeedMin": 0.5,
+    "initialSpeedMax": 2.0,
+    "sizeMin": 0.03,
+    "sizeMax": 0.08,
+    "sizeEnd": 0.01,
+    "spreadAngle": 360.0,
+    "gravity": -1.0,
+    "drag": 5.0,
+    "blendMode": "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [1.5, 1.2, 0.3, 0.0]},
+        {"time": 0.3, "color": [2.0, 1.8, 0.5, 1.0]},
+        {"time": 1.0, "color": [0.5, 1.0, 0.2, 0.0]}
+    ]
+}

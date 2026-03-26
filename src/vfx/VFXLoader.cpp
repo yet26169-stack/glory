@@ -69,6 +69,7 @@ bool VFXDefinitionLoader::parseFile(const fs::path& filePath, VFXDefinition& out
         out.gravity          = j.value("gravity", 4.0f);
         out.drag             = j.value("drag", 0.0f);
         out.alphaCurve       = j.value("alphaCurve", 1.0f);
+        out.softFadeDistance = j.value("softFadeDistance", 0.5f);
         out.windStrength     = j.value("windStrength", 0.0f);
         if (j.contains("windDirection"))
             out.windDirection = parseVec3(j["windDirection"]);
@@ -112,6 +113,12 @@ bool VFXDefinitionLoader::parseFile(const fs::path& filePath, VFXDefinition& out
 
         out.texturePath      = j.value("texturePath", j.value("textureAtlas", ""));
         out.atlasFrameCount  = j.value("atlasFrameCount", 1u);
+        out.atlasRows        = j.value("atlasRows", 1u);
+        out.atlasCols        = j.value("atlasCols", 1u);
+        out.atlasFrameRate   = j.value("atlasFrameRate", 10.0f);
+        out.atlasLoopFrames  = j.value("atlasLoopFrames", true);
+        out.flipbookFPS        = j.value("flipbookFPS", 0.0f);
+        out.flipbookRandomStart = j.value("flipbookRandomStart", false);
 
         // Color over life
         out.colorOverLife.clear();
@@ -130,6 +137,26 @@ bool VFXDefinitionLoader::parseFile(const fs::path& filePath, VFXDefinition& out
                 float t = k["time"].get<float>();
                 float s = k["value"].get<float>();
                 out.sizeOverLife.emplace_back(t, s);
+            }
+        }
+
+        // Sub-emitters
+        out.subEmitters.clear();
+        if (j.contains("subEmitters") && j["subEmitters"].is_array()) {
+            for (const auto& sj : j["subEmitters"]) {
+                SubEmitterDef se;
+                std::string trig = sj.value("trigger", "onDeath");
+                if      (trig == "onDeath")             se.trigger = SubEmitterDef::Trigger::OnDeath;
+                else if (trig == "onCollision")         se.trigger = SubEmitterDef::Trigger::OnCollision;
+                else if (trig == "onLifetimeFraction")  se.trigger = SubEmitterDef::Trigger::OnLifetimeFraction;
+
+                se.emitterRef       = sj.value("emitterRef", "");
+                se.triggerTime      = sj.value("triggerTime", 1.0f);
+                se.inheritVelocity  = sj.value("inheritVelocity", 0u);
+                se.probability      = sj.value("probability", 1.0f);
+
+                if (!se.emitterRef.empty())
+                    out.subEmitters.push_back(std::move(se));
             }
         }
 

@@ -1,0 +1,29 @@
+{
+    "id": "vfx_ice_zone_snowfall",
+    "maxParticles": 96,
+    "emitRate": 60.0,
+    "burstCount": 0,
+    "looping": true,
+    "duration": 3.0,
+    "lifetimeMin": 0.8,
+    "lifetimeMax": 1.5,
+    "initialSpeedMin": 0.2,
+    "initialSpeedMax": 1.0,
+    "sizeMin": 0.06,
+    "sizeMax": 0.15,
+    "sizeEnd": 0.03,
+    "spreadAngle": 360.0,
+    "gravity": 2.5,
+    "drag": 3.0,
+    "forceType": 3,
+    "forceStrength": 1.0,
+    "emitOffset": [0.0, 4.0, 0.0],
+    "emitRadius": 4.0,
+    "blendMode": "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [0.8, 0.9, 1.0, 0.0]},
+        {"time": 0.2, "color": [0.8, 0.9, 1.0, 0.7]},
+        {"time": 0.8, "color": [0.5, 0.7, 1.0, 0.4]},
+        {"time": 1.0, "color": [0.3, 0.5, 0.9, 0.0]}
+    ]
+}

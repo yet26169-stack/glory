@@ -6,6 +6,7 @@
 #include "renderer/passes/PassSetup.h"
 #include "scene/Components.h"
 #include "combat/CombatComponents.h"
+#include "combat/DissolveEffect.h"
 #include "ability/AbilityComponents.h"
 
 #include "imgui.h"
@@ -15,6 +16,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <array>
 #include <cstring>
 #include <fstream>
@@ -172,6 +174,10 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
         VkDeviceSize instOffset;
         uint32_t     boneBase;
         uint32_t     meshIdx;
+        bool         hasDissolve;
+        float        dissolveProgress;
+        float        edgeWidth;
+        glm::vec3    edgeColor;
     };
     // Use frame allocator instead of std::vector for transient draw list
     constexpr uint32_t MAX_SKINNED_DRAWS = 512;
@@ -328,8 +334,22 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
             VkDeviceSize instOffset = instanceIndex * sizeof(InstanceData);
             uint32_t boneBase = ssm.boneSlot * Descriptors::MAX_BONES;
 
-            if (skinnedDrawCount < MAX_SKINNED_DRAWS)
-                skinnedDrawData[skinnedDrawCount++] = {e, instBuf, instOffset, boneBase, ssm.staticSkinnedMeshIndex};
+            if (skinnedDrawCount < MAX_SKINNED_DRAWS) {
+                bool hasDiss = false;
+                float dissProgress = 0.0f;
+                float dissEdgeW = 0.05f;
+                glm::vec3 dissEdgeCol(3.0f, 1.5f, 0.2f);
+                if (auto* de = m_scene.getRegistry().try_get<DissolveEffect>(e)) {
+                    hasDiss = true;
+                    dissProgress = de->progress;
+                    dissEdgeW = de->edgeWidth;
+                    dissEdgeCol = de->edgeColor;
+                }
+                skinnedDrawData[skinnedDrawCount++] = {
+                    e, instBuf, instOffset, boneBase, ssm.staticSkinnedMeshIndex,
+                    hasDiss, dissProgress, dissEdgeW, dissEdgeCol
+                };
+            }
             ++instanceIndex;
         }
     }
@@ -378,16 +398,46 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
                     VkRect2D lsc{ {0,0}, ext };
                     vkCmdSetViewport(scmd, 0, 1, &lvp);
                     vkCmdSetScissor(scmd, 0, 1, &lsc);
-                    vkCmdBindPipeline(scmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_skinnedPipeline);
                     VkDescriptorSet sets[2] = { ds, m_bindless->getSet() };
+
+                    // Track which pipeline is currently bound to minimize state switches
+                    bool dissolveActive = false;
+                    vkCmdBindPipeline(scmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_skinnedPipeline);
                     vkCmdBindDescriptorSets(scmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                             m_skinnedPipelineLayout, 0, 2, sets, 0, nullptr);
+
                     for (uint32_t i = start; i < end; ++i) {
                         auto& info = skinnedDrawData[i];
+
+                        if (info.hasDissolve && m_dissolveSkinnedPipeline) {
+                            if (!dissolveActive) {
+                                vkCmdBindPipeline(scmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_dissolveSkinnedPipeline);
+                                vkCmdBindDescriptorSets(scmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                        m_dissolvePipelineLayout, 0, 2, sets, 0, nullptr);
+                                dissolveActive = true;
+                            }
+                            DissolvePushConstants dpc{};
+                            dpc.boneBaseIndex   = info.boneBase;
+                            dpc.dissolveProgress = info.dissolveProgress;
+                            dpc.edgeWidth       = info.edgeWidth;
+                            dpc.noiseTexIdx     = m_dissolveNoiseIdx;
+                            dpc.edgeColor       = glm::vec4(info.edgeColor, 1.0f);
+                            vkCmdPushConstants(scmd, m_dissolvePipelineLayout,
+                                               VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                                               0, sizeof(DissolvePushConstants), &dpc);
+                        } else {
+                            if (dissolveActive) {
+                                vkCmdBindPipeline(scmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_skinnedPipeline);
+                                vkCmdBindDescriptorSets(scmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                        m_skinnedPipelineLayout, 0, 2, sets, 0, nullptr);
+                                dissolveActive = false;
+                            }
+                            vkCmdPushConstants(scmd, m_skinnedPipelineLayout,
+                                               VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                                               0, sizeof(uint32_t), &info.boneBase);
+                        }
+
                         vkCmdBindVertexBuffers(scmd, 1, 1, &info.instBuf, &info.instOffset);
-                        vkCmdPushConstants(scmd, m_skinnedPipelineLayout,
-                                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                                           0, sizeof(uint32_t), &info.boneBase);
                         const auto& mesh = m_scene.getStaticSkinnedMesh(info.meshIdx);
                         mesh.bind(scmd);
                         mesh.draw(scmd);
@@ -676,6 +726,14 @@ void Renderer::recordTransparentVFXPass(VkCommandBuffer cmd, const FrameContext&
 
     glm::mat4 viewProj = ctx.viewProj;
 
+    // ── Deferred decals (depth-projected, before particles) ─────────────────
+    if (m_deferredDecalRenderer) {
+        glm::vec2 screenSize(static_cast<float>(ext.width), static_cast<float>(ext.height));
+        m_deferredDecalRenderer->render(cmd, viewProj,
+                                         m_hdrFB->depthView(), m_hdrFB->sampler(),
+                                         screenSize, m_isoCam.getNear(), m_isoCam.getFar());
+    }
+
     // ── VFX particle render pass ────────────────────────────────────────────
     if (m_vfxRenderer) {
         const glm::mat4& view = m_isoCam.getViewMatrix();
@@ -774,59 +832,212 @@ void Renderer::recordTransparentVFXPass(VkCommandBuffer cmd, const FrameContext&
 void Renderer::recordTonemapPass(VkCommandBuffer cmd, const FrameContext& ctx) {
     auto ext = ctx.extent;
 
-    // ── Transition swapchain image to COLOR_ATTACHMENT_OPTIMAL ───────────────
+    // ═══════════════════════════════════════════════════════════════════════
+    // Phase 1: Tone-map HDR → intermediate render target
+    // ═══════════════════════════════════════════════════════════════════════
     {
-        VkImageMemoryBarrier2 swapBarrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
-        swapBarrier.srcStageMask  = VK_PIPELINE_STAGE_2_NONE;
-        swapBarrier.srcAccessMask = VK_ACCESS_2_NONE;
-        swapBarrier.dstStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-        swapBarrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-        swapBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        swapBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        swapBarrier.image = m_swapchain->getImages()[ctx.imageIndex];
-        swapBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+        VkImageMemoryBarrier2 bar{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
+        bar.srcStageMask  = VK_PIPELINE_STAGE_2_NONE;
+        bar.srcAccessMask = VK_ACCESS_2_NONE;
+        bar.dstStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+        bar.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+        bar.oldLayout     = VK_IMAGE_LAYOUT_UNDEFINED;
+        bar.newLayout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        bar.image         = m_toneMapResult.getImage();
+        bar.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
         VkDependencyInfo depInfo{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
         depInfo.imageMemoryBarrierCount = 1;
-        depInfo.pImageMemoryBarriers    = &swapBarrier;
+        depInfo.pImageMemoryBarriers    = &bar;
         vkCmdPipelineBarrier2(cmd, &depInfo);
     }
 
-    VkRenderingAttachmentInfo swapColorAttach{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-    swapColorAttach.imageView   = m_swapchain->getImageViews()[ctx.imageIndex];
-    swapColorAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    swapColorAttach.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    swapColorAttach.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
-    swapColorAttach.clearValue.color = {{ 0.0f, 0.0f, 0.0f, 1.0f }};
-
-    VkRenderingInfo swapRenderInfo{VK_STRUCTURE_TYPE_RENDERING_INFO};
-    swapRenderInfo.renderArea          = { {0, 0}, ext };
-    swapRenderInfo.layerCount          = 1;
-    swapRenderInfo.colorAttachmentCount = 1;
-    swapRenderInfo.pColorAttachments   = &swapColorAttach;
-
-    vkCmdBeginRendering(cmd, &swapRenderInfo);
-    if (m_gpuTimer) m_gpuTimer->beginZone(cmd, m_currentFrame, "Tonemap");
-
     {
+        VkRenderingAttachmentInfo colorAttach{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+        colorAttach.imageView   = m_toneMapResult.getImageView();
+        colorAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        colorAttach.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        colorAttach.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
+        colorAttach.clearValue.color = {{ 0.0f, 0.0f, 0.0f, 1.0f }};
+
+        VkRenderingInfo renderInfo{VK_STRUCTURE_TYPE_RENDERING_INFO};
+        renderInfo.renderArea           = { {0, 0}, ext };
+        renderInfo.layerCount           = 1;
+        renderInfo.colorAttachmentCount = 1;
+        renderInfo.pColorAttachments    = &colorAttach;
+
+        vkCmdBeginRendering(cmd, &renderInfo);
+
         VkViewport vp{0, 0, static_cast<float>(ext.width), static_cast<float>(ext.height), 0, 1};
         VkRect2D   sc{{0, 0}, ext};
         vkCmdSetViewport(cmd, 0, 1, &vp);
         vkCmdSetScissor(cmd, 0, 1, &sc);
+
+        if (m_gpuTimer) m_gpuTimer->beginZone(cmd, m_currentFrame, "Tonemap");
+
+        float deathDesat = 0.0f;
+        if (RespawnSystem::isDead(m_scene.getRegistry(), m_playerEntity))
+            deathDesat = 0.7f;
+        m_toneMap->render(cmd, /*exposure=*/1.0f, /*bloomStrength=*/0.3f,
+                          /*vignette=*/1, /*colorGrade=*/1, /*chromatic=*/0.003f,
+                          deathDesat);
+
+        if (m_gpuTimer) m_gpuTimer->endZone(cmd, m_currentFrame, "Tonemap");
+        vkCmdEndRendering(cmd);
     }
-    float deathDesat = 0.0f;
-    if (RespawnSystem::isDead(m_scene.getRegistry(), m_playerEntity))
-        deathDesat = 0.7f; // heavy desaturation for death screen
-    m_toneMap->render(cmd, /*exposure=*/1.0f, /*bloomStrength=*/0.3f,
-                      /*vignette=*/1, /*colorGrade=*/1, /*chromatic=*/0.003f,
-                      deathDesat);
 
-    if (m_gpuTimer) m_gpuTimer->endZone(cmd, m_currentFrame, "Tonemap");
+    // Transition intermediate to SHADER_READ_ONLY for the color grade pass
+    {
+        VkImageMemoryBarrier2 bar{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
+        bar.srcStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+        bar.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+        bar.dstStageMask  = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+        bar.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+        bar.oldLayout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        bar.newLayout     = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        bar.image         = m_toneMapResult.getImage();
+        bar.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
-    // ── ImGui render draw data (last thing inside render pass) ──────────────
-    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
+        VkDependencyInfo depInfo{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        depInfo.imageMemoryBarrierCount = 1;
+        depInfo.pImageMemoryBarriers    = &bar;
+        vkCmdPipelineBarrier2(cmd, &depInfo);
+    }
 
-    vkCmdEndRendering(cmd);
+    // ═══════════════════════════════════════════════════════════════════════
+    // Phase 2: Color grade intermediate → swapchain (or radial blur intermediate)
+    // ═══════════════════════════════════════════════════════════════════════
+    const bool doRadialBlur = m_radialBlurIntensity > 0.001f;
+
+    // When radial blur is active, color grade writes to m_radialBlurIntermediate
+    // so that radial blur can read from it and write to the swapchain.
+    VkImage  phase2DstImage = doRadialBlur ? m_radialBlurIntermediate.getImage()
+                                           : m_swapchain->getImages()[ctx.imageIndex];
+    VkImageView phase2DstView = doRadialBlur ? m_radialBlurIntermediate.getImageView()
+                                             : m_swapchain->getImageViews()[ctx.imageIndex];
+
+    {
+        VkImageMemoryBarrier2 bar{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
+        bar.srcStageMask  = VK_PIPELINE_STAGE_2_NONE;
+        bar.srcAccessMask = VK_ACCESS_2_NONE;
+        bar.dstStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+        bar.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+        bar.oldLayout     = VK_IMAGE_LAYOUT_UNDEFINED;
+        bar.newLayout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        bar.image         = phase2DstImage;
+        bar.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+        VkDependencyInfo depInfo{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+        depInfo.imageMemoryBarrierCount = 1;
+        depInfo.pImageMemoryBarriers    = &bar;
+        vkCmdPipelineBarrier2(cmd, &depInfo);
+    }
+
+    {
+        VkRenderingAttachmentInfo swapColorAttach{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+        swapColorAttach.imageView   = phase2DstView;
+        swapColorAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        swapColorAttach.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        swapColorAttach.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
+        swapColorAttach.clearValue.color = {{ 0.0f, 0.0f, 0.0f, 1.0f }};
+
+        VkRenderingInfo swapRenderInfo{VK_STRUCTURE_TYPE_RENDERING_INFO};
+        swapRenderInfo.renderArea           = { {0, 0}, ext };
+        swapRenderInfo.layerCount           = 1;
+        swapRenderInfo.colorAttachmentCount = 1;
+        swapRenderInfo.pColorAttachments    = &swapColorAttach;
+
+        vkCmdBeginRendering(cmd, &swapRenderInfo);
+
+        VkViewport vp{0, 0, static_cast<float>(ext.width), static_cast<float>(ext.height), 0, 1};
+        VkRect2D   sc{{0, 0}, ext};
+        vkCmdSetViewport(cmd, 0, 1, &vp);
+        vkCmdSetScissor(cmd, 0, 1, &sc);
+
+        if (m_gpuTimer) m_gpuTimer->beginZone(cmd, m_currentFrame, "ColorGrade");
+        m_colorGrade->render(cmd, /*lutIntensity=*/1.0f);
+        if (m_gpuTimer) m_gpuTimer->endZone(cmd, m_currentFrame, "ColorGrade");
+
+        if (!doRadialBlur) {
+            // No radial blur — render ImGui directly on this target (swapchain)
+            ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
+        }
+
+        vkCmdEndRendering(cmd);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Phase 3 (optional): Radial blur m_radialBlurIntermediate → swapchain
+    // ═══════════════════════════════════════════════════════════════════════
+    if (doRadialBlur) {
+        // Transition radial blur intermediate → shader read
+        {
+            VkImageMemoryBarrier2 bar{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
+            bar.srcStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+            bar.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+            bar.dstStageMask  = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+            bar.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+            bar.oldLayout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            bar.newLayout     = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            bar.image         = m_radialBlurIntermediate.getImage();
+            bar.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+            VkDependencyInfo depInfo{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+            depInfo.imageMemoryBarrierCount = 1;
+            depInfo.pImageMemoryBarriers    = &bar;
+            vkCmdPipelineBarrier2(cmd, &depInfo);
+        }
+
+        // Transition swapchain to color attachment
+        {
+            VkImageMemoryBarrier2 bar{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
+            bar.srcStageMask  = VK_PIPELINE_STAGE_2_NONE;
+            bar.srcAccessMask = VK_ACCESS_2_NONE;
+            bar.dstStageMask  = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+            bar.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+            bar.oldLayout     = VK_IMAGE_LAYOUT_UNDEFINED;
+            bar.newLayout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            bar.image         = m_swapchain->getImages()[ctx.imageIndex];
+            bar.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+            VkDependencyInfo depInfo{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+            depInfo.imageMemoryBarrierCount = 1;
+            depInfo.pImageMemoryBarriers    = &bar;
+            vkCmdPipelineBarrier2(cmd, &depInfo);
+        }
+
+        // Render radial blur to swapchain + ImGui
+        {
+            VkRenderingAttachmentInfo colorAttach{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+            colorAttach.imageView   = m_swapchain->getImageViews()[ctx.imageIndex];
+            colorAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            colorAttach.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            colorAttach.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
+            colorAttach.clearValue.color = {{ 0.0f, 0.0f, 0.0f, 1.0f }};
+
+            VkRenderingInfo renderInfo{VK_STRUCTURE_TYPE_RENDERING_INFO};
+            renderInfo.renderArea           = { {0, 0}, ext };
+            renderInfo.layerCount           = 1;
+            renderInfo.colorAttachmentCount = 1;
+            renderInfo.pColorAttachments    = &colorAttach;
+
+            vkCmdBeginRendering(cmd, &renderInfo);
+
+            VkViewport viewport{0, 0, static_cast<float>(ext.width),
+                                      static_cast<float>(ext.height), 0, 1};
+            VkRect2D scissor{{0, 0}, ext};
+            vkCmdSetViewport(cmd, 0, 1, &viewport);
+            vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+            if (m_gpuTimer) m_gpuTimer->beginZone(cmd, m_currentFrame, "RadialBlur");
+            m_radialBlur.render(cmd, m_radialBlurCenter, m_radialBlurIntensity);
+            if (m_gpuTimer) m_gpuTimer->endZone(cmd, m_currentFrame, "RadialBlur");
+
+            ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
+
+            vkCmdEndRendering(cmd);
+        }
+    }
 
     // Transition swapchain image to PRESENT_SRC_KHR for presentation
     {
@@ -1091,6 +1302,187 @@ void Renderer::destroySkinnedPipeline() {
     VkDevice dev = m_device->getDevice();
     if (m_skinnedPipeline)       { vkDestroyPipeline(dev, m_skinnedPipeline, nullptr);            m_skinnedPipeline       = VK_NULL_HANDLE; }
     if (m_skinnedPipelineLayout) { vkDestroyPipelineLayout(dev, m_skinnedPipelineLayout, nullptr); m_skinnedPipelineLayout = VK_NULL_HANDLE; }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Dissolve Pipeline (skinned.vert + dissolve.frag)
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Simple hash-based value noise for procedural dissolve texture
+static float valueNoise(int x, int y) {
+    int n = x + y * 57;
+    n = (n << 13) ^ n;
+    return 1.0f - static_cast<float>((n * (n * n * 15731 + 789221) + 1376312589) & 0x7fffffff) / 1073741824.0f;
+}
+
+static float smoothNoise(int x, int y) {
+    float corners = (valueNoise(x - 1, y - 1) + valueNoise(x + 1, y - 1) +
+                     valueNoise(x - 1, y + 1) + valueNoise(x + 1, y + 1)) / 16.0f;
+    float sides   = (valueNoise(x - 1, y) + valueNoise(x + 1, y) +
+                     valueNoise(x, y - 1) + valueNoise(x, y + 1)) / 8.0f;
+    float center  = valueNoise(x, y) / 4.0f;
+    return corners + sides + center;
+}
+
+static float interpolatedNoise(float x, float y) {
+    int ix = static_cast<int>(x); float fx = x - ix;
+    int iy = static_cast<int>(y); float fy = y - iy;
+    float v1 = smoothNoise(ix, iy);
+    float v2 = smoothNoise(ix + 1, iy);
+    float v3 = smoothNoise(ix, iy + 1);
+    float v4 = smoothNoise(ix + 1, iy + 1);
+    float i1 = v1 * (1.0f - fx) + v2 * fx;
+    float i2 = v3 * (1.0f - fx) + v4 * fx;
+    return i1 * (1.0f - fy) + i2 * fy;
+}
+
+static float perlinOctaves(float x, float y, int octaves) {
+    float total = 0.0f, freq = 1.0f, amp = 1.0f, maxAmp = 0.0f;
+    for (int i = 0; i < octaves; ++i) {
+        total += interpolatedNoise(x * freq, y * freq) * amp;
+        maxAmp += amp;
+        amp *= 0.5f;
+        freq *= 2.0f;
+    }
+    return (total / maxAmp) * 0.5f + 0.5f; // normalise to [0,1]
+}
+
+void Renderer::createDissolvePipeline() {
+    VkDevice dev = m_device->getDevice();
+
+    // ── Generate 256×256 Perlin noise texture ───────────────────────────────
+    constexpr uint32_t NOISE_SIZE = 256;
+    std::vector<uint32_t> noisePixels(NOISE_SIZE * NOISE_SIZE);
+    for (uint32_t y = 0; y < NOISE_SIZE; ++y) {
+        for (uint32_t x = 0; x < NOISE_SIZE; ++x) {
+            float n = perlinOctaves(static_cast<float>(x) * 0.05f,
+                                    static_cast<float>(y) * 0.05f, 6);
+            uint8_t v = static_cast<uint8_t>(std::clamp(n, 0.0f, 1.0f) * 255.0f);
+            noisePixels[y * NOISE_SIZE + x] = (0xFFu << 24) | (v << 16) | (v << 8) | v;
+        }
+    }
+    m_dissolveNoise = Texture::createFromPixels(*m_device, noisePixels.data(),
+                                                 NOISE_SIZE, NOISE_SIZE,
+                                                 VK_FORMAT_R8G8B8A8_UNORM);
+    m_dissolveNoiseIdx = m_bindless->registerTexture(m_dissolveNoise.getImageView(),
+                                                      m_dissolveNoise.getSampler());
+    spdlog::info("Dissolve noise texture generated ({}×{}, bindless idx {})",
+                 NOISE_SIZE, NOISE_SIZE, m_dissolveNoiseIdx);
+
+    // ── Shader modules ──────────────────────────────────────────────────────
+    auto readFile = [](const std::string& path) -> std::vector<char> {
+        std::ifstream file(path, std::ios::ate | std::ios::binary);
+        if (!file.is_open()) throw std::runtime_error("Shader not found: " + path);
+        size_t sz = static_cast<size_t>(file.tellg());
+        std::vector<char> buf(sz);
+        file.seekg(0); file.read(buf.data(), static_cast<std::streamsize>(sz));
+        return buf;
+    };
+    auto makeModule = [&](const std::vector<char>& code) {
+        VkShaderModuleCreateInfo ci{ VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
+        ci.codeSize = code.size();
+        ci.pCode    = reinterpret_cast<const uint32_t*>(code.data());
+        VkShaderModule m;
+        VK_CHECK(vkCreateShaderModule(dev, &ci, nullptr, &m), "shader module");
+        return m;
+    };
+
+    VkShaderModule vert = makeModule(readFile(std::string(SHADER_DIR) + "skinned.vert.spv"));
+    VkShaderModule frag = makeModule(readFile(std::string(SHADER_DIR) + "dissolve.frag.spv"));
+
+    VkPipelineShaderStageCreateInfo stages[2]{};
+    stages[0] = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, nullptr, 0, VK_SHADER_STAGE_VERTEX_BIT,   vert, "main" };
+    stages[1] = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, nullptr, 0, VK_SHADER_STAGE_FRAGMENT_BIT, frag, "main" };
+
+    // ── Vertex input: identical to skinned pipeline ─────────────────────────
+    auto skinnedBind  = SkinnedVertex::getBindingDescription();
+    auto skinnedAttrs = SkinnedVertex::getAttributeDescriptions();
+    auto instBind     = InstanceData::getBindingDescription();
+    auto instAttrs    = InstanceData::getAttributeDescriptions();
+    instBind.binding = 1;
+    for (auto& a : instAttrs) { a.binding = 1; a.location += 2; }
+
+    std::array<VkVertexInputBindingDescription, 2> bindings{ skinnedBind, instBind };
+    std::vector<VkVertexInputAttributeDescription> allAttrs(skinnedAttrs.begin(), skinnedAttrs.end());
+    allAttrs.insert(allAttrs.end(), instAttrs.begin(), instAttrs.end());
+
+    VkPipelineVertexInputStateCreateInfo vi{ VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
+    vi.vertexBindingDescriptionCount   = 2;
+    vi.pVertexBindingDescriptions      = bindings.data();
+    vi.vertexAttributeDescriptionCount = static_cast<uint32_t>(allAttrs.size());
+    vi.pVertexAttributeDescriptions    = allAttrs.data();
+
+    VkPipelineInputAssemblyStateCreateInfo ia{ VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
+    ia.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+    VkDynamicState dynStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+    VkPipelineDynamicStateCreateInfo dyn{ VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
+    dyn.dynamicStateCount = 2; dyn.pDynamicStates = dynStates;
+
+    VkPipelineViewportStateCreateInfo vps{ VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO };
+    vps.viewportCount = 1; vps.scissorCount = 1;
+
+    VkPipelineRasterizationStateCreateInfo rast{ VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
+    rast.polygonMode = VK_POLYGON_MODE_FILL; rast.lineWidth = 1.0f;
+    rast.cullMode = VK_CULL_MODE_NONE; rast.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+
+    VkPipelineMultisampleStateCreateInfo ms{ VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
+    ms.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+    VkPipelineDepthStencilStateCreateInfo ds{ VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
+    ds.depthTestEnable = VK_TRUE; ds.depthWriteEnable = VK_TRUE; ds.depthCompareOp = VK_COMPARE_OP_GREATER;
+
+    VkPipelineColorBlendAttachmentState blendAttach{};
+    blendAttach.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                                 VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    VkPipelineColorBlendAttachmentState charDepthBlend{};
+    charDepthBlend.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                                    VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    VkPipelineColorBlendAttachmentState dissolveBlends[2] = { blendAttach, charDepthBlend };
+    VkPipelineColorBlendStateCreateInfo cb{ VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
+    cb.attachmentCount = 2; cb.pAttachments = dissolveBlends;
+
+    // ── Pipeline layout with dissolve push constants (32 bytes) ─────────────
+    VkDescriptorSetLayout setLayouts[2] = { m_descriptors->getLayout(), m_bindless->getLayout() };
+    VkPushConstantRange pc{};
+    pc.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    pc.size       = sizeof(DissolvePushConstants);
+    VkPipelineLayoutCreateInfo lci{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+    lci.setLayoutCount         = 2;
+    lci.pSetLayouts            = setLayouts;
+    lci.pushConstantRangeCount = 1;
+    lci.pPushConstantRanges    = &pc;
+    VK_CHECK(vkCreatePipelineLayout(dev, &lci, nullptr, &m_dissolvePipelineLayout), "dissolve layout");
+
+    VkPipelineRenderingCreateInfo dynCI = m_pipeline->getRenderFormats().pipelineRenderingCI();
+
+    VkGraphicsPipelineCreateInfo pci{ VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
+    pci.pNext               = &dynCI;
+    pci.stageCount          = 2;
+    pci.pStages             = stages;
+    pci.pVertexInputState   = &vi;
+    pci.pInputAssemblyState = &ia;
+    pci.pViewportState      = &vps;
+    pci.pRasterizationState = &rast;
+    pci.pMultisampleState   = &ms;
+    pci.pDepthStencilState  = &ds;
+    pci.pColorBlendState    = &cb;
+    pci.pDynamicState       = &dyn;
+    pci.layout              = m_dissolvePipelineLayout;
+    pci.renderPass          = VK_NULL_HANDLE;
+    VK_CHECK(vkCreateGraphicsPipelines(dev, VK_NULL_HANDLE, 1, &pci, nullptr, &m_dissolveSkinnedPipeline),
+             "dissolve skinned pipeline");
+
+    vkDestroyShaderModule(dev, frag, nullptr);
+    vkDestroyShaderModule(dev, vert, nullptr);
+    spdlog::info("Dissolve pipeline created");
+}
+
+void Renderer::destroyDissolvePipeline() {
+    VkDevice dev = m_device->getDevice();
+    if (m_dissolveSkinnedPipeline)  { vkDestroyPipeline(dev, m_dissolveSkinnedPipeline, nullptr);       m_dissolveSkinnedPipeline  = VK_NULL_HANDLE; }
+    if (m_dissolvePipelineLayout)   { vkDestroyPipelineLayout(dev, m_dissolvePipelineLayout, nullptr);   m_dissolvePipelineLayout   = VK_NULL_HANDLE; }
+    m_dissolveNoise = Texture{};
 }
 
 } // namespace glory

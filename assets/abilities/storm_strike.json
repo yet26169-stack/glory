@@ -10,7 +10,12 @@
     "cooldownPerLevel": [120.0, 100.0, 80.0],
     "areaShape": "CIRCLE",
     "areaRadius": 5.0,
+    "aimIndicatorDecal": "decal_circle",
+    "aimIndicatorColor": [0.4, 0.2, 0.8, 0.5],
+    "aimIndicatorScale": 1.3,
     "compositeImpactVFX": "storm_strike_impact_composite",
+    "compositeCastVFX": "storm_strike_cast_composite",
+    "castAnticipationVFX": "storm_strike_anticipation_composite",
     "castVFX": ["vfx_shield_pulse"],
     "onHitEffects": [
         {
@@ -23,7 +28,8 @@
         },
         {
             "type": "STUN",
-            "duration": 1.5
+            "duration": 1.5,
+            "applyVFX": "vfx_stun_stars"
         }
     ],
     "onSelfEffects": [],

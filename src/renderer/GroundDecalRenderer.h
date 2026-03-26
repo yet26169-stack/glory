@@ -50,6 +50,9 @@ public:
     void destroy(uint32_t handle);
     void destroyAll();
 
+    // Override per-instance color (for pulsing indicators, etc.)
+    void setColor(uint32_t handle, glm::vec4 color);
+
     static constexpr int MAX_DECALS = 64;
 
 private:
@@ -61,6 +64,7 @@ private:
         float rotation;
         float elapsed = 0.0f;
         Texture* texture = nullptr;
+        glm::vec4 colorOverride{-1.0f}; // negative alpha = use def color
     };
 
     struct DecalPC {

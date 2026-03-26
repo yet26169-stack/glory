@@ -1,0 +1,26 @@
+{
+    "id": "vfx_storm_impact_smoke",
+    "maxParticles": 24,
+    "emitRate": 0.0,
+    "burstCount": 16,
+    "looping": false,
+    "duration": 0.1,
+    "lifetimeMin": 0.6,
+    "lifetimeMax": 1.2,
+    "initialSpeedMin": 3.0,
+    "initialSpeedMax": 6.0,
+    "sizeMin": 1.0,
+    "sizeMax": 2.5,
+    "sizeEnd": 4.0,
+    "spreadAngle": 360.0,
+    "gravity": -1.0,
+    "drag": 2.0,
+    "forceType": 3,
+    "forceStrength": 1.5,
+    "blendMode": "alpha",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [0.12, 0.1, 0.18, 0.5]},
+        {"time": 0.5, "color": [0.08, 0.07, 0.12, 0.3]},
+        {"time": 1.0, "color": [0.04, 0.03, 0.06, 0.0]}
+    ]
+}

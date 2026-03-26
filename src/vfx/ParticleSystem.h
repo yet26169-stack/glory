@@ -8,10 +8,17 @@
 #include <glm/glm.hpp>
 #include <cstdint>
 #include <random>
+#include <vector>
 
 namespace glory {
 
 class Device;
+
+// Info about a particle that just died (used for sub-emitter spawning)
+struct ParticleDeathEvent {
+    glm::vec3 position;
+    glm::vec3 velocity;
+};
 
 // ── ParticleSystem ─────────────────────────────────────────────────────────
 // Manages a single active effect instance:
@@ -79,6 +86,12 @@ public:
     }
     uint32_t        maxParticles()const { return m_maxParticles; }
     glm::vec3       worldPosition() const { return m_position; }
+    const EmitterDef* emitterDef() const { return m_def; }
+
+    // Scan the mapped SSBO for particles that died since the last scan.
+    // Must be called AFTER the GPU compute fence has been waited on.
+    // Returns a list of death events (position + velocity at time of death).
+    std::vector<ParticleDeathEvent> scanDeaths();
 
 private:
     const Device*      m_device     = nullptr;
@@ -113,6 +126,9 @@ private:
     uint32_t           m_handle     = 0;
 
     std::mt19937       m_rng;
+
+    // Per-particle alive tracking for death detection (sub-emitters)
+    std::vector<bool>  m_wasAlive;
 
     void spawnParticle();
     void writeToDescriptorSet(VkDescriptorSetLayout layout,

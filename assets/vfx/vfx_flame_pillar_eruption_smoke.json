@@ -1,27 +1,60 @@
 {
-    "id":              "vfx_flame_pillar_eruption_smoke",
-    "maxParticles":    128,
-    "emitRate":        0.0,
-    "burstCount":      60.0,
-    "looping":         false,
-    "duration":        2.0,
-    "lifetimeMin":     0.8,
-    "lifetimeMax":     1.8,
+    "id": "vfx_flame_pillar_eruption_smoke",
+    "maxParticles": 128,
+    "emitRate": 0.0,
+    "burstCount": 60.0,
+    "looping": false,
+    "duration": 2.0,
+    "lifetimeMin": 0.8,
+    "lifetimeMax": 1.8,
     "initialSpeedMin": 3.0,
     "initialSpeedMax": 8.0,
-    "sizeMin":         1.5,
-    "sizeMax":         3.0,
-    "sizeEnd":         4.0,
+    "sizeMin": 1.5,
+    "sizeMax": 3.0,
+    "sizeEnd": 4.0,
     "rotationSpeedMin": -90.0,
     "rotationSpeedMax": 90.0,
-    "drag":            1.5,
-    "alphaCurve":      1.8,
-    "spreadAngle":     50.0,
-    "gravity":         -2.0,
+    "drag": 1.5,
+    "alphaCurve": 1.8,
+    "spreadAngle": 50.0,
+    "gravity": -2.0,
     "colorOverLifetime": [
-        {"time": 0.0, "color": [0.3, 0.25, 0.2, 0.6]},
-        {"time": 0.3, "color": [0.2, 0.15, 0.1, 0.5]},
-        {"time": 0.7, "color": [0.12, 0.1, 0.08, 0.3]},
-        {"time": 1.0, "color": [0.05, 0.04, 0.03, 0.0]}
-    ]
+        {
+            "time": 0.0,
+            "color": [
+                0.3,
+                0.25,
+                0.2,
+                0.6
+            ]
+        },
+        {
+            "time": 0.3,
+            "color": [
+                0.2,
+                0.15,
+                0.1,
+                0.5
+            ]
+        },
+        {
+            "time": 0.7,
+            "color": [
+                0.12,
+                0.1,
+                0.08,
+                0.3
+            ]
+        },
+        {
+            "time": 1.0,
+            "color": [
+                0.05,
+                0.04,
+                0.03,
+                0.0
+            ]
+        }
+    ],
+    "softFadeDistance": 0.8
 }

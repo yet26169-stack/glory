@@ -21,6 +21,7 @@ class GpuCollisionSystem;
 class VFXRenderer;
 class TrailRenderer;
 class GroundDecalRenderer;
+class DeferredDecalRenderer;
 class MeshEffectRenderer;
 class DistortionRenderer;
 class ExplosionRenderer;
@@ -40,21 +41,24 @@ class VFXFlushSystem : public ISystem {
 public:
     VFXFlushSystem(VFXRenderer* vfx, VFXEventQueue* q1, VFXEventQueue* q2,
                    TrailRenderer* trail, GroundDecalRenderer* decals,
+                   DeferredDecalRenderer* deferredDecals,
                    MeshEffectRenderer* mesh, DistortionRenderer* distortion)
         : m_vfx(vfx), m_q1(q1), m_q2(q2), m_trail(trail)
-        , m_decals(decals), m_mesh(mesh), m_distortion(distortion) {}
+        , m_decals(decals), m_deferredDecals(deferredDecals)
+        , m_mesh(mesh), m_distortion(distortion) {}
 
     void execute(entt::registry& registry, float dt) override;
     std::string_view name() const override { return "VFXFlush"; }
 
 private:
-    VFXRenderer*         m_vfx;
-    VFXEventQueue*       m_q1;
-    VFXEventQueue*       m_q2;
-    TrailRenderer*       m_trail;
-    GroundDecalRenderer* m_decals;
-    MeshEffectRenderer*  m_mesh;
-    DistortionRenderer*  m_distortion;
+    VFXRenderer*          m_vfx;
+    VFXEventQueue*        m_q1;
+    VFXEventQueue*        m_q2;
+    TrailRenderer*        m_trail;
+    GroundDecalRenderer*  m_decals;
+    DeferredDecalRenderer* m_deferredDecals;
+    MeshEffectRenderer*   m_mesh;
+    DistortionRenderer*   m_distortion;
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -65,12 +69,13 @@ class AbilityUpdateSystem : public ISystem {
 public:
     AbilityUpdateSystem(AbilitySystem* abilities, VFXEventQueue* q,
                         TrailRenderer* trail, GroundDecalRenderer* decals,
+                        DeferredDecalRenderer* deferredDecals,
                         MeshEffectRenderer* mesh, ExplosionRenderer* explosions,
                         ConeAbilityRenderer* cone, SpriteEffectRenderer* sprites,
                         DistortionRenderer* distortion)
         : m_abilities(abilities), m_q(q), m_trail(trail), m_decals(decals)
-        , m_mesh(mesh), m_explosions(explosions), m_cone(cone)
-        , m_sprites(sprites), m_distortion(distortion) {}
+        , m_deferredDecals(deferredDecals), m_mesh(mesh), m_explosions(explosions)
+        , m_cone(cone), m_sprites(sprites), m_distortion(distortion) {}
 
     void execute(entt::registry& registry, float dt) override;
     std::vector<std::type_index> dependsOn() const override {
@@ -83,6 +88,7 @@ private:
     VFXEventQueue*        m_q;
     TrailRenderer*        m_trail;
     GroundDecalRenderer*  m_decals;
+    DeferredDecalRenderer* m_deferredDecals;
     MeshEffectRenderer*   m_mesh;
     ExplosionRenderer*    m_explosions;
     ConeAbilityRenderer*  m_cone;

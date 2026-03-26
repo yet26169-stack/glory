@@ -2,6 +2,7 @@
 #include "ability/AbilityTypes.h"
 #include "audio/GameAudioEvents.h"
 #include "combat/CombatSystem.h"
+#include "combat/DissolveEffect.h"
 #include "combat/EconomySystem.h"
 #include "combat/HeroDefinition.h"
 #include "combat/RespawnSystem.h"
@@ -825,6 +826,28 @@ void RespawnSystem::update(entt::registry& reg, float dt) {
     for (auto e : toDestroy) {
         if (reg.valid(e)) reg.destroy(e);
     }
+
+    // Tick dissolve effects
+    auto dissolveView = reg.view<DissolveEffect>();
+    std::vector<entt::entity> dissolveComplete;
+    for (auto [e, de] : dissolveView.each()) {
+        if (de.reverse) {
+            de.progress -= de.speed * dt;
+            if (de.progress <= 0.0f) {
+                de.progress = 0.0f;
+                dissolveComplete.push_back(e);
+            }
+        } else {
+            de.progress += de.speed * dt;
+            if (de.progress >= 1.0f) {
+                de.progress = 1.0f;
+                dissolveComplete.push_back(e);
+            }
+        }
+    }
+    for (auto e : dissolveComplete) {
+        if (reg.valid(e)) reg.remove<DissolveEffect>(e);
+    }
 }
 
 // ── Handle death transition ─────────────────────────────────────────────────
@@ -884,6 +907,15 @@ void RespawnSystem::handleDeath(entt::registry& reg, entt::entity e,
     rc.state = LifeState::DYING;
     rc.respawnTimer = rc.isHero ? 1.5f : 1.0f; // death animation duration
 
+    // Start dissolve effect (mesh dissolves over the death animation window)
+    reg.emplace_or_replace<DissolveEffect>(e, DissolveEffect{
+        .progress  = 0.0f,
+        .speed     = rc.isHero ? 0.7f : 1.0f,
+        .reverse   = false,
+        .edgeWidth = 0.05f,
+        .edgeColor = {3.0f, 1.5f, 0.2f}
+    });
+
     spdlog::info("Entity died at ({:.0f}, {:.0f})", rc.deathPosition.x, rc.deathPosition.z);
 }
 
@@ -932,6 +964,15 @@ void RespawnSystem::handleRespawn(entt::registry& reg, entt::entity e,
 
     rc.state = LifeState::ALIVE;
     rc.respawnTimer = 0.0f;
+
+    // Start reveal dissolve (mesh materializes)
+    reg.emplace_or_replace<DissolveEffect>(e, DissolveEffect{
+        .progress  = 1.0f,
+        .speed     = 1.5f,
+        .reverse   = true,
+        .edgeWidth = 0.05f,
+        .edgeColor = {0.5f, 2.0f, 3.0f}  // cool blue for respawn
+    });
 
     spdlog::info("Hero respawned at fountain ({:.0f}, {:.0f})", fountain.x, fountain.z);
 

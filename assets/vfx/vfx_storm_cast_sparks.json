@@ -1,0 +1,23 @@
+{
+    "id": "vfx_storm_cast_sparks",
+    "maxParticles": 48,
+    "emitRate": 60.0,
+    "burstCount": 0,
+    "looping": false,
+    "duration": 0.5,
+    "lifetimeMin": 0.1,
+    "lifetimeMax": 0.25,
+    "initialSpeedMin": 4.0,
+    "initialSpeedMax": 10.0,
+    "sizeMin": 0.02,
+    "sizeMax": 0.06,
+    "sizeEnd": 0.01,
+    "spreadAngle": 360.0,
+    "gravity": 0.0,
+    "drag": 8.0,
+    "blendMode": "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [3.0, 3.0, 5.0, 1.0]},
+        {"time": 1.0, "color": [0.5, 0.3, 2.0, 0.0]}
+    ]
+}

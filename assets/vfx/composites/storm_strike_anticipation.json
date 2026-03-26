@@ -1,0 +1,8 @@
+{
+    "id": "storm_strike_anticipation_composite",
+    "layers": [
+        { "delay": 0.0, "type": "PARTICLE",     "effectRef": "vfx_anticipation_storm_charge", "anchor": "CASTER", "followAnchor": true },
+        { "delay": 0.0, "type": "GROUND_DECAL", "effectRef": "decal_circle",                  "anchor": "CASTER", "scale": 2.5, "color": [0.2, 0.15, 0.5, 0.4] },
+        { "delay": 0.1, "type": "GROUND_DECAL", "effectRef": "decal_circle",                  "anchor": "TARGET", "scale": 5.5, "color": [0.15, 0.1, 0.4, 0.5] }
+    ]
+}

@@ -18,6 +18,7 @@ layout(push_constant) uniform PC {
     int   normalMapIdx;
     int   flowMapIdx;
     int   foamTexIdx;
+    int   ssrTexIdx;
 } pc;
 
 layout(location = 0) in vec3 inPosition;

@@ -45,6 +45,7 @@ struct VFXDefinition {
     float     gravity      = 4.0f;
     float     drag         = 0.0f;
     float     alphaCurve   = 1.0f;
+    float     softFadeDistance = 0.5f;  // depth-fade for soft particles (0 = hard)
     glm::vec3 windDirection{0.0f};
     float     windStrength = 0.0f;
 
@@ -67,10 +68,21 @@ struct VFXDefinition {
 
     std::string texturePath;                  // atlas texture path
     uint32_t    atlasFrameCount = 1;
+    uint32_t    atlasRows       = 1;
+    uint32_t    atlasCols       = 1;
+    float       atlasFrameRate  = 10.0f;  // frames per second (legacy, see flipbookFPS)
+    bool        atlasLoopFrames = true;
+
+    // Flipbook animation
+    float       flipbookFPS        = 0.0f;   // 0 = lifetime-based; >0 = fixed FPS
+    bool        flipbookRandomStart = false;
 
     // ── Visual curves ────────────────────────────────────────────────────
     std::vector<std::pair<float, glm::vec4>> colorOverLife;   // {time, rgba}
     std::vector<std::pair<float, float>>     sizeOverLife;    // {time, scale}
+
+    // ── Sub-emitters (per-particle child spawns) ─────────────────────────
+    std::vector<SubEmitterDef> subEmitters;
 
     // ── Conversion to legacy EmitterDef ──────────────────────────────────
     EmitterDef toEmitterDef() const {
@@ -78,6 +90,12 @@ struct VFXDefinition {
         def.id              = name;
         def.textureAtlas    = texturePath;
         def.atlasFrameCount = atlasFrameCount;
+        def.atlasRows       = atlasRows;
+        def.atlasCols       = atlasCols;
+        def.atlasFrameRate  = atlasFrameRate;
+        def.atlasLoopFrames = atlasLoopFrames;
+        def.flipbookFPS        = flipbookFPS;
+        def.flipbookRandomStart = flipbookRandomStart;
         def.maxParticles    = maxParticles;
         def.emitRate        = emitRate;
         def.burstCount      = burstCount;
@@ -96,6 +114,7 @@ struct VFXDefinition {
         def.gravity         = gravity;
         def.drag            = drag;
         def.alphaCurve      = alphaCurve;
+        def.softFadeDistance = softFadeDistance;
         def.windDirection   = windDirection;
         def.windStrength    = windStrength;
 
@@ -128,6 +147,8 @@ struct VFXDefinition {
             def.blendMode = EmitterDef::BlendMode::Additive;
         else
             def.blendMode = EmitterDef::BlendMode::Alpha;
+
+        def.subEmitters = subEmitters;
 
         return def;
     }

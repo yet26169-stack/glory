@@ -78,6 +78,7 @@ private:
     };
     std::vector<TrailGraveyardEntry> m_graveyard;
     int m_frameCount = 0;
+    int m_renderFrame = 0; // incremented per render, not per tick
 
     std::unique_ptr<Texture> m_whiteTexture;
 

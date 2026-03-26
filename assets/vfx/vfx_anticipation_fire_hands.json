@@ -1,0 +1,23 @@
+{
+    "id": "vfx_anticipation_fire_hands",
+    "maxParticles": 32,
+    "emitRate": 80.0,
+    "burstCount": 0,
+    "looping": true,
+    "duration": 0.5,
+    "lifetimeMin": 0.08,
+    "lifetimeMax": 0.15,
+    "initialSpeedMin": 1.0,
+    "initialSpeedMax": 3.0,
+    "sizeMin": 0.05,
+    "sizeMax": 0.12,
+    "sizeEnd": 0.02,
+    "spreadAngle": 360.0,
+    "gravity": -2.0,
+    "drag": 8.0,
+    "blendMode": "additive",
+    "colorOverLifetime": [
+        {"time": 0.0, "color": [3.0, 1.5, 0.2, 1.0]},
+        {"time": 1.0, "color": [1.0, 0.3, 0.0, 0.0]}
+    ]
+}

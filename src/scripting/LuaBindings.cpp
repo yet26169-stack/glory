@@ -213,6 +213,12 @@ static void registerVFXBindings(sol::state& lua, VFXEventQueue* vfxQueue) {
         spdlog::debug("[Lua] screenShake: intensity={}, duration={}", intensity, duration);
     };
 
+    vfx_ns["radialBlur"] = [](float duration, float peakIntensity) {
+        // Placeholder: triggered via AbilitySystem → Renderer pipeline.
+        // Lua scripts can log intent; actual trigger is in AbilitySystem::processRequest.
+        spdlog::debug("[Lua] radialBlur: duration={}, peak={}", duration, peakIntensity);
+    };
+
     spdlog::info("[LuaBindings] registered VFX bindings");
 }
 

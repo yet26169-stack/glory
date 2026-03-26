@@ -42,6 +42,7 @@ class ThreadedCommandPoolManager;
 class AsyncComputeManager;
 class IsometricCamera;
 class SSAOPass;
+class SSRPass;
 struct InstanceData;
 
 struct FrameContext {
@@ -96,6 +97,7 @@ struct FrameContext {
     ThreadedCommandPoolManager* cmdPools    = nullptr;
     AsyncComputeManager*    asyncCompute    = nullptr;
     SSAOPass*               ssaoPass        = nullptr;
+    SSRPass*                ssrPass         = nullptr;
 
     // ── Renderer state (avoids coupling passes to Renderer) ──
     VkPipeline              skinnedPipeline       = VK_NULL_HANDLE;

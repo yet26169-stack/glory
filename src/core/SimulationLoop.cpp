@@ -1,6 +1,7 @@
 #include "core/SimulationLoop.h"
 // All system types are forward-declared in GameSystems.h (via SimulationLoop.h).
 // Concrete includes needed for preTick / postTick subsystem calls.
+#include "ability/AbilitySystem.h"
 #include "scene/Components.h"
 #include "nav/DebugRenderer.h"
 #include "audio/AudioEngine.h"
@@ -28,11 +29,12 @@ void SimulationLoop::init(const SimulationContext& ctx) {
 
     m_scheduler.add<VFXFlushSystem>(
         ctx.vfxRenderer, ctx.vfxQueue, ctx.combatVfxQueue,
-        ctx.trailRenderer, ctx.groundDecals, ctx.meshEffects, ctx.distortion);
+        ctx.trailRenderer, ctx.groundDecals, ctx.deferredDecals,
+        ctx.meshEffects, ctx.distortion);
 
     m_scheduler.add<AbilityUpdateSystem>(
         ctx.abilities, ctx.vfxQueue, ctx.trailRenderer,
-        ctx.groundDecals, ctx.meshEffects, ctx.explosions,
+        ctx.groundDecals, ctx.deferredDecals, ctx.meshEffects, ctx.explosions,
         ctx.coneEffect, ctx.spriteEffects, ctx.distortion);
 
     m_scheduler.add<ProjectileUpdateSystem>(
@@ -95,6 +97,16 @@ void SimulationLoop::tick(SimulationContext& ctx) {
 
     // Sync cone effect timer back to the context (Renderer reads it)
     ctx.coneEffectTimer = m_coneState.timer;
+
+    // Sync radial blur trigger from ability system
+    if (ctx.abilities) {
+        if (auto ev = ctx.abilities->consumeRadialBlur(); ev.has_value()) {
+            ctx.radialBlurTriggered   = true;
+            ctx.radialBlurWorldCenter = ev->worldPos;
+            ctx.radialBlurDuration    = ev->duration;
+            ctx.radialBlurPeak        = ev->peakIntensity;
+        }
+    }
 
     ++m_tick;
 }

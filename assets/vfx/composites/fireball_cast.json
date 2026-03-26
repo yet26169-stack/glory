@@ -1,9 +1,12 @@
 {
     "id": "fireball_cast_composite",
     "layers": [
-        { "delay": 0.0,  "type": "PARTICLE",     "effectRef": "vfx_fireball_cast",        "anchor": "CASTER" },
-        { "delay": 0.0,  "type": "PARTICLE",     "effectRef": "vfx_fireball_cast_sparks",  "anchor": "CASTER" },
-        { "delay": 0.0,  "type": "PARTICLE",     "effectRef": "vfx_fireball_cast_glow",    "anchor": "CASTER" },
-        { "delay": 0.0,  "type": "GROUND_DECAL", "effectRef": "decal_circle",              "anchor": "CASTER", "scale": 2.0, "color": [1.0, 0.5, 0.1, 0.3] }
+        { "delay": 0.0,  "type": "PARTICLE",      "effectRef": "vfx_fireball_cast",           "anchor": "CASTER" },
+        { "delay": 0.0,  "type": "PARTICLE",      "effectRef": "vfx_fireball_cast_sparks",     "anchor": "CASTER" },
+        { "delay": 0.0,  "type": "PARTICLE",      "effectRef": "vfx_fireball_cast_glow",       "anchor": "CASTER" },
+        { "delay": 0.0,  "type": "PARTICLE",      "effectRef": "vfx_fireball_cast_swirl",      "anchor": "CASTER" },
+        { "delay": 0.0,  "type": "DISTORTION",    "effectRef": "vfx_fireball_cast_heat",       "anchor": "CASTER" },
+        { "delay": 0.05, "type": "SPRITE_EFFECT", "effectRef": "vfx_fireball_cast_flash_sprite", "anchor": "CASTER" },
+        { "delay": 0.0,  "type": "GROUND_DECAL",  "effectRef": "decal_circle",                 "anchor": "CASTER", "scale": 2.0, "color": [1.0, 0.5, 0.1, 0.3] }
     ]
 }

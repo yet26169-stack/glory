@@ -1,25 +1,50 @@
 {
-    "id":              "vfx_bomb_trail_smoke",
-    "maxParticles":    64,
-    "emitRate":        25.0,
-    "burstCount":      0.0,
-    "looping":         true,
-    "duration":        -1.0,
-    "lifetimeMin":     0.4,
-    "lifetimeMax":     0.8,
+    "id": "vfx_bomb_trail_smoke",
+    "maxParticles": 64,
+    "emitRate": 25.0,
+    "burstCount": 0.0,
+    "looping": true,
+    "duration": -1.0,
+    "lifetimeMin": 0.4,
+    "lifetimeMax": 0.8,
     "initialSpeedMin": 0.2,
     "initialSpeedMax": 0.8,
-    "sizeMin":         0.2,
-    "sizeMax":         0.5,
-    "sizeEnd":         0.8,
+    "sizeMin": 0.2,
+    "sizeMax": 0.5,
+    "sizeEnd": 0.8,
     "rotationSpeedMin": -60.0,
     "rotationSpeedMax": 60.0,
-    "drag":            1.0,
-    "spreadAngle":     120.0,
-    "gravity":         -0.5,
+    "drag": 1.0,
+    "spreadAngle": 120.0,
+    "gravity": -0.5,
     "colorOverLifetime": [
-        {"time": 0.0, "color": [0.4, 0.35, 0.3, 0.5]},
-        {"time": 0.4, "color": [0.3, 0.25, 0.2, 0.35]},
-        {"time": 1.0, "color": [0.15, 0.12, 0.1, 0.0]}
-    ]
+        {
+            "time": 0.0,
+            "color": [
+                0.4,
+                0.35,
+                0.3,
+                0.5
+            ]
+        },
+        {
+            "time": 0.4,
+            "color": [
+                0.3,
+                0.25,
+                0.2,
+                0.35
+            ]
+        },
+        {
+            "time": 1.0,
+            "color": [
+                0.15,
+                0.12,
+                0.1,
+                0.0
+            ]
+        }
+    ],
+    "softFadeDistance": 0.8
 }

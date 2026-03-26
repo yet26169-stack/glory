@@ -18,6 +18,7 @@
 #include "renderer/DistortionRenderer.h"
 #include "renderer/ExplosionRenderer.h"
 #include "renderer/GroundDecalRenderer.h"
+#include "renderer/DeferredDecalRenderer.h"
 #include "renderer/SpriteEffectRenderer.h"
 #include "scene/Components.h"
 #include "scene/Scene.h"
@@ -808,6 +809,7 @@ void VFXFlushSystem::execute(entt::registry& /*registry*/, float dt) {
     }
     if (m_trail)      m_trail->update(dt);
     if (m_decals)     m_decals->update(dt);
+    if (m_deferredDecals) m_deferredDecals->update(dt);
     if (m_mesh)       m_mesh->update(dt);
     if (m_distortion) m_distortion->update(dt);
 }
@@ -818,14 +820,14 @@ void VFXFlushSystem::execute(entt::registry& /*registry*/, float dt) {
 void AbilityUpdateSystem::execute(entt::registry& registry, float dt) {
     if (!m_abilities) return;
 
-    m_abilities->update(registry, dt, m_trail);
+    m_abilities->update(registry, dt, m_trail, m_decals);
 
-    if (m_q && m_trail && m_decals && m_mesh &&
+    if (m_q && m_trail && m_decals && m_deferredDecals && m_mesh &&
         m_explosions && m_cone && m_sprites && m_distortion)
     {
         m_abilities->getSequencer().update(dt,
-            *m_q, *m_trail, *m_decals, *m_mesh,
-            *m_explosions, *m_cone, *m_sprites, *m_distortion);
+            *m_q, *m_trail, *m_decals, *m_deferredDecals,
+            *m_mesh, *m_explosions, *m_cone, *m_sprites, *m_distortion);
     }
 }
 

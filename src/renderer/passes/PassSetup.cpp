@@ -33,6 +33,7 @@
 #include "renderer/AsyncComputeManager.h"
 #include "renderer/ParallelRecorder.h"
 #include "renderer/SSAOPass.h"
+#include "renderer/SSRPass.h"
 
 #include <GLFW/glfw3.h>
 
@@ -234,6 +235,34 @@ RenderPassNode createSSAORenderPass() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// SSR compute pass (reads scene color + depth, writes half-res reflection)
+// ═══════════════════════════════════════════════════════════════════════════════
+RenderPassNode createSSRRenderPass() {
+    RenderPassNode node;
+    node.name = "SSR";
+    node.reads(res::HdrColor,
+               VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+               VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    node.reads(res::HdrDepth,
+               VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+               VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+               VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
+    node.writes(res::SSRTexture,
+                VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+                VK_IMAGE_LAYOUT_GENERAL);
+    node.execute = [](VkCommandBuffer cmd, const FrameContext& ctx) {
+        if (!ctx.ssrPass || ctx.isLauncher) return;
+        if (ctx.gpuTimer) ctx.gpuTimer->beginZone(cmd, ctx.frameIndex, "SSR");
+        glm::mat4 invViewProj = glm::inverse(ctx.viewProj);
+        ctx.ssrPass->dispatch(cmd, ctx.viewProj, invViewProj, ctx.cameraPos);
+        if (ctx.gpuTimer) ctx.gpuTimer->endZone(cmd, ctx.frameIndex, "SSR");
+    };
+    return node;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Bloom compute pass
 // ═══════════════════════════════════════════════════════════════════════════════
 RenderPassNode createBloomRenderPass() {
@@ -295,6 +324,7 @@ void buildDefaultRenderGraph(RenderGraph& graph) {
     graph.addPass(createOcclusionCullPass());
     graph.addPass(createTransparentVFXPass());
     graph.addPass(createSSAORenderPass());
+    graph.addPass(createSSRRenderPass());
     graph.addPass(createBloomRenderPass());
     graph.addPass(createTonemapRenderPass());
 

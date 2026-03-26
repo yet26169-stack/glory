@@ -4,6 +4,7 @@
 #include "scene/Components.h"  // TransformComponent
 #include "scripting/ScriptEngine.h"
 #include "vfx/TrailRenderer.h"
+#include "renderer/GroundDecalRenderer.h"
 
 #include <spdlog/spdlog.h>
 
@@ -114,10 +115,11 @@ void AbilitySystem::enqueueRequest(entt::entity caster, AbilitySlot slot,
 }
 
 // ── update ──────────────────────────────────────────────────────────────────
-void AbilitySystem::update(entt::registry& registry, float dt, TrailRenderer* trailRenderer) {
+void AbilitySystem::update(entt::registry& registry, float dt, TrailRenderer* trailRenderer,
+                           GroundDecalRenderer* groundDecals) {
     // 1. Flush incoming requests
     while (!m_requests.empty()) {
-        processRequest(registry, m_requests.front());
+        processRequest(registry, m_requests.front(), groundDecals);
         m_requests.pop();
     }
 
@@ -127,7 +129,7 @@ void AbilitySystem::update(entt::registry& registry, float dt, TrailRenderer* tr
         auto& book = view.get<AbilityBookComponent>(entity);
         for (auto& inst : book.abilities) {
             if (inst.level > 0) {
-                tickAbility(registry, entity, inst, dt, trailRenderer);
+                tickAbility(registry, entity, inst, dt, trailRenderer, groundDecals);
             }
         }
     }
@@ -192,7 +194,8 @@ void AbilitySystem::update(entt::registry& registry, float dt, TrailRenderer* tr
 }
 
 // ── processRequest ────────────────────────────────────────────────────────────
-void AbilitySystem::processRequest(entt::registry& reg, const AbilityRequest& req) {
+void AbilitySystem::processRequest(entt::registry& reg, const AbilityRequest& req,
+                                   GroundDecalRenderer* groundDecals) {
     if (!reg.valid(req.casterEntity)) return;
     if (!reg.all_of<AbilityBookComponent>(req.casterEntity)) return;
 
@@ -214,6 +217,22 @@ void AbilitySystem::processRequest(entt::registry& reg, const AbilityRequest& re
     inst.currentTarget = req.target;
     inst.phaseTimer    = inst.def->castTime;
 
+    // Trigger radial blur screen effect for ultimate abilities (R slot)
+    if (req.slot == AbilitySlot::R) {
+        glm::vec3 casterPos{0.f};
+        if (reg.all_of<TransformComponent>(req.casterEntity))
+            casterPos = reg.get<TransformComponent>(req.casterEntity).position;
+        m_pendingRadialBlur = RadialBlurEvent{casterPos, 0.5f, 0.8f};
+    }
+
+    // Emit cast anticipation VFX (plays during cast wind-up)
+    if (!inst.def->castAnticipationVFX.empty()) {
+        glm::vec3 pos{0.f};
+        if (reg.all_of<TransformComponent>(req.casterEntity))
+            pos = reg.get<TransformComponent>(req.casterEntity).position;
+        m_compositeSequencer.trigger(inst.def->castAnticipationVFX, pos, req.target.targetPosition, req.target.direction);
+    }
+
     // Emit cast VFX
     if (!inst.def->compositeCastVFX.empty()) {
         glm::vec3 pos{0.f};
@@ -227,6 +246,16 @@ void AbilitySystem::processRequest(entt::registry& reg, const AbilityRequest& re
         for (const auto& vfxID : inst.def->castVFX) {
             emitVFX(vfxID, pos, req.target.direction);
         }
+    }
+
+    // Spawn AoE aim indicator for POINT-targeted abilities during cast
+    if (groundDecals && !inst.def->aimIndicatorDecal.empty()
+        && inst.def->targeting == TargetingType::POINT && inst.def->castTime > 0.0f) {
+        float indicatorRadius = inst.def->areaRadius * inst.def->aimIndicatorScale;
+        inst.aimIndicatorHandle = groundDecals->spawn(
+            inst.def->aimIndicatorDecal, req.target.targetPosition,
+            indicatorRadius, 0.0f);
+        groundDecals->setColor(inst.aimIndicatorHandle, inst.def->aimIndicatorColor);
     }
 }
 
@@ -256,13 +285,26 @@ bool AbilitySystem::validateRequest(entt::registry& reg, const AbilityRequest& r
 
 // ── tickAbility ───────────────────────────────────────────────────────────────
 void AbilitySystem::tickAbility(entt::registry& reg, entt::entity entity,
-                                  AbilityInstance& inst, float dt, TrailRenderer* trailRenderer) {
+                                  AbilityInstance& inst, float dt, TrailRenderer* trailRenderer,
+                                  GroundDecalRenderer* groundDecals) {
     switch (inst.currentPhase) {
         case AbilityPhase::READY: break;
 
         case AbilityPhase::CASTING:
+            // Pulse aim indicator alpha while casting
+            if (inst.aimIndicatorHandle != 0 && groundDecals) {
+                float pulse = 0.3f + 0.3f * std::sin(inst.phaseTimer * 6.0f);
+                glm::vec4 c = inst.def->aimIndicatorColor;
+                c.a = pulse;
+                groundDecals->setColor(inst.aimIndicatorHandle, c);
+            }
             inst.phaseTimer -= dt;
             if (inst.phaseTimer <= 0.0f) {
+                // Destroy aim indicator when cast completes
+                if (inst.aimIndicatorHandle != 0 && groundDecals) {
+                    groundDecals->destroy(inst.aimIndicatorHandle);
+                    inst.aimIndicatorHandle = 0;
+                }
                 if (inst.def->channelDuration > 0.0f) {
                     // → CHANNELING
                     inst.currentPhase = AbilityPhase::CHANNELING;
@@ -773,10 +815,20 @@ AbilityDefinition AbilitySystem::parseJSON(const nlohmann::json& j,
     def.projectileTrailDef = j.value("projectileTrailDef", "");
     def.compositeCastVFX   = j.value("compositeCastVFX", "");
     def.compositeImpactVFX = j.value("compositeImpactVFX", "");
+    def.castAnticipationVFX = j.value("castAnticipationVFX", "");
 
     def.castSFX       = j.value("castSFX",       "");
     def.impactSFX     = j.value("impactSFX",     "");
     def.castAnimation = j.value("castAnimation", "");
+
+    def.aimIndicatorDecal = j.value("aimIndicatorDecal", "");
+    def.aimIndicatorScale = j.value("aimIndicatorScale", 1.0f);
+    if (j.contains("aimIndicatorColor") && j["aimIndicatorColor"].is_array()) {
+        auto& arr = j["aimIndicatorColor"];
+        if (arr.size() >= 4)
+            def.aimIndicatorColor = {arr[0].get<float>(), arr[1].get<float>(),
+                                     arr[2].get<float>(), arr[3].get<float>()};
+    }
 
     if (j.contains("tags"))
         for (const auto& t : j["tags"])

@@ -16,6 +16,7 @@ enum class VFXLayerType : uint8_t {
     SHIELD,         // → ShieldBubbleRenderer
     SPRITE_EFFECT,  // → SpriteEffectRenderer
     DISTORTION,     // → DistortionRenderer
+    DEFERRED_DECAL, // → DeferredDecalRenderer
 };
 
 struct VFXLayer {
