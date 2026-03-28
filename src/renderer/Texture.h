@@ -64,8 +64,10 @@ public:
   VkImage     getImage()     const { return m_image.getImage(); }
   VkSampler getSampler() const { return m_sampler; }
 
-  // 1x1 white fallback texture
+  // 1x1 magenta debug fallback texture (scene objects)
   static Texture createDefault(const Device &device);
+  // 1x1 white fallback texture (VFX — neutral multiply identity)
+  static Texture createWhiteDefault(const Device &device);
   
   /// Create a texture that can be used as a color attachment and sampled.
   static Texture createRenderable(const Device &device, uint32_t width, uint32_t height,
@@ -73,8 +75,8 @@ public:
   // Procedural checkerboard (tileSize in pixels, total = tileSize*tiles*2)
   static Texture createCheckerboard(const Device &device, uint32_t tiles = 8,
                                     uint32_t tileSize = 16,
-                                    uint32_t colorA = 0xFFCCCCCC,
-                                    uint32_t colorB = 0xFF444444);
+                                    uint32_t colorA = 0xFF999999,
+                                    uint32_t colorB = 0xFF333333);
 
   // Flat normal map (default — no perturbation)
   static Texture createFlatNormal(const Device &device);

@@ -347,12 +347,45 @@ void Texture::destroy() {
   }
 }
 
-// ── Default 1x1 white texture ───────────────────────────────────────────────
+// ── Default 1x1 MAGENTA debug texture ────────────────────────────────────────
 Texture Texture::createDefault(const Device &device) {
   Texture tex;
   tex.m_vkDevice = device.getDevice();
 
-  uint32_t white = 0xFFFFFFFF;
+  uint32_t magenta = 0xFFFF00FF;  // Magenta ABGR — makes missing textures obvious
+  VkDeviceSize size = 4;
+
+  Buffer staging(device.getAllocator(), size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VMA_MEMORY_USAGE_CPU_ONLY);
+  void *mapped = staging.map();
+  std::memcpy(mapped, &magenta, 4);
+  staging.unmap();
+  staging.flush();
+
+  tex.m_image =
+      Image(device, 1, 1, VK_FORMAT_R8G8B8A8_SRGB,
+            VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_IMAGE_ASPECT_COLOR_BIT);
+
+  transitionImageLayout(device, tex.m_image.getImage(),
+                        VK_IMAGE_LAYOUT_UNDEFINED,
+                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  copyBufferToImage(device, staging.getBuffer(), tex.m_image.getImage(), 1, 1);
+  transitionImageLayout(device, tex.m_image.getImage(),
+                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+  tex.createSampler(device);
+  spdlog::info("Default 1x1 MAGENTA debug texture created");
+  return tex;
+}
+
+// ── Default 1x1 WHITE fallback texture (VFX neutral multiply identity) ───────
+Texture Texture::createWhiteDefault(const Device &device) {
+  Texture tex;
+  tex.m_vkDevice = device.getDevice();
+
+  uint32_t white = 0xFFFFFFFF;  // White ABGR — neutral multiply identity for VFX
   VkDeviceSize size = 4;
 
   Buffer staging(device.getAllocator(), size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -376,7 +409,7 @@ Texture Texture::createDefault(const Device &device) {
                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
   tex.createSampler(device);
-  spdlog::info("Default 1x1 white texture created");
+  spdlog::info("Default 1x1 WHITE VFX fallback texture created");
   return tex;
 }
 

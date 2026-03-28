@@ -8,6 +8,7 @@
 #include "combat/CombatComponents.h"
 #include "combat/DissolveEffect.h"
 #include "ability/AbilityComponents.h"
+#include "core/Profiler.h"
 
 #include "imgui.h"
 #include "imgui_impl_vulkan.h"
@@ -25,10 +26,11 @@
 namespace glory {
 
 void Renderer::recordShadowPass(VkCommandBuffer cmd, const FrameContext& ctx) {
+    GLORY_ZONE_N("ShadowRecord");
     VkDescriptorSet ds = m_descriptors->getSet(m_currentFrame);
 
     // Pre-collect static entities for random-access indexing
-    struct ShadowEntity { uint32_t meshIndex; glm::mat4 model; };
+    struct ShadowEntity { uint32_t meshIndex; glm::mat4 model; AABB worldAABB; };
     std::vector<ShadowEntity> shadowEntities;
     {
         auto staticView = m_scene.getRegistry()
@@ -36,7 +38,10 @@ void Renderer::recordShadowPass(VkCommandBuffer cmd, const FrameContext& ctx) {
                 entt::exclude<GPUSkinnedMeshComponent>);
         for (auto&& [e, t, mc, mat] : staticView.each()) {
             if (shadowEntities.size() >= MAX_INSTANCES) break;
-            shadowEntities.push_back({mc.meshIndex, t.getInterpolatedModelMatrix(m_renderAlpha)});
+            glm::mat4 model = t.getInterpolatedModelMatrix(m_renderAlpha);
+            AABB worldAABB = mc.localAABB.transformed(model);
+            if (!ctx.frustum.isVisible(worldAABB)) continue;
+            shadowEntities.push_back({mc.meshIndex, model, worldAABB});
         }
     }
 
@@ -46,13 +51,20 @@ void Renderer::recordShadowPass(VkCommandBuffer cmd, const FrameContext& ctx) {
         instances[i].model = shadowEntities[i].model;
     }
 
+    // Build per-cascade light frustums for culling
+    std::array<Frustum, ShadowPass::CASCADE_COUNT> cascadeFrustums;
+    const auto& cascades = m_shadowPass.getCascades();
+    for (uint32_t c = 0; c < ShadowPass::CASCADE_COUNT; ++c) {
+        cascadeFrustums[c].update(cascades[c].lightViewProj);
+    }
+
     if (m_gpuTimer) m_gpuTimer->beginZone(cmd, m_currentFrame, "Shadow");
 
     if (shadowEntities.size() >= PARALLEL_THRESHOLD) {
         auto shadowFormats = RenderFormats::depthOnly(ShadowPass::DEPTH_FORMAT);
         VkBuffer instBuf = m_instanceBuffers[m_currentFrame].getBuffer();
 
-        auto parallelStaticFn = [&](uint32_t /*cascade*/, const glm::mat4& lvp,
+        auto parallelStaticFn = [&](uint32_t cascade, const glm::mat4& lvp,
                                     VkViewport vp, VkRect2D sc) -> std::vector<VkCommandBuffer> {
             auto result = ParallelRecorder::record(
                 m_threadPool, m_cmdPools, m_currentFrame, shadowFormats,
@@ -65,6 +77,12 @@ void Renderer::recordShadowPass(VkCommandBuffer cmd, const FrameContext& ctx) {
                     vkCmdPushConstants(scmd, m_shadowPass.getPipelineLayout(),
                                        VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &lvp);
                     for (uint32_t i = start; i < end; ++i) {
+                        if (!cascadeFrustums[cascade].isVisible(shadowEntities[i].worldAABB))
+                            continue;
+                        float diag = glm::length(shadowEntities[i].worldAABB.max - shadowEntities[i].worldAABB.min);
+                        if (cascade == 2 && diag < 2.0f) continue;
+                        if (cascade == 1 && diag < 0.5f) continue;
+
                         VkDeviceSize instOffset = i * sizeof(InstanceData);
                         vkCmdBindVertexBuffers(scmd, 1, 1, &instBuf, &instOffset);
                         m_scene.getMesh(shadowEntities[i].meshIndex).draw(scmd);
@@ -75,9 +93,15 @@ void Renderer::recordShadowPass(VkCommandBuffer cmd, const FrameContext& ctx) {
 
         m_shadowPass.recordCommandsParallel(cmd, parallelStaticFn, nullptr);
     } else {
-        auto drawStaticShadows = [&](VkCommandBuffer scmd, uint32_t /*cascade*/) {
+        auto drawStaticShadows = [&](VkCommandBuffer scmd, uint32_t cascade) {
             VkBuffer instBuf = m_instanceBuffers[m_currentFrame].getBuffer();
             for (uint32_t i = 0; i < static_cast<uint32_t>(shadowEntities.size()); ++i) {
+                if (!cascadeFrustums[cascade].isVisible(shadowEntities[i].worldAABB))
+                    continue;
+                float diag = glm::length(shadowEntities[i].worldAABB.max - shadowEntities[i].worldAABB.min);
+                if (cascade == 2 && diag < 2.0f) continue;
+                if (cascade == 1 && diag < 0.5f) continue;
+
                 VkDeviceSize instOffset = i * sizeof(InstanceData);
                 vkCmdBindVertexBuffers(scmd, 1, 1, &instBuf, &instOffset);
                 m_scene.getMesh(shadowEntities[i].meshIndex).draw(scmd);
@@ -91,6 +115,7 @@ void Renderer::recordShadowPass(VkCommandBuffer cmd, const FrameContext& ctx) {
 
 // ── recordGBufferPass ────────────────────────────────────────────────────────
 void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
+    GLORY_ZONE_N("GBufferRecord");
     auto ext = ctx.extent;
     float aspect = ctx.aspect;
 
@@ -185,6 +210,7 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
     uint32_t skinnedDrawCount = 0;
     uint32_t objectCount   = 0;
     uint32_t instanceIndex = 0;
+    uint32_t frustumCulled = 0;
 
     if (!m_menuMode) {
         auto* instances = static_cast<InstanceData*>(m_instanceMapped[m_currentFrame]);
@@ -243,6 +269,8 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
 
             glm::mat4 normalMat = glm::transpose(glm::inverse(model));
             AABB worldAABB = mc.localAABB.transformed(model);
+            if (!ctx.frustum.isVisible(worldAABB)) { ++frustumCulled; continue; }
+
             glm::vec4 params(mat.shininess, mat.metallic, mat.roughness, mat.emissive);
 
             for (uint32_t si = siStart; si < siEnd && objectCount < MAX_INSTANCES; ++si) {
@@ -284,9 +312,27 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
             }
         }
         spdlog::debug("[GBuffer] Structures: {}/{} have render components, "
-                      "{} passed FoW, {} drawn (no frustum cull, MAX_INSTANCES={})",
+                      "{} passed FoW, {} drawn, {} frustum-culled (MAX_INSTANCES={})",
                       dbgStructRenderable, dbgStructTotal,
-                      dbgStructFowPass, dbgStructDrawn, MAX_INSTANCES);
+                      dbgStructFowPass, dbgStructDrawn, frustumCulled, MAX_INSTANCES);
+
+        // One-time FoW visibility diagnostic for structures
+        static bool fowDiagDone = false;
+        if (!fowDiagDone && dbgStructDrawn > 0) {
+            fowDiagDone = true;
+            auto& reg = m_scene.getRegistry();
+            for (auto se : reg.view<StructureComponent, TransformComponent>()) {
+                auto& stc = reg.get<TransformComponent>(se);
+                glm::vec3 pos = glm::vec3(stc.getInterpolatedModelMatrix(m_renderAlpha)[3]);
+                bool vis  = m_fogSystem.isPositionVisible(pos.x, pos.z);
+                bool expl = m_fogSystem.isPositionExplored(pos.x, pos.z);
+                auto& ssc = reg.get<StructureComponent>(se);
+                spdlog::warn("[FoW-Diag] Structure team={} type={} pos=({:.1f},{:.1f},{:.1f}) "
+                             "visible={} explored={}",
+                             ssc.teamIndex, static_cast<int>(ssc.type),
+                             pos.x, pos.y, pos.z, vis, expl);
+            }
+        }
         instanceIndex = objectCount;
 
         // Flush scene buffer descriptor
@@ -652,6 +698,7 @@ void Renderer::recordGBufferPass(VkCommandBuffer cmd, const FrameContext& ctx) {
 
 // ── recordTransparentVFXPass ─────────────────────────────────────────────────
 void Renderer::recordTransparentVFXPass(VkCommandBuffer cmd, const FrameContext& ctx) {
+    GLORY_ZONE_N("TransparentVFXRecord");
     auto ext = ctx.extent;
     float aspect = ctx.aspect;
 
@@ -878,7 +925,7 @@ void Renderer::recordTonemapPass(VkCommandBuffer cmd, const FrameContext& ctx) {
         float deathDesat = 0.0f;
         if (RespawnSystem::isDead(m_scene.getRegistry(), m_playerEntity))
             deathDesat = 0.7f;
-        m_toneMap->render(cmd, /*exposure=*/1.0f, /*bloomStrength=*/0.3f,
+        m_toneMap->render(cmd, /*exposure=*/1.0f, /*bloomStrength=*/0.15f,
                           /*vignette=*/1, /*colorGrade=*/1, /*chromatic=*/0.003f,
                           deathDesat);
 
@@ -1364,10 +1411,10 @@ void Renderer::createDissolvePipeline() {
     m_dissolveNoise = Texture::createFromPixels(*m_device, noisePixels.data(),
                                                  NOISE_SIZE, NOISE_SIZE,
                                                  VK_FORMAT_R8G8B8A8_UNORM);
-    m_dissolveNoiseIdx = m_bindless->registerTexture(m_dissolveNoise.getImageView(),
-                                                      m_dissolveNoise.getSampler());
-    spdlog::info("Dissolve noise texture generated ({}×{}, bindless idx {})",
-                 NOISE_SIZE, NOISE_SIZE, m_dissolveNoiseIdx);
+    // NOTE: bindless registration is deferred to registerDeferredTextures()
+    // so SceneBuilder texture IDs stay in sync with bindless slots.
+    spdlog::info("Dissolve noise texture generated ({}×{}, registration deferred)",
+                 NOISE_SIZE, NOISE_SIZE);
 
     // ── Shader modules ──────────────────────────────────────────────────────
     auto readFile = [](const std::string& path) -> std::vector<char> {
@@ -1483,6 +1530,19 @@ void Renderer::destroyDissolvePipeline() {
     if (m_dissolveSkinnedPipeline)  { vkDestroyPipeline(dev, m_dissolveSkinnedPipeline, nullptr);       m_dissolveSkinnedPipeline  = VK_NULL_HANDLE; }
     if (m_dissolvePipelineLayout)   { vkDestroyPipelineLayout(dev, m_dissolvePipelineLayout, nullptr);   m_dissolvePipelineLayout   = VK_NULL_HANDLE; }
     m_dissolveNoise = Texture{};
+}
+
+void Renderer::registerDeferredBindlessTextures() {
+    // Register textures that were created during init but whose bindless
+    // registration was deferred to keep scene texture IDs in sync with
+    // bindless slots.  Must be called AFTER SceneBuilder registers all
+    // scene textures (default, checker, flatNorm, GLB textures, etc.).
+    if (m_dissolveNoise.getImageView()) {
+        m_dissolveNoiseIdx = m_bindless->registerTexture(
+            m_dissolveNoise.getImageView(), m_dissolveNoise.getSampler());
+        spdlog::info("Deferred dissolve noise registered at bindless slot {}",
+                     m_dissolveNoiseIdx);
+    }
 }
 
 } // namespace glory

@@ -110,6 +110,7 @@ private:
     VkPipeline             m_compactPipeline = VK_NULL_HANDLE;
     VkPipelineLayout       m_sortLayout      = VK_NULL_HANDLE;
     VkPipeline             m_sortPipeline    = VK_NULL_HANDLE;
+    VkPipeline             m_sortLocalPipeline = VK_NULL_HANDLE;
 
 
     struct SimPC {

@@ -44,7 +44,7 @@ struct LightUBO {
 
     // ── Toon / stylized shading (LoL/SC2 style) ───────────────────────────
     alignas(16) glm::vec3 rimColor{0.4f, 0.7f, 1.0f};   // team-colour rim (blue team default)
-    alignas(4)  float     rimIntensity      = 0.6f;       // rim brightness multiplier
+    alignas(4)  float     rimIntensity      = 0.25f;      // rim brightness multiplier
     alignas(4)  float     appTime           = 0.0f;       // elapsed game time for animation
     alignas(4)  float     toonRampSharpness = 0.45f;      // 0=soft LoL look, 1=hard cel-shade
     alignas(4)  float     shadowWarmth      = 0.3f;       // warm/cool shadow tinting weight

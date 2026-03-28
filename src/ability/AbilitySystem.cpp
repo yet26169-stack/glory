@@ -1,5 +1,6 @@
 #include "ability/AbilitySystem.h"
 #include "audio/GameAudioEvents.h"
+#include "core/Profiler.h"
 #include "combat/CombatComponents.h"  // TeamComponent
 #include "scene/Components.h"  // TransformComponent
 #include "scripting/ScriptEngine.h"
@@ -117,6 +118,7 @@ void AbilitySystem::enqueueRequest(entt::entity caster, AbilitySlot slot,
 // ── update ──────────────────────────────────────────────────────────────────
 void AbilitySystem::update(entt::registry& registry, float dt, TrailRenderer* trailRenderer,
                            GroundDecalRenderer* groundDecals) {
+    GLORY_ZONE_N("AbilityUpdate");
     // 1. Flush incoming requests
     while (!m_requests.empty()) {
         processRequest(registry, m_requests.front(), groundDecals);
@@ -539,14 +541,10 @@ void AbilitySystem::resolveInstantEffects(entt::registry& reg, entt::entity cast
                         : target.targetPosition;
 
     float r2 = radius * radius;
-    auto view = reg.view<TransformComponent, StatsComponent>();
-    for (auto [entity, tc, stats] : view.each()) {
+    auto view = reg.view<TransformComponent, StatsComponent, TeamComponent>();
+    for (auto [entity, tc, stats, teamComp] : view.each()) {
         if (entity == caster) continue;
-
-        // Only hit enemies
-        if (reg.all_of<TeamComponent>(entity)) {
-            if (reg.get<TeamComponent>(entity).team == casterTeam) continue;
-        }
+        if (teamComp.team == casterTeam) continue;
 
         glm::vec3 diff = tc.position - center;
         diff.y = 0.0f;

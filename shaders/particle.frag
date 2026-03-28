@@ -49,10 +49,10 @@ void main() {
     color.a *= softFade;
 
     if (color.a < 0.01) discard;
+    color.rgb = min(color.rgb, vec3(4.0));
     outColor = color;
 
-    // ── LoL/SC2 VFX readability boost ─────────────────────────────────────────
-    outColor.rgb = pow(outColor.rgb, vec3(0.85));
-    float brightBoost = smoothstep(0.2, 0.5, outColor.a) * 0.3;
-    outColor.rgb *= 1.0 + brightBoost;
+    // Mild saturation boost for VFX readability
+    float lum = dot(outColor.rgb, vec3(0.299, 0.587, 0.114));
+    outColor.rgb = mix(vec3(lum), outColor.rgb, 1.1);
 }

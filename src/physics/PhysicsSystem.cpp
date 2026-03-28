@@ -7,6 +7,7 @@
 #include <glm/glm.hpp>
 #include <algorithm>
 #include <cmath>
+#include <unordered_map>
 #include <vector>
 
 namespace glory {
@@ -85,48 +86,77 @@ void PhysicsSystem::resolveCollisionsAndWake(entt::registry& reg) {
     std::vector<Contact> contacts;
     contacts.reserve(32);
 
-    // ── Phase 1: broad+narrow phase → impulse + manifold build ──────────────
+    // ── Phase 1: spatial-hash broad phase + narrow phase → impulse + manifold ─
+    constexpr float kCellSize = 2.0f;
+    constexpr float kInvCell  = 1.0f / kCellSize;
+
+    auto cellKey = [&](float x, float z) -> int64_t {
+        int32_t cx = static_cast<int32_t>(std::floor(x * kInvCell));
+        int32_t cz = static_cast<int32_t>(std::floor(z * kInvCell));
+        return (static_cast<int64_t>(cx) << 32) | static_cast<uint32_t>(cz);
+    };
+
+    std::unordered_map<int64_t, std::vector<size_t>> grid;
+    grid.reserve(dynamic.size());
+    for (size_t i = 0; i < dynamic.size(); ++i) {
+        int64_t key = cellKey(dynamic[i].pos->x, dynamic[i].pos->z);
+        grid[key].push_back(i);
+    }
+
     for (size_t i = 0; i < dynamic.size(); ++i) {
         auto& A = dynamic[i];
         if (A.rb->isSleeping) continue; // sleeping cannot initiate contact
 
-        for (size_t j = i + 1; j < dynamic.size(); ++j) {
-            auto& B = dynamic[j];
+        int32_t cx = static_cast<int32_t>(std::floor(A.pos->x * kInvCell));
+        int32_t cz = static_cast<int32_t>(std::floor(A.pos->z * kInvCell));
 
-            float combinedR = A.rb->collisionRadius + B.rb->collisionRadius;
-            glm::vec3 delta = *B.pos - *A.pos;
-            float dx = delta.x, dy = delta.y, dz = delta.z;
-            float dist2 = dx*dx + dy*dy + dz*dz;
+        for (int32_t ddx = -1; ddx <= 1; ++ddx) {
+            for (int32_t ddz = -1; ddz <= 1; ++ddz) {
+                int64_t nkey = (static_cast<int64_t>(cx + ddx) << 32)
+                             | static_cast<uint32_t>(cz + ddz);
+                auto it = grid.find(nkey);
+                if (it == grid.end()) continue;
 
-            if (dist2 >= combinedR * combinedR) continue; // no overlap
+                for (size_t j : it->second) {
+                    if (j <= i) continue; // avoid duplicate pairs
+                    auto& B = dynamic[j];
 
-            // Wake sleeping partner immediately on first contact
-            if (B.rb->isSleeping) B.rb->wake();
+                    float combinedR = A.rb->collisionRadius + B.rb->collisionRadius;
+                    glm::vec3 delta = *B.pos - *A.pos;
+                    float dx = delta.x, dy = delta.y, dz = delta.z;
+                    float dist2 = dx*dx + dy*dy + dz*dz;
 
-            float dist = std::sqrt(dist2);
-            if (dist < 1e-6f) continue;
+                    if (dist2 >= combinedR * combinedR) continue; // no overlap
 
-            glm::vec3 normal = delta / dist;
+                    // Wake sleeping partner immediately on first contact
+                    if (B.rb->isSleeping) B.rb->wake();
 
-            // Velocity impulse — single pass (velocity is not iterative here;
-            // only the positional correction is iterated).
-            glm::vec3 relVel    = A.rb->linearVelocity - B.rb->linearVelocity;
-            float     velAlongN = glm::dot(relVel, normal);
-            if (velAlongN < 0.0f) {
-                float e         = std::min(A.rb->restitution, B.rb->restitution);
-                float invA      = A.rb->inverseMass();
-                float invB      = B.rb->inverseMass();
-                float totalInvM = invA + invB;
-                if (totalInvM > 0.0f) {
-                    float j = -(1.0f + e) * velAlongN / totalInvM;
-                    A.rb->linearVelocity -= j * invA * normal;
-                    B.rb->linearVelocity += j * invB * normal;
-                    A.rb->wake();
-                    B.rb->wake();
+                    float dist = std::sqrt(dist2);
+                    if (dist < 1e-6f) continue;
+
+                    glm::vec3 normal = delta / dist;
+
+                    // Velocity impulse — single pass (velocity is not iterative here;
+                    // only the positional correction is iterated).
+                    glm::vec3 relVel    = A.rb->linearVelocity - B.rb->linearVelocity;
+                    float     velAlongN = glm::dot(relVel, normal);
+                    if (velAlongN < 0.0f) {
+                        float e         = std::min(A.rb->restitution, B.rb->restitution);
+                        float invA      = A.rb->inverseMass();
+                        float invB      = B.rb->inverseMass();
+                        float totalInvM = invA + invB;
+                        if (totalInvM > 0.0f) {
+                            float j_imp = -(1.0f + e) * velAlongN / totalInvM;
+                            A.rb->linearVelocity -= j_imp * invA * normal;
+                            B.rb->linearVelocity += j_imp * invB * normal;
+                            A.rb->wake();
+                            B.rb->wake();
+                        }
+                    }
+
+                    contacts.push_back({ A.pos, B.pos, A.rb, B.rb, normal, combinedR });
                 }
             }
-
-            contacts.push_back({ A.pos, B.pos, A.rb, B.rb, normal, combinedR });
         }
     }
 

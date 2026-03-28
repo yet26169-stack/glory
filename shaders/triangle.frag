@@ -299,8 +299,18 @@ void main() {
     // and visible (full colour).  Smooth borders between zones with wide
     // smoothstep ranges to match League's soft circular vision edges.
     vec2 fowUV = (fragWorldPos.xz - lightData.fowMapMin) / (lightData.fowMapMax - lightData.fowMapMin);
+    // Fragments outside the FoW map bounds are beyond the playable area —
+    // treat them as fully visible so the ground doesn't turn blue/dark.
+    bool outsideFoW = any(lessThan(fowUV, vec2(0.0))) || any(greaterThan(fowUV, vec2(1.0)));
     fowUV = clamp(fowUV, 0.0, 1.0);
-    float visibility = texture(fowTexture, fowUV).r;
+    float visibility = outsideFoW ? 1.0 : texture(fowTexture, fowUV).r;
+
+    // Objects above ground (structures, characters) that passed shouldRender()
+    // should never be fully blacked-out by FoW.  Apply a small floor so they
+    // remain distinguishable even if the FoW texture has a stale zero at their
+    // position (e.g. first-frame timing or upsample boundary issue).
+    if (fragWorldPos.y > 0.3)
+        visibility = max(visibility, 0.35);
 
     // Wide smoothstep bands for soft, gradual transitions (LoL-style)
     float fowEdge = smoothstep(0.0, 0.25, visibility);   // 0→1 as unexplored→explored
@@ -327,6 +337,14 @@ void main() {
     fogFactor = clamp(fogFactor, 0.0, 1.0);
     float fogStrength = (1.0 - fowMid) * 0.5;  // half-strength, only outside vision
     result = mix(result, lightData.fogColor * 0.3, fogStrength * (1.0 - fogFactor));
+
+    // Clamp to reasonable HDR range to prevent bloom blow-out
+    result = min(result, vec3(4.0));
+
+    // DEBUG: Uncomment ONE of these to diagnose white-model issue:
+    // result = albedo;                           // raw texture color (no lighting)
+    // result = vec3(float(fragDiffuseIdx) / 20.0); // visualize texture index as grayscale
+    // result = vec3(fragTexCoord, 0.0);          // visualize UVs as red/green
 
     outColor = vec4(result, 1.0);
     outCharDepth = gl_FragCoord.z;

@@ -352,6 +352,7 @@ private:
     void destroySkinnedPipeline();
     void createDissolvePipeline();
     void destroyDissolvePipeline();
+    void registerDeferredBindlessTextures(); // call AFTER SceneBuilder registers its textures
     glm::vec3 screenToWorld(float mx, float my) const; // unproject to Y=0 plane
     glm::vec2 worldToScreen(const glm::vec3& worldPos) const; // project world to screen pixels
 

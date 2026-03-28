@@ -15,7 +15,7 @@ void main() {
     float brightness = dot(color, vec3(0.2126, 0.7152, 0.0722));
 
     // Soft knee: gradual ramp from threshold-knee to threshold+knee
-    float knee = 0.1; // half-width of the soft transition zone
+    float knee = 0.05; // half-width of the soft transition zone
     float soft = brightness - pc.threshold + knee;
     soft = clamp(soft / (2.0 * knee + 0.0001), 0.0, 1.0);
     soft = soft * soft; // quadratic curve for smooth rolloff

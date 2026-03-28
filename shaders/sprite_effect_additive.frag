@@ -21,5 +21,5 @@ void main() {
 
     // For additive blending: output RGB weighted by alpha (pre-multiplied).
     // The pipeline uses blend factors ONE/ONE, so black pixels contribute nothing.
-    outColor = vec4(texColor.rgb * texColor.a * pc.tint.rgb * pc.tint.a, texColor.a);
+    outColor = vec4(texColor.rgb * texColor.a * pc.tint.rgb * pc.tint.a * 0.7, texColor.a);
 }

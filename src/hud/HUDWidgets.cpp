@@ -54,7 +54,7 @@ void FloatingText::update(const glm::mat4& vp, float screenW, float screenH, flo
         glm::vec3 ndc = glm::vec3(clip) / clip.w;
 
         float sx = (ndc.x * 0.5f + 0.5f) * screenW;
-        float sy = (1.0f - (ndc.y * 0.5f + 0.5f)) * screenH; // flip Y
+        float sy = (ndc.y * 0.5f + 0.5f) * screenH;
 
         // Rise upward in screen space
         float t = e.age / e.lifetime;
@@ -132,11 +132,11 @@ void HealthBar::render(const entt::registry& reg,
             yOff = modelTop + m_config.yPadding;
         } else if (reg.all_of<GPUSkinnedMeshComponent>(entity)) {
             if (reg.all_of<MinionComponent>(entity))
-                yOff = tc.scale.y * m_config.minionYOffset;
+                yOff = m_config.minionYOffset + m_config.yPadding;
             else if (reg.all_of<HeroComponent>(entity))
-                yOff = tc.scale.y * m_config.championYOffset;
+                yOff = m_config.championYOffset + m_config.yPadding;
             else
-                yOff = tc.scale.y * m_config.yOffset;
+                yOff = m_config.yOffset + m_config.yPadding;
         } else {
             yOff = m_config.yOffset;
         }
@@ -152,7 +152,7 @@ void HealthBar::render(const entt::registry& reg,
 
         // NDC → screen
         float sx = (ndc.x * 0.5f + 0.5f) * screenW;
-        float sy = (1.0f - (ndc.y * 0.5f + 0.5f)) * screenH;
+        float sy = (ndc.y * 0.5f + 0.5f) * screenH;
 
         // Scale bar width by projected distance (perspective LOD)
         float projScale = 1.0f / clip.w;

@@ -132,7 +132,9 @@ void FogOfWarGameplay::tickWards(entt::registry& reg, float dt) {
     for (auto e : expired) {
         if (reg.valid(e)) {
             spdlog::info("Ward expired, destroying entity");
-            reg.destroy(e);
+            for (auto&& [id, pool] : reg.storage()) {
+                pool.remove(e);
+            }
         }
     }
 }

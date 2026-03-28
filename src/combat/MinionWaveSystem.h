@@ -20,10 +20,19 @@ namespace glory {
 
 class PathfindingSystem;
 class Scene;
+class CombatSystem;
 
 // ── Per-entity tint (used by renderer for team colouring) ───────────────────
 struct TintComponent {
     glm::vec4 color{1.0f, 1.0f, 1.0f, 1.0f};
+};
+
+// ── Minion AI state machine ─────────────────────────────────────────────────
+enum class MinionAIState : uint8_t {
+    LANE_MARCH,      // Default: follow flow field down the lane
+    CHASE_TARGET,    // Moving toward an aggro target
+    ATTACKING,       // In attack range, letting CombatSystem drive the attack cycle
+    RETURN_TO_LANE,  // Lost target, walking back to lane flow field
 };
 
 // ── Per-minion wave AI component ────────────────────────────────────────────
@@ -32,9 +41,14 @@ struct WaveMinionComponent {
     uint8_t   laneIndex   = 0;      // 0=top, 1=mid, 2=bot
     MinionType type       = MinionType::MELEE;
 
+    // FSM state
+    MinionAIState aiState = MinionAIState::LANE_MARCH;
+
     // Aggro state
     entt::entity aggroTarget = entt::null;
-    float aggroRange      = 6.0f;   // acquire-target radius
+    float aggroRange         = 6.0f;   // leash radius (drop target beyond this × 1.5)
+    float acquisitionRange   = 8.0f;   // scanning radius for new targets
+    float callForHelpRadius  = 10.0f;  // radius for hero-attacked-hero aggro
 
     // Retarget cooldown — avoids O(N×M) registry scan every frame
     float retargetCooldown = 0.0f;
@@ -45,6 +59,10 @@ struct WaveMinionComponent {
     float heroAggroTimer  = 0.0f;   // seconds remaining on hero aggro
     float heroAggroLeash  = 10.0f;  // max distance before dropping hero aggro
     static constexpr float HERO_AGGRO_DURATION = 6.0f;
+
+    // Lane return: remember where we left the lane to limit chase distance
+    glm::vec3 laneLeavePos{0.0f};
+    static constexpr float MAX_CHASE_DIST = 12.0f; // max distance from lane before forced return
 
     // NPC ability decision
     float   decisionCooldown = 0.0f; // seconds until next ability decision
@@ -71,8 +89,12 @@ public:
     void setSpawnConfig(WaveSpawnConfig config) { m_spawnCfg = std::move(config); }
     const WaveSpawnConfig& getSpawnConfig() const { return m_spawnCfg; }
 
+    void setCasterSpawnConfig(WaveSpawnConfig config) { m_casterSpawnCfg = std::move(config); }
+    const WaveSpawnConfig& getCasterSpawnConfig() const { return m_casterSpawnCfg; }
+
     void setPathfinding(PathfindingSystem* ps) { m_pathfinding = ps; }
     void setScene(Scene* s) { m_scene = s; }
+    void setCombatSystem(CombatSystem* cs) { m_combat = cs; }
 
     // Called each sim tick.  gameTime is seconds since match start.
     void update(entt::registry& reg, float dt, float gameTime);
@@ -121,9 +143,11 @@ private:
 
     // ── Data ────────────────────────────────────────────────────────────────
     MapData            m_mapData;
-    WaveSpawnConfig    m_spawnCfg;
+    WaveSpawnConfig    m_spawnCfg;        // melee minions
+    WaveSpawnConfig    m_casterSpawnCfg;  // ranged / cannon minions
     PathfindingSystem* m_pathfinding = nullptr;
     Scene*             m_scene       = nullptr;
+    CombatSystem*      m_combat      = nullptr;
 
     // Team tint colours
     static constexpr glm::vec4 BLUE_TINT{0.6f, 0.7f, 1.0f, 1.0f};

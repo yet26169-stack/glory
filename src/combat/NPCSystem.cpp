@@ -2,12 +2,15 @@
 #include "ability/AbilitySystem.h"
 #include "ability/AbilityTypes.h"
 #include "combat/CombatComponents.h"
+#include "combat/CombatSystem.h"
+#include "core/Profiler.h"
 #include "combat/EconomySystem.h"
 #include "combat/MinionWaveSystem.h"
 #include "combat/NPCBehaviorSystem.h"
 #include "combat/RespawnSystem.h"
 #include "fog/FogComponents.h"
 #include "nav/PathfindingSystem.h"
+#include "physics/RigidBodyComponent.h"
 #include "scene/Components.h"
 #include "scene/Scene.h"
 
@@ -154,20 +157,20 @@ entt::entity MinionWaveSystem::spawnMinion(entt::registry& reg,
     case MinionType::CANNON: name += "Cannon"; break;
     }
     name += "_" + std::to_string(minionId++);
-    reg.emplace<TagComponent>(e, TagComponent{name});
+    reg.emplace_or_replace<TagComponent>(e, TagComponent{name});
 
     // Transform
-    auto& tc = reg.emplace<TransformComponent>(e);
+    auto& tc = reg.emplace_or_replace<TransformComponent>(e);
     tc.position = pos;
-    tc.scale    = glm::vec3(0.05f); // match existing minion scale
+    tc.scale    = glm::vec3(0.025f);
     tc.rotation = glm::vec3(0.0f);
 
     // Team
     Team teamEnum = (team == 0) ? Team::PLAYER : Team::ENEMY;
-    reg.emplace<TeamComponent>(e, TeamComponent{teamEnum});
+    reg.emplace_or_replace<TeamComponent>(e, TeamComponent{teamEnum});
 
     // Tint for team-coloured rendering
-    reg.emplace<TintComponent>(e, TintComponent{tint});
+    reg.emplace_or_replace<TintComponent>(e, TintComponent{tint});
 
     // Stats
     StatsComponent sc;
@@ -176,7 +179,7 @@ entt::entity MinionWaveSystem::spawnMinion(entt::registry& reg,
     sc.base.armor        = 10.0f;
     sc.base.magicResist  = 10.0f;
     sc.base.attackDamage = stats.ad;
-    reg.emplace<StatsComponent>(e, sc);
+    reg.emplace_or_replace<StatsComponent>(e, sc);
 
     // Combat
     CombatComponent cc;
@@ -185,52 +188,62 @@ entt::entity MinionWaveSystem::spawnMinion(entt::registry& reg,
     cc.attackDamage = stats.ad;
     cc.isRanged     = stats.isRanged;
     if (stats.isRanged) cc.projectileSpeed = 15.0f;
-    reg.emplace<CombatComponent>(e, cc);
+    reg.emplace_or_replace<CombatComponent>(e, cc);
 
     // Minion economy (kill rewards)
-    reg.emplace<MinionComponent>(e, MinionComponent{stats.type, stats.goldReward, stats.xpReward});
-    reg.emplace<EconomyComponent>(e, EconomyComponent{0, 0, 1}); // minions start with 0 gold
+    reg.emplace_or_replace<MinionComponent>(e, MinionComponent{stats.type, stats.goldReward, stats.xpReward});
+    reg.emplace_or_replace<EconomyComponent>(e, EconomyComponent{0, 0, 1});
 
     // Movement
-    reg.emplace<UnitComponent>(e, UnitComponent{UnitComponent::State::MOVING, pos, stats.moveSpeed});
-    reg.emplace<CharacterComponent>(e, CharacterComponent{pos, stats.moveSpeed});
-    reg.emplace<SelectableComponent>(e, SelectableComponent{false, 1.0f});
+    reg.emplace_or_replace<UnitComponent>(e, UnitComponent{UnitComponent::State::MOVING, pos, stats.moveSpeed});
+    reg.emplace_or_replace<CharacterComponent>(e, CharacterComponent{pos, stats.moveSpeed});
+    reg.emplace_or_replace<SelectableComponent>(e, SelectableComponent{false, 1.0f});
 
     // Wave AI component
     WaveMinionComponent wmc;
     wmc.teamIndex = team;
     wmc.laneIndex = lane;
     wmc.type      = stats.type;
-    reg.emplace<WaveMinionComponent>(e, wmc);
+    reg.emplace_or_replace<WaveMinionComponent>(e, wmc);
 
     // Minions die permanently (no respawn, entity destroyed)
-    reg.emplace<RespawnComponent>(e, RespawnComponent{
+    reg.emplace_or_replace<RespawnComponent>(e, RespawnComponent{
         LifeState::ALIVE, 0.f, 0.f, glm::vec3(0.f), false /*isHero=false*/
     });
 
     // FoW vision: minions have small sight radius
-    reg.emplace<VisionComponent>(e, VisionComponent{6.0f});
+    reg.emplace_or_replace<VisionComponent>(e, VisionComponent{6.0f});
 
-    // Mesh + material + animation (from shared spawn config)
-    reg.emplace<GPUSkinnedMeshComponent>(e, GPUSkinnedMeshComponent{m_spawnCfg.meshIndex});
-    reg.emplace<MaterialComponent>(e, MaterialComponent{
-        m_spawnCfg.texIndex, m_spawnCfg.flatNormIndex, 0.0f, 0.0f, 0.5f, 0.2f});
+    // Physics body for collision separation (prevents minion stacking)
+    RigidBodyComponent rbc;
+    rbc.collisionRadius = 0.4f;
+    rbc.mass            = 1.0f;
+    rbc.linearDamping   = 0.9f;  // high damping — physics only separates, doesn't propel
+    rbc.restitution     = 0.0f;
+    reg.emplace_or_replace<RigidBodyComponent>(e, rbc);
+
+    // Mesh + material + animation — pick config based on minion type
+    const WaveSpawnConfig& cfg = (stats.type != MinionType::MELEE && m_casterSpawnCfg.ready)
+                                 ? m_casterSpawnCfg : m_spawnCfg;
+    reg.emplace_or_replace<GPUSkinnedMeshComponent>(e, GPUSkinnedMeshComponent{cfg.meshIndex});
+    reg.emplace_or_replace<MaterialComponent>(e, MaterialComponent{
+        cfg.texIndex, cfg.flatNormIndex, 0.0f, 0.0f, 0.5f, 0.2f});
 
     // GPU skinning only needs the joint hierarchy (for matrix computation) — not raw vertex data.
     // Copying skinVertices/bindPoseVertices per entity caused ~53 MB/wave allocation overhead.
     SkeletonComponent skelComp;
-    skelComp.skeleton = m_spawnCfg.skeleton;
+    skelComp.skeleton = cfg.skeleton;
 
     AnimationComponent animComp;
     animComp.player.setSkeleton(&skelComp.skeleton);
-    animComp.clips = m_spawnCfg.clips;
+    animComp.clips = cfg.clips;
     if (!animComp.clips.empty()) {
         animComp.activeClipIndex = 0;
         animComp.player.setClip(&animComp.clips[0]);
     }
 
-    reg.emplace<SkeletonComponent>(e, std::move(skelComp));
-    reg.emplace<AnimationComponent>(e, std::move(animComp));
+    reg.emplace_or_replace<SkeletonComponent>(e, std::move(skelComp));
+    reg.emplace_or_replace<AnimationComponent>(e, std::move(animComp));
 
     // Re-point raw pointers to registry-owned copies
     auto& regSkel = reg.get<SkeletonComponent>(e);
@@ -246,18 +259,55 @@ entt::entity MinionWaveSystem::spawnMinion(entt::registry& reg,
 // Movement + aggro AI each tick
 // ═════════════════════════════════════════════════════════════════════════════
 void MinionWaveSystem::updateMovementAndAggro(entt::registry& reg, float dt) {
+    GLORY_ZONE_N("MinionAggro");
     auto view = reg.view<WaveMinionComponent, TransformComponent,
                          CharacterComponent, StatsComponent, CombatComponent>();
+
+    // Separation: pre-collect minion positions to avoid nested view iteration
+    constexpr float SEPARATION_RADIUS  = 1.0f;
+    constexpr float SEPARATION_RADIUS2 = SEPARATION_RADIUS * SEPARATION_RADIUS;
+    constexpr float SEPARATION_WEIGHT  = 3.0f;
+
+    struct MinionPos { entt::entity e; uint8_t team; glm::vec3 pos; };
+    std::vector<MinionPos> minionPositions;
+    for (auto&& [e, wmc, tc] : reg.view<WaveMinionComponent, TransformComponent>().each()) {
+        minionPositions.push_back({e, wmc.teamIndex, tc.position});
+    }
+
+    auto computeSeparation = [&](entt::entity self, glm::vec3 selfPos,
+                                 uint8_t selfTeam) -> glm::vec3 {
+        glm::vec3 sep{0.0f};
+        int count = 0;
+        for (const auto& mp : minionPositions) {
+            if (mp.e == self || mp.team != selfTeam) continue;
+            glm::vec3 diff = selfPos - mp.pos;
+            diff.y = 0.0f;
+            float d2 = glm::dot(diff, diff);
+            if (d2 > 0.001f && d2 < SEPARATION_RADIUS2) {
+                sep += diff / std::sqrt(d2);
+                ++count;
+            }
+        }
+        if (count > 0) sep /= static_cast<float>(count);
+        return sep * SEPARATION_WEIGHT;
+    };
 
     for (auto&& [entity, wmc, transform, character, stats, combat]
          : view.each()) {
 
-        // Skip dead minions
         if (stats.base.currentHP <= 0.0f) continue;
+
+        // Clamp to ground plane — physics applies gravity but minions are ground units.
+        // Zero Y velocity so gravity never accumulates between frames.
+        if (auto* rb = reg.try_get<RigidBodyComponent>(entity)) {
+            rb->linearVelocity.y = 0.0f;
+            rb->accumulatedForce.y = 0.0f;
+        }
+        transform.position.y = 0.2f;
 
         glm::vec3 pos = transform.position;
 
-        // ── Hero aggro timer countdown ──────────────────────────────────────
+        // ── Hero aggro timer countdown ──────────────────────────────────
         if (wmc.heroAggroTimer > 0.0f) {
             wmc.heroAggroTimer -= dt;
             if (wmc.heroAggroTimer <= 0.0f) {
@@ -266,7 +316,7 @@ void MinionWaveSystem::updateMovementAndAggro(entt::registry& reg, float dt) {
             }
         }
 
-        // ── Validate current hero aggro target ──────────────────────────────
+        // ── Validate hero aggro target ──────────────────────────────────
         if (wmc.heroAggroTarget != entt::null) {
             if (!reg.valid(wmc.heroAggroTarget)) {
                 wmc.heroAggroTarget = entt::null;
@@ -287,79 +337,189 @@ void MinionWaveSystem::updateMovementAndAggro(entt::registry& reg, float dt) {
             }
         }
 
-        // ── Find target (hero aggro overrides normal aggro) ─────────────────
-        entt::entity target = entt::null;
-        if (wmc.heroAggroTarget != entt::null) {
-            target = wmc.heroAggroTarget;
-        } else {
-            // Validate current cached target before doing a full search
-            bool currentValid = false;
-            if (wmc.aggroTarget != entt::null && reg.valid(wmc.aggroTarget)) {
-                auto* tgt = reg.try_get<TransformComponent>(wmc.aggroTarget);
-                auto* tgtStats = reg.try_get<StatsComponent>(wmc.aggroTarget);
-                auto* tgtTeam = reg.try_get<TeamComponent>(wmc.aggroTarget);
-                if (tgt && tgtStats && tgtTeam && tgtStats->base.currentHP > 0.0f) {
-                    Team myTeam = (wmc.teamIndex == 0) ? Team::PLAYER : Team::ENEMY;
-                    if (tgtTeam->team != myTeam && tgtTeam->team != Team::NEUTRAL) {
-                        float dist = glm::length(tgt->position - pos);
-                        if (dist <= wmc.aggroRange * 1.5f) {
-                            currentValid = true;
-                            target = wmc.aggroTarget;
-                        }
-                    }
-                }
-            }
+        // ── Helper: validate a target entity ────────────────────────────
+        auto isTargetValid = [&](entt::entity t, float maxRange) -> bool {
+            if (t == entt::null || !reg.valid(t)) return false;
+            auto* tgt = reg.try_get<TransformComponent>(t);
+            auto* tgtStats = reg.try_get<StatsComponent>(t);
+            auto* tgtTeam = reg.try_get<TeamComponent>(t);
+            if (!tgt || !tgtStats || !tgtTeam) return false;
+            if (tgtStats->base.currentHP <= 0.0f) return false;
+            Team myTeam = (wmc.teamIndex == 0) ? Team::PLAYER : Team::ENEMY;
+            if (tgtTeam->team == myTeam || tgtTeam->team == Team::NEUTRAL) return false;
+            float distSq = glm::dot(
+                glm::vec2(tgt->position.x - pos.x, tgt->position.z - pos.z),
+                glm::vec2(tgt->position.x - pos.x, tgt->position.z - pos.z));
+            return distSq <= maxRange * maxRange;
+        };
 
-            // Only do a full registry scan if we have no valid target and
-            // the retarget cooldown has elapsed.
-            if (!currentValid) {
-                wmc.retargetCooldown -= dt;
-                if (wmc.retargetCooldown <= 0.0f) {
-                    target = findTarget(reg, entity, wmc, pos);
-                    wmc.retargetCooldown = WaveMinionComponent::RETARGET_INTERVAL;
-                }
+        // ── Resolve effective target (hero aggro overrides) ─────────────
+        entt::entity resolvedTarget = entt::null;
+        if (wmc.heroAggroTarget != entt::null && reg.valid(wmc.heroAggroTarget)) {
+            resolvedTarget = wmc.heroAggroTarget;
+        } else if (isTargetValid(wmc.aggroTarget, wmc.acquisitionRange * 1.5f)) {
+            resolvedTarget = wmc.aggroTarget;
+        } else {
+            wmc.retargetCooldown -= dt;
+            if (wmc.retargetCooldown <= 0.0f) {
+                resolvedTarget = findTarget(reg, entity, wmc, pos);
+                wmc.retargetCooldown = WaveMinionComponent::RETARGET_INTERVAL;
             }
         }
-        wmc.aggroTarget = target;
-        combat.targetEntity = target;
+        wmc.aggroTarget = resolvedTarget;
+        combat.targetEntity = resolvedTarget;
 
-        // ── Move toward target or follow flow field ─────────────────────────
-        if (target != entt::null) {
-            // Move toward aggro target
-            auto& targetTransform = reg.get<TransformComponent>(target);
-            glm::vec3 toTarget = targetTransform.position - pos;
-            float dist = glm::length(toTarget);
+        // ── FSM state transitions ───────────────────────────────────────
+        switch (wmc.aiState) {
 
-            if (dist > combat.attackRange) {
-                // Move toward target
-                glm::vec3 dir = toTarget / dist;
-                transform.position += dir * character.moveSpeed * dt;
-                transform.position.y = 0.2f;
-
-                // Update facing
-                character.currentYaw = std::atan2(dir.x, dir.z);
-                character.hasTarget = true;
-                character.targetPosition = targetTransform.position;
+        case MinionAIState::LANE_MARCH: {
+            if (resolvedTarget != entt::null) {
+                wmc.laneLeavePos = pos;
+                wmc.aiState = MinionAIState::CHASE_TARGET;
+                break;
             }
-            // Else: in attack range, CombatSystem handles the actual attack
-        } else {
-            // No target: follow flow field along the lane
             if (m_pathfinding && m_pathfinding->flowFieldsReady()) {
                 glm::vec2 dir2 = m_pathfinding->sampleFlowField(
                     wmc.teamIndex, wmc.laneIndex,
                     glm::vec2(pos.x, pos.z));
-
                 if (glm::length(dir2) > 0.01f) {
                     glm::vec3 dir3(dir2.x, 0.0f, dir2.y);
-                    transform.position += dir3 * character.moveSpeed * dt;
+                    glm::vec3 sep = computeSeparation(entity, pos, wmc.teamIndex);
+                    glm::vec3 move = dir3 + sep;
+                    move.y = 0.0f;
+                    float len = glm::length(move);
+                    if (len > 0.01f) move /= len;
+                    transform.position += move * character.moveSpeed * dt;
                     transform.position.y = 0.2f;
-
-                    character.currentYaw = std::atan2(dir3.x, dir3.z);
+                    character.currentYaw = std::atan2(move.x, move.z);
                     character.hasTarget = true;
                     character.targetPosition = pos + dir3 * 5.0f;
                 }
             }
+            break;
         }
+
+        case MinionAIState::CHASE_TARGET: {
+            if (resolvedTarget == entt::null) {
+                wmc.aiState = MinionAIState::RETURN_TO_LANE;
+                break;
+            }
+            // Leash: hero aggro ignores distance leash
+            float chaseDist = glm::length(pos - wmc.laneLeavePos);
+            if (chaseDist > WaveMinionComponent::MAX_CHASE_DIST
+                && wmc.heroAggroTarget == entt::null) {
+                wmc.aggroTarget = entt::null;
+                combat.targetEntity = entt::null;
+                wmc.aiState = MinionAIState::RETURN_TO_LANE;
+                break;
+            }
+
+            if (!reg.valid(resolvedTarget) || !reg.all_of<TransformComponent>(resolvedTarget)) {
+                wmc.aggroTarget = entt::null;
+                combat.targetEntity = entt::null;
+                wmc.aiState = MinionAIState::RETURN_TO_LANE;
+                break;
+            }
+            {
+            auto& targetTransform = reg.get<TransformComponent>(resolvedTarget);
+            glm::vec3 toTarget = targetTransform.position - pos;
+            float dist = glm::length(toTarget);
+
+            if (dist <= combat.attackRange) {
+                wmc.aiState = MinionAIState::ATTACKING;
+                glm::vec3 dir = toTarget / std::max(dist, 0.001f);
+                character.currentYaw = std::atan2(dir.x, dir.z);
+                character.hasTarget = true;
+                character.targetPosition = targetTransform.position;
+            } else {
+                glm::vec3 dir = toTarget / dist;
+                glm::vec3 sep = computeSeparation(entity, pos, wmc.teamIndex);
+                glm::vec3 move = dir + sep;
+                move.y = 0.0f;
+                float len = glm::length(move);
+                if (len > 0.01f) move /= len;
+                transform.position += move * character.moveSpeed * dt;
+                transform.position.y = 0.2f;
+                character.currentYaw = std::atan2(move.x, move.z);
+                character.hasTarget = true;
+                character.targetPosition = targetTransform.position;
+            }
+            }
+            break;
+        }
+
+        case MinionAIState::ATTACKING: {
+            if (resolvedTarget == entt::null) {
+                // Immediate retarget attempt (bypass cooldown)
+                wmc.retargetCooldown = 0.0f;
+                entt::entity newTarget = findTarget(reg, entity, wmc, pos);
+                if (newTarget != entt::null) {
+                    wmc.aggroTarget = newTarget;
+                    combat.targetEntity = newTarget;
+                    wmc.aiState = MinionAIState::CHASE_TARGET;
+                } else {
+                    wmc.aiState = MinionAIState::RETURN_TO_LANE;
+                }
+                break;
+            }
+
+            if (!reg.valid(resolvedTarget) || !reg.all_of<TransformComponent>(resolvedTarget)) {
+                wmc.aggroTarget = entt::null;
+                combat.targetEntity = entt::null;
+                wmc.retargetCooldown = 0.0f;
+                wmc.aiState = MinionAIState::RETURN_TO_LANE;
+                break;
+            }
+            auto& targetTransform = reg.get<TransformComponent>(resolvedTarget);
+            float dist = glm::length(targetTransform.position - pos);
+
+            if (dist > combat.attackRange * 1.2f) {
+                wmc.aiState = MinionAIState::CHASE_TARGET;
+            } else {
+                glm::vec3 toTarget = targetTransform.position - pos;
+                float len = glm::length(toTarget);
+                if (len > 0.01f) {
+                    glm::vec3 dir = toTarget / len;
+                    character.currentYaw = std::atan2(dir.x, dir.z);
+                }
+                character.hasTarget = true;
+                character.targetPosition = targetTransform.position;
+
+                // Drive the CombatSystem auto-attack state machine
+                if (m_combat)
+                    m_combat->requestAutoAttack(entity, resolvedTarget, reg);
+            }
+            break;
+        }
+
+        case MinionAIState::RETURN_TO_LANE: {
+            if (resolvedTarget != entt::null) {
+                wmc.laneLeavePos = pos;
+                wmc.aiState = MinionAIState::CHASE_TARGET;
+                break;
+            }
+            if (m_pathfinding && m_pathfinding->flowFieldsReady()) {
+                glm::vec2 dir2 = m_pathfinding->sampleFlowField(
+                    wmc.teamIndex, wmc.laneIndex,
+                    glm::vec2(pos.x, pos.z));
+                if (glm::length(dir2) > 0.01f) {
+                    glm::vec3 dir3(dir2.x, 0.0f, dir2.y);
+                    transform.position += dir3 * character.moveSpeed * dt;
+                    transform.position.y = 0.2f;
+                    character.currentYaw = std::atan2(dir3.x, dir3.z);
+                    character.hasTarget = true;
+                    character.targetPosition = pos + dir3 * 5.0f;
+                    wmc.aiState = MinionAIState::LANE_MARCH;
+                } else {
+                    wmc.aiState = MinionAIState::LANE_MARCH;
+                }
+            } else {
+                wmc.aiState = MinionAIState::LANE_MARCH;
+            }
+            break;
+        }
+
+        } // switch
     }
 }
 
@@ -370,25 +530,63 @@ entt::entity MinionWaveSystem::findTarget(entt::registry& reg,
                                            entt::entity self,
                                            const WaveMinionComponent& wmc,
                                            glm::vec3 selfPos) const {
+    GLORY_ZONE_N("MinionFindTarget");
     Team myTeam = (wmc.teamIndex == 0) ? Team::PLAYER : Team::ENEMY;
-    float bestDist = wmc.aggroRange;
-    entt::entity best = entt::null;
+    float scanRadiusSq = wmc.acquisitionRange * wmc.acquisitionRange;
 
-    // Check enemy minions and heroes (anything with TeamComponent + StatsComponent)
+    // Priority buckets: [0]=P1 (highest) .. [6]=P7 (lowest)
+    // Each stores best entity + best distSq for that priority
+    struct Candidate { entt::entity e = entt::null; float distSq = 1e30f; };
+    std::array<Candidate, 7> buckets{};
+
     auto targets = reg.view<TransformComponent, TeamComponent, StatsComponent>();
     for (auto&& [e, tt, teamComp, tStats] : targets.each()) {
         if (e == self) continue;
         if (teamComp.team == myTeam || teamComp.team == Team::NEUTRAL) continue;
         if (tStats.base.currentHP <= 0.0f) continue;
 
-        float dist = glm::length(tt.position - selfPos);
-        if (dist < bestDist) {
-            bestDist = dist;
-            best = e;
+        glm::vec3 diff = tt.position - selfPos;
+        float distSq = diff.x * diff.x + diff.z * diff.z;
+        if (distSq > scanRadiusSq) continue;
+
+        bool isMinion = reg.all_of<MinionComponent>(e);
+        bool isStructure = reg.all_of<MapComponent>(e);
+        bool isChampion = !isMinion && !isStructure;
+
+        int priority = -1;
+        auto* enemyCombat = reg.try_get<CombatComponent>(e);
+        if (enemyCombat && enemyCombat->targetEntity != entt::null
+            && enemyCombat->state != CombatState::IDLE
+            && reg.valid(enemyCombat->targetEntity)) {
+
+            auto* victimTeam = reg.try_get<TeamComponent>(enemyCombat->targetEntity);
+            if (victimTeam && victimTeam->team == myTeam) {
+                bool victimIsMinion = reg.all_of<MinionComponent>(enemyCombat->targetEntity);
+                bool victimIsChampion = !victimIsMinion && !reg.all_of<MapComponent>(enemyCombat->targetEntity);
+
+                if (isChampion && victimIsChampion)        priority = 0; // P1
+                else if (isMinion && victimIsChampion)     priority = 1; // P2
+                else if (isMinion && victimIsMinion)       priority = 2; // P3
+                else if (isStructure && victimIsMinion)    priority = 3; // P4
+                else if (isChampion && victimIsMinion)     priority = 4; // P5
+            }
+        }
+
+        if (priority < 0) {
+            if (isMinion)         priority = 5; // P6: closest enemy minion
+            else if (isChampion)  priority = 6; // P7: closest enemy champion
+            else continue; // structures with no aggro context
+        }
+
+        if (distSq < buckets[priority].distSq) {
+            buckets[priority] = {e, distSq};
         }
     }
 
-    return best;
+    for (auto& b : buckets) {
+        if (b.e != entt::null) return b.e;
+    }
+    return entt::null;
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

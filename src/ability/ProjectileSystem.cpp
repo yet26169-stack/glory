@@ -2,10 +2,12 @@
 #include "ability/AbilitySystem.h"
 #include "combat/GpuCollisionSystem.h"
 #include "combat/EconomySystem.h"
+#include "combat/MinionWaveSystem.h"
 #include "vfx/TrailRenderer.h"
 #include "scene/Components.h"
 #include "combat/CombatComponents.h"
 #include "core/FixedPoint.h"
+#include "core/Profiler.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
@@ -27,6 +29,7 @@ void ProjectileSystem::update(entt::registry& reg, float dt,
                                VFXEventQueue& vfxQueue, AbilitySystem& abilitySystem,
                                TrailRenderer* trailRenderer,
                                const GpuCollisionSystem* gpuCollision) {
+    GLORY_ZONE_N("ProjectileUpdate");
     m_landedPositions.clear();
     std::vector<entt::entity> toDestroy;
 
@@ -61,6 +64,21 @@ void ProjectileSystem::update(entt::registry& reg, float dt,
                         if (stats.base.currentHP <= 0.0f && m_economy) {
                             auto caster = static_cast<entt::entity>(pc.casterEntity);
                             m_economy->awardKill(reg, caster, target);
+                        }
+
+                        // Call-for-help: champion-vs-champion projectile hit
+                        if (m_minionWaves) {
+                            auto caster = static_cast<entt::entity>(pc.casterEntity);
+                            bool casterIsChampion = reg.valid(caster)
+                                                  && !reg.all_of<MinionComponent>(caster)
+                                                  && !reg.all_of<MapComponent>(caster)
+                                                  && reg.all_of<TeamComponent, StatsComponent>(caster);
+                            bool targetIsChampion = !reg.all_of<MinionComponent>(target)
+                                                  && !reg.all_of<MapComponent>(target)
+                                                  && reg.all_of<TeamComponent, StatsComponent>(target);
+                            if (casterIsChampion && targetIsChampion) {
+                                m_minionWaves->notifyHeroAttackedHero(reg, caster, target);
+                            }
                         }
                         
                         // Hit VFX
@@ -142,8 +160,9 @@ void ProjectileSystem::update(entt::registry& reg, float dt,
                 TargetInfo ti{};
                 ti.type           = TargetingType::POINT;
                 ti.targetPosition = pc.lobTarget;
-                abilitySystem.resolveHit(reg, static_cast<entt::entity>(pc.casterEntity),
-                                         *pc.sourceDef, ti);
+                if (pc.sourceDef)
+                    abilitySystem.resolveHit(reg, static_cast<entt::entity>(pc.casterEntity),
+                                             *pc.sourceDef, ti);
 
                 m_landedPositions.push_back(pc.lobTarget);
 
@@ -243,7 +262,8 @@ void ProjectileSystem::update(entt::registry& reg, float dt,
                     ti.targetEntity   = static_cast<EntityID>(entt::to_integral(targetEnt));
                     ti.targetPosition = reg.get<TransformComponent>(targetEnt).position;
 
-                    abilitySystem.resolveHit(reg, casterEntt, *pc.sourceDef, ti);
+                    if (pc.sourceDef)
+                        abilitySystem.resolveHit(reg, casterEntt, *pc.sourceDef, ti);
                     pc.hitCount++;
                     hitSomething = true;
 
@@ -267,7 +287,8 @@ void ProjectileSystem::update(entt::registry& reg, float dt,
                     ti.targetEntity   = static_cast<EntityID>(entt::to_integral(targetEnt));
                     ti.targetPosition = ttc.position;
 
-                    abilitySystem.resolveHit(reg, casterEntt, *pc.sourceDef, ti);
+                    if (pc.sourceDef)
+                        abilitySystem.resolveHit(reg, casterEntt, *pc.sourceDef, ti);
                     pc.hitCount++;
                     hitSomething = true;
 
@@ -284,9 +305,12 @@ void ProjectileSystem::update(entt::registry& reg, float dt,
         }
     }
 
+    // Strip hit projectiles of all components instead of destroying them.
+    // Avoids entity storage swap_only tombstone recycling assertion.
     for (auto e : toDestroy)
         if (reg.valid(e))
-            reg.destroy(e);
+            for (auto&& [id, pool] : reg.storage())
+                pool.remove(e);
 }
 
 void ProjectileSystem::destroyProjectile(entt::registry& reg, entt::entity /*e*/,

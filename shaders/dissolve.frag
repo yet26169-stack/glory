@@ -354,6 +354,9 @@ void main() {
     // Add HDR edge color additively for bloom pickup at the dissolve boundary
     result += dissolve.edgeColor.rgb * edgeFactor;
 
+    // Clamp to reasonable HDR range to prevent bloom blow-out
+    result = min(result, vec3(4.0));
+
     outColor = vec4(result, 1.0);
     outCharDepth = gl_FragCoord.z;
 }

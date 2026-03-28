@@ -20,6 +20,7 @@
 
 #include <array>
 #include <filesystem>
+#include <fstream>
 #include <future>
 #include <string>
 #include <unordered_map>
@@ -28,6 +29,9 @@ namespace glory {
 
 void SceneBuilder::build(Renderer& r) {
     GLORY_ZONE_N("buildScene");
+
+    spdlog::info("MODEL_DIR = '{}'", MODEL_DIR);
+    spdlog::info("ASSET_DIR = '{}'", ASSET_DIR);
 
     // Batch all texture GPU uploads into a single command buffer submission.
     // This eliminates 50+ individual vkQueueWaitIdle stalls.
@@ -85,7 +89,7 @@ void SceneBuilder::build(Renderer& r) {
     };
 
     // Default textures — use batched upload path for thread safety
-    uint32_t white = 0xFFFFFFFF;
+    uint32_t white = 0xFFFF00FF;  // Magenta ABGR — makes missing textures obvious
     uint32_t defaultTex = r.m_scene.addTexture(
         Texture::createFromPixels(*r.m_device, &white, 1, 1,
                                   VK_FORMAT_R8G8B8A8_SRGB, &uploadBatch));
@@ -180,8 +184,9 @@ void SceneBuilder::build(Renderer& r) {
         reg.emplace<MeshComponent>(groundEnt, MeshComponent{ groundMeshIdx });
         // Matte green-brown terrain: no metallic, rough, slight warm tint
         reg.emplace<MaterialComponent>(groundEnt,
-            MaterialComponent{ defaultTex, flatNorm, /*shininess*/0.0f, /*metallic*/0.0f, /*roughness*/0.9f, /*emissive*/0.0f });
+            MaterialComponent{ checkerTex, flatNorm, /*shininess*/0.0f, /*metallic*/0.0f, /*roughness*/0.9f, /*emissive*/0.0f });
         reg.emplace<MapComponent>(groundEnt);
+        reg.emplace<TintComponent>(groundEnt, TintComponent{ glm::vec4(0.3f, 0.5f, 0.2f, 1.0f) });
         auto& gt   = reg.get<TransformComponent>(groundEnt);
         gt.position = glm::vec3(100.0f, -0.01f, 100.0f); // centred, just under lane tiles
         gt.scale    = glm::vec3(1.0f);
@@ -215,6 +220,38 @@ void SceneBuilder::build(Renderer& r) {
         "red_team_inhib.glb",    "red_team_nexus.glb",
         "arcane+tile+3d+model.glb", "jungle_tile.glb", "river_tile.glb"
     };
+
+    // ── Startup diagnostic: check map model files exist on disk ─────────
+    for (const auto& f : mapFiles) {
+        std::string path = std::string(MODEL_DIR) + "map models/" + f;
+        std::ifstream test(path, std::ios::binary);
+        if (!test.good())
+            spdlog::error("MISSING MAP MODEL: {} — will use fallback texture", path);
+        else
+            spdlog::info("Found map model: {}", path);
+    }
+
+    // ── Check character, minion, and ability models ─────────────────────
+    {
+        const std::vector<std::string> otherModels = {
+            "models/scientist/scientist.glb",
+            "models/scientist/scientist_idle.glb",
+            "models/scientist/scientist_walk.glb",
+            "models/scientist/scientist_auto_attack.glb",
+            "models/melee_minion/melee_minion_walking.glb",
+            "models/melee_minion/melee_minion_idle.glb",
+            "models/melee_minion/melee_minion_attack1.glb",
+            "models/abiliities_models/q+ability.glb",
+        };
+        for (const auto& f : otherModels) {
+            std::string path = std::string(MODEL_DIR) + f;
+            std::ifstream test(path, std::ios::binary);
+            if (!test.good())
+                spdlog::error("MISSING MODEL: {} — will use fallback texture", path);
+            else
+                spdlog::info("Found model: {}", path);
+        }
+    }
 
     std::vector<std::future<ParsedMapModel>> modelFutures;
     modelFutures.reserve(mapFiles.size());
@@ -251,9 +288,12 @@ void SceneBuilder::build(Renderer& r) {
         uint32_t primaryTex = defaultTex;
         for (auto& t : glbTextures) {
             uint32_t tid = r.m_scene.addTexture(std::move(t.texture));
-            r.m_bindless->registerTexture(
+            uint32_t bindlessSlot = r.m_bindless->registerTexture(
                 r.m_scene.getTexture(tid).getImageView(),
                 r.m_scene.getTexture(tid).getSampler());
+            if (tid != bindlessSlot)
+                spdlog::error("Bindless mismatch: sceneID={} != bindlessSlot={} for '{}'",
+                              tid, bindlessSlot, pm.filename);
             matToTex[t.materialIndex] = tid;
             if (primaryTex == defaultTex) primaryTex = tid;
         }
@@ -340,6 +380,10 @@ void SceneBuilder::build(Renderer& r) {
     // ── Give structures proper meshes from map models ───────────────────
     {
         auto& reg = r.m_scene.getRegistry();
+        // Create ONE shared cube mesh for all fallback structures (instead of
+        // allocating a separate copy per structure).
+        uint32_t fallbackCubeMesh = UINT32_MAX;
+
         auto structView = reg.view<StructureComponent, TransformComponent>();
         for (auto e : structView) {
             if (reg.all_of<MeshComponent>(e)) continue;
@@ -421,7 +465,11 @@ void SceneBuilder::build(Renderer& r) {
                 spdlog::warn("[Renderer] Structure fallback to cube — model '{}' not found "
                              "(team={}, type={})", modelFile, sc.teamIndex,
                              static_cast<int>(sc.type));
-                uint32_t cubeMesh = r.m_scene.addMesh(Model::createCube(*r.m_device, r.m_device->getAllocator()));
+                if (fallbackCubeMesh == UINT32_MAX) {
+                    fallbackCubeMesh = r.m_scene.addMesh(
+                        Model::createCube(*r.m_device, r.m_device->getAllocator()));
+                    spdlog::info("[Renderer] Shared fallback cube mesh created (id={})", fallbackCubeMesh);
+                }
                 float s = 1.0f;
                 switch (sc.type) {
                     case StructureType::TOWER_T1:
@@ -434,7 +482,7 @@ void SceneBuilder::build(Renderer& r) {
                 tc.scale = glm::vec3(s, s * 2.0f, s);
                 // Cube is centered at origin; raise so base sits at ground (y=0).
                 tc.position.y = s;
-                reg.emplace<MeshComponent>(e, MeshComponent{ cubeMesh });
+                reg.emplace<MeshComponent>(e, MeshComponent{ fallbackCubeMesh });
                 reg.emplace<MaterialComponent>(e,
                     MaterialComponent{ checkerTex, flatNorm, 0.0f, 0.0f, 0.8f, 0.0f });
                 // Team-colored tint so cubes are visible against the fog
@@ -606,9 +654,12 @@ void SceneBuilder::build(Renderer& r) {
             std::unordered_map<int, uint32_t> matToTex;
             for (auto& t : glbTextures) {
                 uint32_t tid = r.m_scene.addTexture(std::move(t.texture));
-                r.m_bindless->registerTexture(
+                uint32_t bindlessSlot = r.m_bindless->registerTexture(
                     r.m_scene.getTexture(tid).getImageView(),
                     r.m_scene.getTexture(tid).getSampler());
+                if (tid != bindlessSlot)
+                    spdlog::error("Bindless mismatch: sceneID={} != bindlessSlot={} for character",
+                                  tid, bindlessSlot);
                 matToTex[t.materialIndex] = tid;
                 if (charTex == defaultTex) charTex = tid;
             }
@@ -933,6 +984,107 @@ void SceneBuilder::build(Renderer& r) {
         spdlog::warn("Could not load minion model: {}", e.what());
     }
 
+    // ── Load Caster Minion assets for ranged minion spawning ─────────────
+    try {
+        std::string casterPath = std::string(MODEL_DIR) + "models/caster_minion/caster_minion_walking.glb";
+        auto casterSkinned = Model::loadSkinnedFromGLB(*r.m_device, r.m_device->getAllocator(), casterPath, 0.6f);
+
+        uint32_t casterTex = defaultTex;
+        auto casterTextures = Model::loadGLBTextures(*r.m_device, casterPath, &uploadBatch);
+        if (!casterTextures.empty()) {
+            for (auto& t : casterTextures) {
+                uint32_t tid = r.m_scene.addTexture(std::move(t.texture));
+                r.m_bindless->registerTexture(
+                    r.m_scene.getTexture(tid).getImageView(),
+                    r.m_scene.getTexture(tid).getSampler());
+                if (casterTex == defaultTex) casterTex = tid;
+            }
+            spdlog::info("Caster minion: {} texture(s) loaded, primary slot {}", casterTextures.size(), casterTex);
+        }
+
+        r.m_scene.addMesh(std::move(casterSkinned.model));
+
+        if (!casterSkinned.bindPoseVertices.empty() && !casterSkinned.skinVertices.empty()) {
+            std::vector<SkinnedVertex> csverts;
+            csverts.reserve(casterSkinned.bindPoseVertices[0].size());
+            for (size_t vi = 0; vi < casterSkinned.bindPoseVertices[0].size(); ++vi) {
+                SkinnedVertex sv{};
+                sv.position = casterSkinned.bindPoseVertices[0][vi].position;
+                sv.color    = casterSkinned.bindPoseVertices[0][vi].color;
+                sv.normal   = casterSkinned.bindPoseVertices[0][vi].normal;
+                sv.texCoord = casterSkinned.bindPoseVertices[0][vi].texCoord;
+                sv.joints   = casterSkinned.skinVertices[0][vi].joints;
+                sv.weights  = casterSkinned.skinVertices[0][vi].weights;
+                csverts.push_back(sv);
+            }
+            uint32_t casterMeshIdx = r.m_scene.addStaticSkinnedMesh(
+                StaticSkinnedMesh(*r.m_device, r.m_device->getAllocator(),
+                                  csverts, casterSkinned.indices[0]));
+
+            Skeleton casterSkeleton = std::move(casterSkinned.skeleton);
+            std::vector<AnimationClip> casterClips;
+
+            std::string casterAnimBase = std::string(MODEL_DIR) + "models/caster_minion/";
+
+            // Clip[0]: Idle
+            bool cIdleOk = false;
+            try {
+                auto idleData = Model::loadSkinnedFromGLB(
+                    *r.m_device, r.m_device->getAllocator(),
+                    casterAnimBase + "caster_minion_idle.glb", 0.0f);
+                if (!idleData.animations.empty()) {
+                    casterClips.push_back(std::move(idleData.animations[0]));
+                    retargetClip(casterClips.back(), casterSkeleton);
+                    cIdleOk = true;
+                    spdlog::info("Caster minion idle animation loaded");
+                }
+            } catch (const std::exception& ie) {
+                spdlog::warn("Could not load caster idle animation: {}", ie.what());
+            }
+            if (!cIdleOk)
+                casterClips.push_back(AnimationClip{});
+
+            // Clip[1]: Walk (embedded in base model)
+            if (!casterSkinned.animations.empty()) {
+                casterClips.push_back(std::move(casterSkinned.animations[0]));
+            } else {
+                casterClips.push_back(AnimationClip{});
+            }
+
+            // Clip[2]: Attack
+            bool cAttackOk = false;
+            try {
+                auto attackData = Model::loadSkinnedFromGLB(
+                    *r.m_device, r.m_device->getAllocator(),
+                    casterAnimBase + "caster_minion_attack.glb", 0.0f);
+                if (!attackData.animations.empty()) {
+                    casterClips.push_back(std::move(attackData.animations[0]));
+                    retargetClip(casterClips.back(), casterSkeleton);
+                    casterClips.back().looping = false;
+                    cAttackOk = true;
+                    spdlog::info("Caster minion attack animation loaded");
+                }
+            } catch (const std::exception& ae) {
+                spdlog::warn("Could not load caster attack animation: {}", ae.what());
+            }
+            if (!cAttackOk)
+                casterClips.push_back(AnimationClip{});
+
+            spdlog::info("Caster minion model and {} animations loaded", casterClips.size());
+
+            WaveSpawnConfig cwsc;
+            cwsc.meshIndex     = casterMeshIdx;
+            cwsc.texIndex      = casterTex;
+            cwsc.flatNormIndex = flatNorm;
+            cwsc.skeleton      = std::move(casterSkeleton);
+            cwsc.clips         = std::move(casterClips);
+            cwsc.ready         = true;
+            r.m_minionWaveSystem->setCasterSpawnConfig(std::move(cwsc));
+        }
+    } catch (const std::exception& e) {
+        spdlog::warn("Could not load caster minion model: {}", e.what());
+    }
+
     spdlog::info("Scene built: flat map + player character");
 
     // ── Pre-load Q ability model (q+ability.glb) for projectile rendering ────
@@ -1005,6 +1157,10 @@ void SceneBuilder::build(Renderer& r) {
             spdlog::info("[SSR] Registered in bindless slot {}", ssrIdx);
         }
     }
+
+    // Register textures that were deferred during init (e.g. dissolve noise)
+    // so their bindless slots don't conflict with scene texture IDs.
+    r.registerDeferredBindlessTextures();
 
     // ── Flush all batched texture uploads in a single GPU submission ─────
     if (!uploadBatch.empty()) {

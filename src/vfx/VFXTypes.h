@@ -10,7 +10,7 @@ namespace glory {
 
 // ── Constants ──────────────────────────────────────────────────────────────
 static constexpr uint32_t MAX_PARTICLES_PER_EMITTER = 2048;
-static constexpr uint32_t MAX_CONCURRENT_EMITTERS   = 256;
+static constexpr uint32_t MAX_CONCURRENT_EMITTERS   = 512;
 static constexpr uint32_t INVALID_VFX_HANDLE        = 0;
 
 // ── GPU Particle layout (must EXACTLY match GLSL struct in shaders) ────────

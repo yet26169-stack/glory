@@ -1,0 +1,93 @@
+#version 450
+
+// ── Local Bitonic Sort (shared memory) ──────────────────────────────────────
+// Handles all j < BLOCK_SIZE steps in shared memory, reducing dispatch count.
+// Each workgroup processes a block of BLOCK_SIZE (128) elements.
+// Push constant 'j' field carries startJ: the largest j to process locally.
+
+layout(local_size_x = 64) in;
+
+struct Particle {
+    vec4 posLife;   // xyz = world position, w = remaining lifetime
+    vec4 velAge;    // xyz = velocity, w = age
+    vec4 color;     // rgba
+    vec4 params;    // x=size, y=rotation, z=angularVel, w=active
+};
+
+layout(std430, set = 0, binding = 0) buffer ParticleSSBO {
+    Particle particles[];
+};
+
+layout(push_constant) uniform SortPC {
+    vec4  cameraPos;
+    uint  count;      // total particle count (power of 2)
+    uint  k;          // current outer loop param
+    uint  startJ;     // largest j to process (= min(k/2, 64))
+    uint  _pad;
+};
+
+#define LOCAL_SIZE 64
+#define BLOCK_SIZE 128
+
+shared float s_keys[BLOCK_SIZE];
+shared uint  s_idx[BLOCK_SIZE];
+
+float computeKey(uint globalIdx) {
+    if (globalIdx >= count) return 1e20;
+    Particle p = particles[globalIdx];
+    if (p.params.w < 0.1) return -1e20;
+    vec3 d = p.posLife.xyz - cameraPos.xyz;
+    return -(d.x * d.x + d.y * d.y + d.z * d.z);
+}
+
+void main() {
+    uint tid = gl_LocalInvocationID.x;
+    uint blockBase = gl_WorkGroupID.x * BLOCK_SIZE;
+
+    // 1. Load 2 elements per thread into shared memory
+    uint g0 = blockBase + tid;
+    uint g1 = blockBase + tid + LOCAL_SIZE;
+    s_keys[tid]              = computeKey(g0);
+    s_keys[tid + LOCAL_SIZE] = computeKey(g1);
+    s_idx[tid]              = g0;
+    s_idx[tid + LOCAL_SIZE] = g1;
+
+    memoryBarrierShared();
+    barrier();
+
+    // 2. Bitonic merge steps in shared memory
+    for (uint j = startJ; j > 0u; j >>= 1u) {
+        uint group = tid / j;
+        uint pos   = tid % j;
+        uint e0    = group * 2u * j + pos;
+        uint e1    = e0 + j;
+
+        if (e1 < BLOCK_SIZE) {
+            // Sort direction based on GLOBAL index
+            bool ascending = (((blockBase + e0) & k) == 0u);
+            float k0 = s_keys[e0];
+            float k1 = s_keys[e1];
+
+            if ((ascending && k0 > k1) || (!ascending && k0 < k1)) {
+                s_keys[e0] = k1;
+                s_keys[e1] = k0;
+                uint tmp   = s_idx[e0];
+                s_idx[e0]  = s_idx[e1];
+                s_idx[e1]  = tmp;
+            }
+        }
+
+        memoryBarrierShared();
+        barrier();
+    }
+
+    // 3. Apply permutation: read from original positions, write to sorted positions
+    Particle p0 = (g0 < count) ? particles[s_idx[tid]]              : Particle(vec4(0), vec4(0), vec4(0), vec4(0));
+    Particle p1 = (g1 < count) ? particles[s_idx[tid + LOCAL_SIZE]] : Particle(vec4(0), vec4(0), vec4(0), vec4(0));
+
+    // All reads must complete before any writes (WAR hazard within the block)
+    barrier();
+
+    if (g0 < count) particles[g0] = p0;
+    if (g1 < count) particles[g1] = p1;
+}

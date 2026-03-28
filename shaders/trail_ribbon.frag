@@ -18,5 +18,6 @@ void main() {
     c.a *= ageFade;
 
     if (c.a < 0.005) discard;
+    c.rgb = min(c.rgb, vec3(4.0));
     outColor = c;
 }

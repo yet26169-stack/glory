@@ -17,11 +17,11 @@ public:
         float barWidth       = 64.0f;  // pixels at reference distance
         float barHeight      = 6.0f;
         float manaBarHeight  = 4.0f;
-        float yOffset        = 3.2f;   // fallback height for skinned/unknown entities
+        float yOffset        = 5.0f;   // fallback height for skinned/unknown entities
         float yPadding       = 0.3f;   // padding above model top (AABB-based entities)
-        float minionYOffset  = 1.5f;   // skinned minion entities
-        float championYOffset= 2.5f;   // skinned champion/hero entities
-        float monsterYOffset = 3.0f;   // jungle monster entities (reserved)
+        float minionYOffset  = 3.0f;   // skinned minion entities
+        float championYOffset= 4.5f;   // skinned champion/hero entities
+        float monsterYOffset = 5.0f;   // jungle monster entities (reserved)
         float minScreenSize  = 4.0f;   // skip if bar < this many pixels wide
         float borderSize     = 1.0f;
 

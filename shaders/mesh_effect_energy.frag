@@ -33,5 +33,6 @@ void main() {
     finalColor.a *= fragAlpha;
 
     if (finalColor.a < 0.005) discard;
+    finalColor.rgb = min(finalColor.rgb, vec3(3.0));
     outColor = finalColor;
 }

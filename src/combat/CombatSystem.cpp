@@ -2,12 +2,14 @@
 #include "ability/AbilityTypes.h"
 #include "audio/GameAudioEvents.h"
 #include "combat/CombatSystem.h"
+#include "combat/MinionWaveSystem.h"
 #include "combat/DissolveEffect.h"
 #include "combat/EconomySystem.h"
 #include "combat/HeroDefinition.h"
 #include "combat/RespawnSystem.h"
 #include "combat/StructureSystem.h"
 #include "core/FixedPoint.h"
+#include "core/Profiler.h"
 #include "fog/FogComponents.h"
 #include "scene/Components.h"
 #include "vfx/VFXEventQueue.h"
@@ -98,6 +100,7 @@ void CombatSystem::requestTrick(entt::entity attacker, entt::entity target,
 // ── Per-frame update ────────────────────────────────────────────────────────
 
 void CombatSystem::update(entt::registry& registry, float dt) {
+    GLORY_ZONE_N("CombatUpdate");
     auto view = registry.view<CombatComponent>();
     for (auto [entity, combat] : view.each()) {
         // Tick cooldowns
@@ -224,15 +227,16 @@ void CombatSystem::spawnAutoAttackProjectile(entt::registry& reg, entt::entity a
                                               entt::entity target, CombatComponent& combat) {
     if (!reg.valid(target) || !reg.all_of<TransformComponent>(target))
         return;
-
+    if (!reg.valid(attacker) || !reg.all_of<TransformComponent>(attacker))
+        return;
     auto& attackerPos = reg.get<TransformComponent>(attacker).position;
     auto& targetPos   = reg.get<TransformComponent>(target).position;
     glm::vec3 spawnPos = attackerPos + glm::vec3(0, 1.0f, 0); // spawn at chest height
 
     entt::entity proj = reg.create();
-    reg.emplace<TransformComponent>(proj, TransformComponent{spawnPos, glm::vec3(0), glm::vec3(1.0f)});
+    reg.emplace_or_replace<TransformComponent>(proj, TransformComponent{spawnPos, glm::vec3(0), glm::vec3(1.0f)});
     
-    auto& pc = reg.emplace<ProjectileComponent>(proj);
+    auto& pc = reg.emplace_or_replace<ProjectileComponent>(proj);
     pc.casterEntity = static_cast<EntityID>(entt::to_integral(attacker));
     pc.targetEntity = static_cast<EntityID>(entt::to_integral(target));
     pc.speed        = combat.projectileSpeed;
@@ -250,6 +254,8 @@ void CombatSystem::spawnAutoAttackProjectile(entt::registry& reg, entt::entity a
 void CombatSystem::applyAutoAttackHit(entt::registry& reg, entt::entity attacker,
                                        entt::entity target) {
     if (!reg.valid(target) || !reg.all_of<CombatComponent, TransformComponent>(target))
+        return;
+    if (!reg.valid(attacker) || !reg.all_of<TransformComponent>(attacker))
         return;
 
     auto& targetCombat = reg.get<CombatComponent>(target);
@@ -287,6 +293,19 @@ void CombatSystem::applyAutoAttackHit(entt::registry& reg, entt::entity attacker
             if (stats.base.currentHP <= 0.0f && m_economy) {
                 m_economy->awardKill(reg, attacker, target);
             }
+
+            // Call-for-help: champion-vs-champion aggro draws nearby allied minions
+            if (m_minionWaves) {
+                bool attackerIsChampion = !reg.all_of<MinionComponent>(attacker)
+                                       && !reg.all_of<MapComponent>(attacker)
+                                       && reg.all_of<TeamComponent, StatsComponent>(attacker);
+                bool victimIsChampion  = !reg.all_of<MinionComponent>(target)
+                                       && !reg.all_of<MapComponent>(target)
+                                       && reg.all_of<TeamComponent, StatsComponent>(target);
+                if (attackerIsChampion && victimIsChampion) {
+                    m_minionWaves->notifyHeroAttackedHero(reg, attacker, target);
+                }
+            }
         }
     }
 }
@@ -294,6 +313,8 @@ void CombatSystem::applyAutoAttackHit(entt::registry& reg, entt::entity attacker
 void CombatSystem::applyTrickHit(entt::registry& reg, entt::entity attacker,
                                   entt::entity target, CombatComponent& attackerCombat) {
     if (!reg.valid(target) || !reg.all_of<CombatComponent, TransformComponent>(target))
+        return;
+    if (!reg.valid(attacker) || !reg.all_of<TransformComponent>(attacker))
         return;
 
     auto& targetCombat = reg.get<CombatComponent>(target);
@@ -822,9 +843,17 @@ void RespawnSystem::update(entt::registry& reg, float dt) {
         }
     }
 
-    // Destroy dead minions
+    // Strip dead minions of all components instead of destroying them.
+    // reg.destroy() triggers entity storage swap_only tombstone recycling
+    // which can assert under heavy entity churn.  Orphaning the entity
+    // (removing every component) makes it invisible to all views while
+    // keeping the entity slot stable.
     for (auto e : toDestroy) {
-        if (reg.valid(e)) reg.destroy(e);
+        if (reg.valid(e)) {
+            for (auto&& [id, pool] : reg.storage()) {
+                pool.remove(e);
+            }
+        }
     }
 
     // Tick dissolve effects

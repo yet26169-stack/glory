@@ -239,6 +239,11 @@ Renderer::Renderer(Window& window) : m_window(window) {
     m_combatSystem->setEconomySystem(m_economySystem.get());
     m_projectileSystem->setEconomySystem(m_economySystem.get());
 
+    // Wire minion wave system so combat hits trigger call-for-help aggro
+    m_combatSystem->setMinionWaveSystem(m_minionWaveSystem.get());
+    m_projectileSystem->setMinionWaveSystem(m_minionWaveSystem.get());
+    m_minionWaveSystem->setCombatSystem(m_combatSystem.get());
+
     // ── Audio engine ─────────────────────────────────────────────────────
     m_audioEngine.init();
     m_audioResources = std::make_unique<AudioResourceManager>(m_audioEngine);
@@ -1020,7 +1025,7 @@ void Renderer::recordCommandBuffer(VkCommandBuffer cmd, uint32_t imageIndex, flo
         LightUBO light{};
         light.viewPos = m_isoCam.getPosition();
         light.lightCount = 1;
-        light.ambientStrength = 0.5f;
+        light.ambientStrength = 0.20f;
         light.lights[0].position = glm::vec3(100.0f, 60.0f, 100.0f);
         light.lights[0].color    = glm::vec3(1.0f, 0.95f, 0.85f);
         light.fogDensity = m_fogEnabled ? 0.015f : 0.0f;  // moderate — visible but not overpowering

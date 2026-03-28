@@ -114,5 +114,6 @@ void main() {
     }
 
     float waterAlpha = mix(0.45, 0.85, fresnel); // Face-on=transparent, glancing=opaque
-    outColor = vec4(waterColor + waterSpec, waterAlpha);
+    vec3 finalWater = min(waterColor + waterSpec, vec3(4.0));
+    outColor = vec4(finalWater, waterAlpha);
 }

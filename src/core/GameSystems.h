@@ -112,7 +112,7 @@ public:
 
     void execute(entt::registry& registry, float dt) override;
     std::vector<std::type_index> dependsOn() const override {
-        return {}; // No formal dependencies
+        return { std::type_index(typeid(AbilityUpdateSystem)) };
     }
     std::string_view name() const override { return "ProjectileUpdate"; }
 
@@ -180,7 +180,7 @@ public:
 
     void execute(entt::registry& registry, float dt) override;
     std::vector<std::type_index> dependsOn() const override {
-        return {}; // No formal dependencies
+        return { std::type_index(typeid(ProjectileUpdateSystem)) };
     }
     std::string_view name() const override { return "CombatUpdate"; }
 
@@ -198,28 +198,9 @@ public:
 
     void execute(entt::registry& registry, float dt) override;
     std::vector<std::type_index> dependsOn() const override {
-        return {}; // No formal dependencies
+        return { std::type_index(typeid(CombatUpdateSystem)) };
     }
     std::string_view name() const override { return "PhysicsUpdate"; }
-};
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// AnimationUpdateSystem — ticks all AnimationPlayer components
-// Depends on all movement systems (physics, combat, projectile).
-// ═══════════════════════════════════════════════════════════════════════════════
-class AnimationUpdateSystem : public ISystem {
-public:
-    AnimationUpdateSystem() = default;
-
-    void execute(entt::registry& registry, float dt) override;
-    std::vector<std::type_index> dependsOn() const override {
-        return {
-            std::type_index(typeid(PhysicsUpdateSystem)),
-            std::type_index(typeid(CombatUpdateSystem)),
-            std::type_index(typeid(ProjectileUpdateSystem)),
-        };
-    }
-    std::string_view name() const override { return "AnimationUpdate"; }
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -262,26 +243,6 @@ private:
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MinionWaveUpdateSystem — spawns lane minion waves, handles wave AI + movement
-// Runs early so fresh minions participate in combat the same tick.
-// ═══════════════════════════════════════════════════════════════════════════════
-class MinionWaveUpdateSystem : public ISystem {
-public:
-    MinionWaveUpdateSystem(MinionWaveSystem* waves, float* gameTime)
-        : m_waves(waves), m_gameTime(gameTime) {}
-
-    void execute(entt::registry& registry, float dt) override;
-    std::vector<std::type_index> dependsOn() const override {
-        return {}; // runs early — no dependencies
-    }
-    std::string_view name() const override { return "MinionWaveUpdate"; }
-
-private:
-    MinionWaveSystem* m_waves;
-    float*            m_gameTime;
-};
-
-// ═══════════════════════════════════════════════════════════════════════════════
 // RespawnUpdateSystem — detects unit death, runs respawn timers, destroys minions
 // Depends on CombatUpdate + StructureUpdate (needs final HP after all damage).
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -299,6 +260,49 @@ public:
 
 private:
     RespawnSystem* m_respawn;
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MinionWaveUpdateSystem — spawns lane minion waves, handles wave AI + movement
+// Must run after RespawnUpdate (dead entities orphaned before AI iteration).
+// ═══════════════════════════════════════════════════════════════════════════════
+class MinionWaveUpdateSystem : public ISystem {
+public:
+    MinionWaveUpdateSystem(MinionWaveSystem* waves, float* gameTime)
+        : m_waves(waves), m_gameTime(gameTime) {}
+
+    void execute(entt::registry& registry, float dt) override;
+    std::vector<std::type_index> dependsOn() const override {
+        return { std::type_index(typeid(CombatUpdateSystem)),
+                 std::type_index(typeid(StructureUpdateSystem)),
+                 std::type_index(typeid(RespawnUpdateSystem)) };
+    }
+    std::string_view name() const override { return "MinionWaveUpdate"; }
+
+private:
+    MinionWaveSystem* m_waves;
+    float*            m_gameTime;
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AnimationUpdateSystem — ticks all AnimationPlayer components
+// Depends on all movement + spawning systems so entity emplacement is complete.
+// ═══════════════════════════════════════════════════════════════════════════════
+class AnimationUpdateSystem : public ISystem {
+public:
+    AnimationUpdateSystem() = default;
+
+    void execute(entt::registry& registry, float dt) override;
+    std::vector<std::type_index> dependsOn() const override {
+        return {
+            std::type_index(typeid(PhysicsUpdateSystem)),
+            std::type_index(typeid(CombatUpdateSystem)),
+            std::type_index(typeid(ProjectileUpdateSystem)),
+            std::type_index(typeid(MinionWaveUpdateSystem)),
+            std::type_index(typeid(RespawnUpdateSystem)),
+        };
+    }
+    std::string_view name() const override { return "AnimationUpdate"; }
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════

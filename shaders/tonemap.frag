@@ -43,23 +43,29 @@ void main() {
     vec3 combined = hdr + bloom * pc.bloomStrength;
     combined *= pc.exposure;
 
+    // Debug mode: exposure == 0 → visualise raw HDR clamped to [0,1]
+    if (pc.exposure == 0.0) {
+        outColor = vec4(clamp(hdr, 0.0, 1.0), 1.0);
+        return;
+    }
+
     vec3 mapped = ACESFilm(combined);
 
     // ── LoL/SC2 Color Grading — LINEAR space (Rec.709 luminance is valid here) ─
     if (pc.enableColorGrade != 0u) {
         float luminance = dot(mapped, vec3(0.2126, 0.7152, 0.0722));
         // Shadows push toward a very subtle cool tint (avoid heavy purple wash)
-        vec3 shadowShift    = vec3(0.02, 0.01, 0.04);
+        vec3 shadowShift    = vec3(0.01, 0.005, 0.02);
         // Highlights push toward warm gold (LoL highlight palette)
-        vec3 highlightShift = vec3(0.06, 0.04, 0.0);
+        vec3 highlightShift = vec3(0.03, 0.02, 0.0);
         vec3 colorGrade = mapped + mix(shadowShift, highlightShift,
                                        smoothstep(0.2, 0.8, luminance));
-        mapped = mix(mapped, colorGrade, 0.25); // 25% grade intensity (was 40%)
+        mapped = mix(mapped, colorGrade, 0.15); // 15% grade intensity
     }
 
     // ── Saturation Boost — LINEAR space (SC2 midtone punch, mild 12%) ─────────
     float gray = dot(mapped, vec3(0.2126, 0.7152, 0.0722));
-    mapped = mix(vec3(gray), mapped, 1.12);
+    mapped = mix(vec3(gray), mapped, 1.05);
 
     // ── Vignette — LINEAR space, before gamma for consistent darkening ─────────
     if (pc.enableVignette != 0u) {
@@ -76,8 +82,9 @@ void main() {
         mapped = mix(mapped, grayColor, pc.desaturation);
     }
 
-    // ── Gamma correction LAST (swapchain is UNORM) ────────────────────────────
-    mapped = pow(mapped, vec3(1.0 / 2.2));
+    // Swapchain is VK_FORMAT_B8G8R8A8_SRGB — hardware applies sRGB gamma
+    // automatically, so do NOT apply manual pow(1/2.2) here (that would be
+    // double gamma correction, washing out the entire scene).
 
     outColor = vec4(mapped, 1.0);
 }
