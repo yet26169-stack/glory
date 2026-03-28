@@ -65,11 +65,16 @@ public:
     // Number of execution levels (available after build()).
     size_t levelCount() const { return m_levels.size(); }
 
+    // Per-system timing from the most recent tick (milliseconds, indexed by system).
+    float lastSystemTimeMs(size_t idx) const { return m_lastTimingsMs[idx]; }
+    const ISystem* system(size_t idx) const { return m_systems[idx].get(); }
+
 private:
     std::vector<std::unique_ptr<ISystem>> m_systems;
 
     // Each level is a set of system indices that can run in parallel.
     std::vector<std::vector<uint32_t>> m_levels;
+    std::vector<float> m_lastTimingsMs;  // per-system wall-clock time from last tick
     bool m_dirty = true;
 };
 

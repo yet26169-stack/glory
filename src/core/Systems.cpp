@@ -28,6 +28,7 @@
 #include "vfx/VFXRenderer.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <glm/glm.hpp>
 #include <latch>
@@ -990,6 +991,7 @@ void SystemScheduler::build() {
                       processed, N);
     }
 
+    m_lastTimingsMs.resize(N, 0.0f);
     m_dirty = false;
 
     // Log the schedule
@@ -1009,13 +1011,19 @@ void SystemScheduler::tick(entt::registry& registry, float dt, ThreadPool& pool)
     for (const auto& level : m_levels) {
         if (level.size() == 1) {
             // Single system — run directly, no threading overhead
+            auto t0 = std::chrono::high_resolution_clock::now();
             m_systems[level[0]]->execute(registry, dt);
+            auto t1 = std::chrono::high_resolution_clock::now();
+            m_lastTimingsMs[level[0]] = std::chrono::duration<float, std::milli>(t1 - t0).count();
         } else {
             // Multiple systems at this level — run in parallel
             std::latch done(static_cast<std::ptrdiff_t>(level.size()));
             for (uint32_t idx : level) {
                 pool.submit([this, idx, &registry, dt, &done]() {
+                    auto t0 = std::chrono::high_resolution_clock::now();
                     m_systems[idx]->execute(registry, dt);
+                    auto t1 = std::chrono::high_resolution_clock::now();
+                    m_lastTimingsMs[idx] = std::chrono::duration<float, std::milli>(t1 - t0).count();
                     done.count_down();
                 });
             }
@@ -1029,7 +1037,10 @@ void SystemScheduler::tickSequential(entt::registry& registry, float dt) {
 
     for (const auto& level : m_levels) {
         for (uint32_t idx : level) {
+            auto t0 = std::chrono::high_resolution_clock::now();
             m_systems[idx]->execute(registry, dt);
+            auto t1 = std::chrono::high_resolution_clock::now();
+            m_lastTimingsMs[idx] = std::chrono::duration<float, std::milli>(t1 - t0).count();
         }
     }
 }

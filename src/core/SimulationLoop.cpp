@@ -1,4 +1,5 @@
 #include "core/SimulationLoop.h"
+#include "core/Profiler.h"
 // All system types are forward-declared in GameSystems.h (via SimulationLoop.h).
 // Concrete includes needed for preTick / postTick subsystem calls.
 #include "ability/AbilitySystem.h"
@@ -18,6 +19,8 @@
 #include "combat/CombatComponents.h"
 
 #include <spdlog/spdlog.h>
+
+#include <chrono>
 
 namespace glory {
 
@@ -112,6 +115,8 @@ void SimulationLoop::tick(SimulationContext& ctx) {
 }
 
 void SimulationLoop::step(SimulationContext& ctx) {
+    GLORY_ZONE_N("SimulationStep");
+    auto stepStart = std::chrono::high_resolution_clock::now();
     const float dt = ctx.dt;  // save before tick() overrides to FIXED_DT_FLOAT
 
     // ── Pre-tick: housekeeping that must run before the ECS systems ──────
@@ -163,6 +168,21 @@ void SimulationLoop::step(SimulationContext& ctx) {
         ctx.fowGameplay->update(ctx.registry, *ctx.fogSystem, dt, Team::PLAYER);
         ctx.fogOfWar->updateVisibility(
             ctx.fogSystem->getVisibilityBuffer().data(), 128, 128);
+    }
+
+    // ── Frame-budget check: warn when sim step exceeds 20ms (50 fps) ─────
+    auto stepEnd = std::chrono::high_resolution_clock::now();
+    float totalMs = std::chrono::duration<float, std::milli>(stepEnd - stepStart).count();
+
+    static uint32_t budgetLogCounter = 0;
+    if (totalMs > 20.0f && (++budgetLogCounter % 60 == 1)) {
+        std::string detail;
+        for (size_t i = 0; i < m_scheduler.systemCount(); ++i) {
+            detail += fmt::format(" {}={:.1f}ms",
+                                  m_scheduler.system(i)->name(),
+                                  m_scheduler.lastSystemTimeMs(i));
+        }
+        spdlog::warn("[PerfBudget] Sim step {:.1f}ms —{}", totalMs, detail);
     }
 }
 
